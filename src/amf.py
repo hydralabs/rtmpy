@@ -117,7 +117,9 @@ class AMF0Parser:
             return obj
 
         elif type == AMF0Types.AMF3:
-            raise NotImplementedError()
+            p = AMF3Parser()
+            p.input = self.input
+            return p.readElement()
 
         else:
             raise ValueError("Unknown AMF0 type 0x%02x at %d" % (type, self.input.tell()-1))
@@ -175,13 +177,19 @@ class AMF3Types:
     XMLSTRING       = 0x0b
     BYTEARRAY       = 0x0c
 
+class AMF3ObjectTypes:
+    PROPERTY = 0x00
+    EXTERNALIZABLE = 0x01
+    VALUE = 0x02
+
 class AMF3Parser:
 
-    def __init__(self, data):
+    def __init__(self, data=None):
         self.obj_refs = list()
         self.str_refs = list()
         self.class_refs = list()
-        self.input = ByteStream(data)
+        if data:
+            self.input = ByteStream(data)
 
     def readElement(self):
         type = self.input.read_uchar()
@@ -216,13 +224,13 @@ class AMF3Parser:
             return self.readArray()
         
         if type == AMF3Types.OBJECT:
-            raise NotImplementedError()
+            return self.readObject()
         
         if type == AMF3Types.XMLSTRING:
-            raise NotImplementedError()
+            return self.readString(use_references=False)
         
         if type == AMF3Types.BYTEARRAY:
-            raise NotImplementedError()
+            raise self.readByteArray()
         
         else:
             raise ValueError("Unknown AMF3 type 0x%02x at %d" % (type, self.input.tell()-1))
@@ -308,7 +316,65 @@ class AMF3Parser:
         return result
     
     def readObject(self):
-        pass # TODO
+        type = self.input.read_ushort()
+        if type & 0x01 == 0:
+            return self.obj_refs[type >> 1]
+        class_ref = (type >> 1) & 0x01 == 0
+        type >>= 2
+        if class_ref:
+            class_ = self.class_refs[type]
+        else:
+            class_ = AMF3Class()
+            class_.name = self.readString()
+            class_.encoding = (type >> 1) & 0x03
+            class_.attrs = []
+        
+        if class_.class_name:
+            # TODO : do some class mapping?
+            obj = AMF3Object(class_name)
+        else:
+            obj = AMF3Object()
+        
+        self.obj_refs.append(obj)
+        
+        if class_.encoding == AMF3ObjectTypes.EXTERNALIZABLE:
+            if not class_ref:
+                self.class_refs.append(class_)
+            # TODO: implement externalizeable interface here
+            obj.__amf_externalized_data = self.readElement()
+        else:
+            if class_.encoding == AMF3ObjectTypes.VALUE:
+                if not class_ref:
+                    self.class_refs.append(class_)
+                    attr = self.readString()
+                    while attr != "":
+                        class_.attrs.append(attr)
+                        obj.setattr(attr, self.readElement())
+                        attr = self.readString()
+                else:
+                    if not class_ref:
+                        for i in range(type):
+                            class_.attrs.append(self.readString())
+                        self.class_refs.append(class_)
+                    for attr in class_.attrs:
+                        obj.setattr(attr, self.readElement())
+        
+        return obj
+
+    def readByteArray(self):
+        length = self.input.read_ushort()
+        return self.input.read(length >> 1)
+    
+
+class AMF3Class:
+    def __init__(self, name=None, encoding=None, attrs=None):
+        self.name = name
+        self.encoding = encoding
+        self.attrs = attrs
+
+class AMF3Object:
+    def __init__(self, class_name=None):
+        self.__amf_class = class_name
 
 class AMFMessageParser:
     
