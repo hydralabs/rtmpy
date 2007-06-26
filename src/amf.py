@@ -243,6 +243,7 @@ class AMF3Parser:
         while b & 0x80 and n < 3:
             result <<= 7
             result |= b & 0x7f
+            b = self.input.read_uchar()
             n += 1
         if n < 3:
             result <<= 7
@@ -256,7 +257,7 @@ class AMF3Parser:
         return result
     
     def readString(self, use_references=True):
-        length = self.input.read_ushort()
+        length = self.readInteger()
         if use_references and length & 0x01 == 0:
             return self.str_refs[length >> 1]
         
@@ -280,7 +281,7 @@ class AMF3Parser:
         return ET.fromstring(data)
     
     def readDate(self):
-        ref = self.input.read_ushort()
+        ref = self.readInteger()
         if ref & 0x01 == 0:
             return self.obj_refs[ref >> 1]
         ms = self.input.read_double()
@@ -289,7 +290,7 @@ class AMF3Parser:
         return result
     
     def readArray(self):
-        size = self.input.read_ushort()
+        size = self.readInteger()
         if size & 0x01 == 0:
             return self.obj_refs[size >> 1]
         size >>= 1
@@ -316,7 +317,7 @@ class AMF3Parser:
         return result
     
     def readObject(self):
-        type = self.input.read_ushort()
+        type = self.readInteger()
         if type & 0x01 == 0:
             return self.obj_refs[type >> 1]
         class_ref = (type >> 1) & 0x01 == 0
@@ -326,43 +327,45 @@ class AMF3Parser:
         else:
             class_ = AMF3Class()
             class_.name = self.readString()
-            class_.encoding = (type >> 1) & 0x03
+            class_.encoding = type & 0x03
             class_.attrs = []
         
-        if class_.class_name:
+        type >>= 2
+        
+        if class_.name:
             # TODO : do some class mapping?
-            obj = AMF3Object(class_name)
+            obj = AMF3Object(class_)
         else:
             obj = AMF3Object()
         
         self.obj_refs.append(obj)
         
-        if class_.encoding == AMF3ObjectTypes.EXTERNALIZABLE:
+        if class_.encoding & AMF3ObjectTypes.EXTERNALIZABLE:
             if not class_ref:
                 self.class_refs.append(class_)
             # TODO: implement externalizeable interface here
             obj.__amf_externalized_data = self.readElement()
         else:
-            if class_.encoding == AMF3ObjectTypes.VALUE:
+            if class_.encoding & AMF3ObjectTypes.VALUE:
                 if not class_ref:
                     self.class_refs.append(class_)
+                attr = self.readString()
+                while attr != "":
+                    class_.attrs.append(attr)
+                    setattr(obj, attr, self.readElement())
                     attr = self.readString()
-                    while attr != "":
-                        class_.attrs.append(attr)
-                        obj.setattr(attr, self.readElement())
-                        attr = self.readString()
-                else:
-                    if not class_ref:
-                        for i in range(type):
-                            class_.attrs.append(self.readString())
-                        self.class_refs.append(class_)
-                    for attr in class_.attrs:
-                        obj.setattr(attr, self.readElement())
+            else:
+                if not class_ref:
+                    for i in range(type):
+                        class_.attrs.append(self.readString())
+                    self.class_refs.append(class_)
+                for attr in class_.attrs:
+                    setattr(obj, attr, self.readElement())
         
         return obj
 
     def readByteArray(self):
-        length = self.input.read_ushort()
+        length = self.readInteger()
         return self.input.read(length >> 1)
     
 
@@ -373,8 +376,13 @@ class AMF3Class:
         self.attrs = attrs
 
 class AMF3Object:
-    def __init__(self, class_name=None):
-        self.__amf_class = class_name
+    def __init__(self, class_=None):
+        self.__amf_class = class_
+    
+    def __repr__(self):
+        return "<AMF3Object [%s] at 0x%08X>" % (
+            self.__amf_class and self.__amf_class.name or "no class",
+            id(self))
 
 class AMFMessageParser:
     
@@ -461,8 +469,13 @@ if __name__ == "__main__":
             data = f.read()
             f.close()
             p = AMFMessageParser(data)
-            print "=" * 40
-            print "Parsing", fname
-            obj = p.parse()
-            print repr(obj)
+            #print "=" * 40
+            print "Parsing", fname.rsplit("\\",1)[-1], 
+            try:
+                obj = p.parse()
+            except:
+                print "   ---> FAILED"
+            else:
+                print "   ---> OK"
+            #print repr(obj)
     
