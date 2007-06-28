@@ -10,6 +10,9 @@ setup(name = "RTMPy",
     url = "http://dev.collab.com/rtmpy",
     packages = find_packages('src'),
     package_dir = {'':'src'},
+    install_requires = [
+        'Twisted>=2.5'
+    ],
     license = "MIT License",
     classifiers = [
         "Development Status :: 2 - Pre-Alpha",
