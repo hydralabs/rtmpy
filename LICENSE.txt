@@ -1,4 +1,4 @@
-Copyright (c) 2007
+Copyright (c) The RTMPy Project, 2007
 
 Arnar Birgisson
 Thijs Triemstra
