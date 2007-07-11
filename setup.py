@@ -8,8 +8,7 @@ setup(name = "RTMPy",
     version = "0.0.1",
     description = "RTMP and AMF client/server Twisted implementation",
     url = "http://dev.collab.com/rtmpy",
-    packages = find_packages('src'),
-    package_dir = {'':'src'},
+    packages = ["rtmpy"],
     install_requires = [
         'Twisted>=2.5'
     ],
