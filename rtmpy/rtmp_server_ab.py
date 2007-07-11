@@ -30,69 +30,38 @@ States = Enum('HANDSHAKE', 'HANDSHAKE_VERIFY', 'RTMP')
 
 class RTMPTypes:
     """Class for AMF and RTMP marker values constants."""
-    # RTMP chunk size constant
     CHUNK_SIZE  =               0x01
     # Unknown:                  0x02
-    # Send every x bytes read by both sides
     BYTES_READ  =               0x03
-    # Ping is a stream control message, has subtypes
     PING        =               0x04
-    # Server (downstream) bandwidth marker
     SERVER_BW   =               0x05
-    # Client (upstream) bandwidth marker
     CLIENT_BW   =               0x06
     # Unknown:                  0x07
-    # Audio data marker
     AUDIO_DATA  =               0x08
-    # Video data marker
     VIDEO_DATA  =               0x09
     # Unknown:                  0x0A ... 0x0F
-    # AMF3 shared object
     FLEX_SHARED_OBJECT =        0x10
-    # AMF3 message
     FLEX_MESSAGE =              0x11
-    # Notification is invocation without response
     NOTIFY      =               0x12
-    # Stream metadata
     STREAM_METADATA =           0x12
-    # Shared Object marker
     SO          =               0x13
-    # Invoke operation (remoting call but also used
-    # for streaming) marker
     INVOKE      =               0x14
-    # New header marker
     HEADER_NEW =                0x00
-    # Same source marker
     SAME_SOURCE =               0x01
-    # Timer change marker
     HEADER_TIMER_CHANGE =       0x02
-    # There's more to encode
     HEADER_CONTINUE =           0x03
-    # Client Shared Object data update
     CLIENT_UPDATE_DATA =        0x04
-    # Client Shared Object attribute update
     CLIENT_UPDATE_ATTRIBUTE =   0x05
-    # Send Shared Object message flag
     CLIENT_SEND_MESSAGE =       0x06
-    # Shared Object status marker
     CLIENT_STATUS =             0x07
-    # Shared Object status marker
     CLIENT_CLEAR_DATA =         0x08
-    # Delete data for Shared Object
     CLIENT_DELETE_DATA =        0x09
-    # Initial Shared Object data flag
     CLIENT_INITIAL_DATA =       0x0B
-    # Shared Object connection
     SO_CONNECT =                0x01
-    # Shared Object disconnect
     SO_DISCONNECT =             0x02
-    # Set Shared Object attribute flag
     SET_ATTRIBUTE =             0x03
-    # Send message flag
     SEND_MESSAGE =              0x06
-    # Shared Object attribute deletion flag
     DELETE_ATTRIBUTE =          0x0A
-    #
     ACTION_CONNECT =            "connect"
     ACTION_DISCONNECT =         "disconnect"
     ACTION_CREATE_STREAM =      "createStream"
@@ -109,15 +78,10 @@ class RTMPTypes:
     
 class RTMPHeader:
     def __init__(self, channel):
-        # Channel
         self.channel = channel
-        # Timer
         self.timer = None
-        # Header size
         self.size = None
-        # Type of data
         self.type = None
-        # Stream id
         self.streamId = None
     
     def __repr__(self):
@@ -145,6 +109,16 @@ class SharedObjectTypeMapping:
         return ("<SharedObjectTypeMapping type=%r>"
                 % ("server connect"))
 
+class Notify:
+    def __init__(self, call):
+        self.call = call
+        self.data = None
+        self.invokeId = 0
+    
+    def __repr__(self):
+        return ("<Notify call=%r invokeId=%r>"
+                % (self.call, self.invokeId))
+    
 ### RTMP Protocol Implementation
 
 class RTMPProtocol(Protocol):
@@ -419,56 +393,56 @@ class RTMPProtocol(Protocol):
         
     def decodeChunkSize(self, data):
         # TODO
-        return data;
+        return data
 
     def decodeInvoke(self, data, state):
         # TODO
-        return state;
+        return state
 
     def decodeNotify(self, data, header, state):
         # TODO
-        return data;
+        return data
     
     def decodeStreamMetadata(self, data):
         # TODO
-        return data;
+        return data
 
     def decodeBytesRead(self, data):
         # TODO
-        return data;
+        return data
 
     def decodeAudioData(self, data):
         # TODO
-        return data;
-
+        return data
+    
     def decodeVideoData(self, data):
         # TODO
-        return data;
+        return data
 
     def decodeFlexSharedObject(self, data, state):
         # TODO
-        return data;
+        return data
 
     def decodeSharedObject(self, data, state):
         # TODO
-        return data;
+        return data
 
     def decodeServerBW(self, data):
         # TODO
-        return data;
-    
+        return data
+
     def decodeClientBW(self, data):
         # TODO
-        return data;
+        return data
 
     def decodeFlexMessage(self, data, state):
         # TODO
-        return data;
+        return data
 
     def decodeUnknown(self, headerType, data):
         # TODO
         warning("Unknown object type: %s", headerType)
-        return data;
+        return data
     
 class RTMPServerFactory(protocol.ServerFactory):
     protocol = RTMPProtocol
