@@ -44,13 +44,6 @@ class AMF0Parser:
         self.obj_refs = list()
         self.input = ByteStream(data)
 
-    def parse(self):
-        # TODO: remove this?
-        elements = []
-        while self.input.peek() is not None:
-            elements.append(self.readElement())
-        return elements
-    
     def readElement(self):
         """Reads the data type."""
         type = self.input.read_uchar()
@@ -60,11 +53,9 @@ class AMF0Parser:
             return self.input.read_double()
 
         elif type == AMF0Types.BOOL:
-            # Reads a boolean
             return bool(self.input.read_uchar())
 
         elif type == AMF0Types.STRING:
-            # Reads string from buffer
             return self.readString()
 
         elif type == AMF0Types.OBJECT:
@@ -74,7 +65,6 @@ class AMF0Parser:
             raise NotImplementedError()
 
         elif type == AMF0Types.NULL:
-            # Reads a null
             return None
 
         elif type == AMF0Types.UNDEFINED:
@@ -105,7 +95,6 @@ class AMF0Parser:
             return obj
 
         elif type == AMF0Types.DATE:
-            # Returns a date
             return readDate()
 
         elif type == AMF0Types.LONGSTRING:
@@ -133,12 +122,10 @@ class AMF0Parser:
             raise ValueError("Unknown AMF0 type 0x%02x at %d" % (type, self.input.tell()-1))
 
     def readString(self):
-        # Reads a string
         len = self.input.read_ushort()
         return self.input.read_utf8_string(len)
 
     def readObject(self):
-        # Reads start object
         obj = dict()
         self.obj_refs.append(obj)
         key = self.readString()
@@ -149,7 +136,6 @@ class AMF0Parser:
         return obj
     
     def readReference(self):
-        # Reads Reference
         idx = self.input.read_ushort()
         return self.obj_refs[idx]
 
@@ -181,54 +167,45 @@ class AMF0Parser:
 
 class AMF3Types:
     UNDEFINED       =           0x00
-    # Null marker
     NULL            =           0x01
-    # Boolean false marker
     BOOL_FALSE      =           0x02
-    # Boolean true marker
     BOOL_TRUE       =           0x03
-    # Integer marker
     INTEGER         =           0x04
-    # Number marker
     NUMBER          =           0x05
-    # String marker
     STRING          =           0x06
     # TODO: not defined on site, says it's only XML type,
     # so we'll assume it is for the time being..
     XML             =           0x07
-    # Date marker
     DATE            =           0x08
-    # Array start marker
     ARRAY           =           0x09
-    # Object start marker
     OBJECT          =           0x0a
-    # XML start marker
     XMLSTRING       =           0x0b
-    # 
     BYTEARRAY       =           0x0c
     # Unkown        =           0x0d   
 
 class AMF3ObjectTypes:
-    """Property list encoding.
-    The remaining integer-data represents the number of
-    class members that exist. The property names are read
-    as string-data. The values are then read as AMF3-data.
-    """
+    # Property list encoding.
+    # The remaining integer-data represents the number of
+    # class members that exist. The property names are read
+    # as string-data. The values are then read as AMF3-data.
     PROPERTY = 0x00
-    """Externalizable object.
-    What follows is the value of the "inner" object,
-    including type code. This value appears for objects
-    that implement IExternalizable, such as
-    ArrayCollection and ObjectProxy."""
+
+    # Externalizable object.
+    # What follows is the value of the "inner" object,
+    # including type code. This value appears for objects
+    # that implement IExternalizable, such as
+    # ArrayCollection and ObjectProxy.
     EXTERNALIZABLE = 0x01
-    """Name-value encoding.
-    The property names and values are encoded as string-data
-    followed by AMF3-data until there is an empty string
-    property name. If there is a class-def reference there
-    are no property names and the number of values is equal
-    to the number of properties in the class-def."""
+    
+    # Name-value encoding.
+    # The property names and values are encoded as string-data
+    # followed by AMF3-data until there is an empty string
+    # property name. If there is a class-def reference there
+    # are no property names and the number of values is equal
+    # to the number of properties in the class-def.
     VALUE = 0x02
-    """Proxy object."""
+    
+    # Proxy object
     PROXY = 0x03
 
 class AMF3Parser:
@@ -285,8 +262,7 @@ class AMF3Parser:
             raise ValueError("Unknown AMF3 datatype 0x%02x at %d" % (type, self.input.tell()-1))
     
     def readInteger(self):
-        """Parser of AMF3 "compressed" integer data type.
-           see http://osflash.org/amf3/parsing_integers"""
+        # see http://osflash.org/amf3/parsing_integers for AMF3 integer data format
         n = 0
         b = self.input.read_uchar()
         result = 0
@@ -309,7 +285,6 @@ class AMF3Parser:
         return result
     
     def readString(self, use_references=True):
-        """Reads a string."""
         length = self.readInteger()
         if use_references and length & 0x01 == 0:
             return self.str_refs[length >> 1]
