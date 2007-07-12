@@ -15,12 +15,12 @@ class ByteStream(StringIO):
     def __init__(self, *args, **kwargs):
         StringIO.__init__(self, *args, **kwargs)
 
-    def read(self, len=-1):
-        if self.at_eof():
+    def read(self, length=-1):
+        if length > 0 and self.at_eof():
             raise EOFError
-        if len > 0 and self.tell() + len > self.len:
-            len = self.len - self.tell()
-        return StringIO.read(self, len)
+        if length > 0 and self.tell() + length > self.len:
+            length = self.len - self.tell()
+        return StringIO.read(self, length)
 
     def peek(self):
         if self.at_eof():
@@ -59,8 +59,8 @@ class ByteStream(StringIO):
     def read_double(self):
         return struct.unpack("!d", self.read(8))[0]
     
-    def read_utf8_string(self, len):
-        str = struct.unpack("%ds" % len, self.read(len))[0]
+    def read_utf8_string(self, length):
+        str = struct.unpack("%ds" % length, self.read(length))[0]
         return unicode(str, "utf8")
 
 # Enum from python cookbook

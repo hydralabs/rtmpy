@@ -42,7 +42,10 @@ class AMF0Parser:
 
     def __init__(self, data):
         self.obj_refs = list()
-        self.input = ByteStream(data)
+        if isinstance(data, ByteStream):
+            self.input = data
+        else:
+            self.input = ByteStream(data)
 
     def readElement(self):
         """Reads the data type."""
@@ -114,8 +117,7 @@ class AMF0Parser:
             return obj
 
         elif type == AMF0Types.AMF3:
-            p = AMF3Parser()
-            p.input = self.input
+            p = AMF3Parser(self.input)
             return p.readElement()
 
         else:
@@ -210,11 +212,13 @@ class AMF3ObjectTypes:
 
 class AMF3Parser:
 
-    def __init__(self, data=None):
+    def __init__(self, data):
         self.obj_refs = list()
         self.str_refs = list()
         self.class_refs = list()
-        if data:
+        if isinstance(data, ByteStream):
+            self.input = data
+        else:
             self.input = ByteStream(data)
 
     def readElement(self):
@@ -437,7 +441,7 @@ class AMFMessageParser:
             header.name = self.input.read_utf8_string(name_len)
             header.required = bool(self.input.read_uchar())
             msg.length = self.input.read_ulong()
-            header.data = parser_class(self.input.read(msg.length)).readElement()
+            header.data = parser_class(self.input).readElement()
             msg.headers.append(header)
         
         bodies_count = self.input.read_short()
@@ -448,7 +452,7 @@ class AMFMessageParser:
             response_len = self.input.read_ushort()
             body.response = self.input.read_utf8_string(response_len)
             body.length = self.input.read_ulong()
-            body.data = parser_class(self.input.read(body.length)).readElement()
+            body.data = parser_class(self.input).readElement()
             msg.bodies.append(body)
         
         return msg
@@ -502,6 +506,7 @@ if __name__ == "__main__":
             try:
                 obj = p.parse()
             except:
+                raise
                 print "   ---> FAILED"
             else:
                 print "   ---> OK"
