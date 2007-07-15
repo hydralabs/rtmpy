@@ -1,4 +1,10 @@
-Copyright (c) The RTMPy Project, 2007
+RTMPy is available under the terms of the MIT license.  The full text
+of the MIT license is included below.
+
+MIT License
+===========
+
+Copyright (c) 2007 The RTMPy Project. All rights reserved.
 
 Arnar Birgisson
 Thijs Triemstra
