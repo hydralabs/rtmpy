@@ -122,18 +122,24 @@ class Notify:
 ### RTMP Protocol Implementation
 
 class RTMPProtocol(Protocol):
-    
-    def connectionMade(self):
+
+    def __init__(self):
         self.chunkSize = DEFAULT_CHUNK_SIZE
+                
+    def connectionMade(self):
         self.buffer = None
         self.bytesNeeded = 0
         self.lastReadHeader = dict() # indexed on channel name
         self.incompletePackets = dict() # indexed on channel name
         self.state = States.HANDSHAKE
+        info("Connected to %s." % (self.transport.getPeer( ).host))
         if self.factory.mode == Modes.CLIENT:
             # begin handshake for client
             self.beginHandshake()
 
+    def connectionLost(self, reason):
+        info("Connection with %s closed." % self.transport.getPeer( ).host)
+        
     def dataReceived(self, data):
         if self.factory.mode == Modes.SERVER:
             if self.state == States.HANDSHAKE:
