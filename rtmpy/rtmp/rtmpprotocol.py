@@ -5,22 +5,95 @@ from twisted.internet import reactor, protocol
 
 import util
 from util import ByteStream, hexdump, Enum, uptime
-from message.constants import Constants
-from message.header import RTMPHeader
-from message.packet import RTMPPacket
-from event.notify import Notify
-from status.statusobject import StatusObject
-from status.statuscodes import StatusCodes
+
+from statuscodes import StatusCodes
 import amf
 
 Modes = Enum('SERVER', 'CLIENT')
-States = Enum('HANDSHAKE', 'HANDSHAKE_VERIFY', 'RTMP')
+States = Enum('CONNECT', 'HANDSHAKE', 'HANDSHAKE_VERIFY', 'CONNECTED', 'ERROR', 'DISCONNECTED')
 
+class Constants:
+    """AMF and RTMP marker values constants"""
+    maxHandshakeTimeout = 5000
+    HANDSHAKE_SIZE = 1536
+    DEFAULT_CHUNK_SIZE = 128
+    
+    CHUNK_SIZE  =               0x01
+    # Unknown:                  0x02
+    BYTES_READ  =               0x03
+    PING        =               0x04
+    SERVER_BW   =               0x05
+    CLIENT_BW   =               0x06
+    # Unknown:                  0x07
+    AUDIO_DATA  =               0x08
+    VIDEO_DATA  =               0x09
+    # Unknown:                  0x0A ... 0x0F
+    FLEX_SHARED_OBJECT =        0x10
+    FLEX_MESSAGE =              0x11
+    NOTIFY      =               0x12
+    STREAM_METADATA =           0x12
+    SO          =               0x13
+    INVOKE      =               0x14
+    HEADER_NEW =                0x00
+    SAME_SOURCE =               0x01
+    HEADER_TIMER_CHANGE =       0x02
+    HEADER_CONTINUE =           0x03
+    CLIENT_UPDATE_DATA =        0x04
+    CLIENT_UPDATE_ATTRIBUTE =   0x05
+    CLIENT_SEND_MESSAGE =       0x06
+    CLIENT_STATUS =             0x07
+    CLIENT_CLEAR_DATA =         0x08
+    CLIENT_DELETE_DATA =        0x09
+    CLIENT_INITIAL_DATA =       0x0B
+    SO_CONNECT =                0x01
+    SO_DISCONNECT =             0x02
+    SET_ATTRIBUTE =             0x03
+    SEND_MESSAGE =              0x06
+    DELETE_ATTRIBUTE =          0x0A
+    ACTION_CONNECT =            "connect"
+    ACTION_DISCONNECT =         "disconnect"
+    ACTION_CREATE_STREAM =      "createStream"
+    ACTION_DELETE_STREAM =      "deleteStream"
+    ACTION_CLOSE_STREAM =       "closeStream"
+    ACTION_RELEASE_STREAM =     "releaseStream"
+    ACTION_PUBLISH =            "publish"
+    ACTION_PAUSE =              "pause"
+    ACTION_SEEK =               "seek"
+    ACTION_PLAY =               "play"
+    ACTION_STOP =               "disconnect"
+    ACTION_RECEIVE_VIDEO =      "receiveVideo"
+    ACTION_RECEIVE_AUDIO =      "receiveAudio"
+
+class RTMPHeader:
+    def __init__(self, channel, timer=0, size=None, type=None, streamId=0):
+        self.channel = channel
+        self.timer = timer
+        self.size = size
+        self.type = type
+        self.streamId = streamId
+    
+    def __repr__(self):
+        return ("<RTMPHeader channel=%r timer=%r size=%r type=%r (0x%02x) streamId=%r>"
+                % (self.channel, self.timer, self.size, self.type, self.type or 0, self.streamId))
+
+class RTMPPacket:
+    """ RTMP packet. Consists of packet header, data and event context."""
+    def __init__(self, header, data, message=None):
+        self.header = header
+        self.data = data
+        self.message = message
+    
+    def __repr__(self):
+        return ("<RTMPPacket message=%r header=%r>"
+                % (self.message, self.header))
+    
 class RTMPProtocol(protocol.Protocol):
 
     def __init__(self):
         self.chunkSize = Constants.DEFAULT_CHUNK_SIZE
         self.handShake = Constants.HANDSHAKE_SIZE
+        self.mode = Modes.SERVER
+        self.state = States.CONNECT
         # initialize the uptime
         uptime()
                 
@@ -31,8 +104,9 @@ class RTMPProtocol(protocol.Protocol):
         self.lastReadHeader = dict() # indexed on channel name
         self.incompletePackets = dict() # indexed on channel name
         self.state = States.HANDSHAKE
+        self.mode = self.factory.mode
         info("Client connecting to %s." % (self.transport.getPeer( ).host))
-        if self.factory.mode == Modes.CLIENT:
+        if self.mode == Modes.CLIENT:
             # begin handshake for client
             self.beginHandshake()
 
@@ -40,7 +114,7 @@ class RTMPProtocol(protocol.Protocol):
         info("Connection with %s closed." % self.transport.getPeer( ).host)
         
     def dataReceived(self, data):
-        if self.factory.mode == Modes.SERVER:
+        if self.mode == Modes.SERVER:
             if self.state == States.HANDSHAKE:
                 debug("Handshake 2nd phase")
                 debug("Handshake size: %d", len(data))
@@ -59,7 +133,7 @@ class RTMPProtocol(protocol.Protocol):
                 if not self._verifyHandshake(data[:self.handShake], self._my_hs_uptime):
                     raise Exception("Handshake verify failed")
                 debug("Server finished handshake")
-                self.state = States.RTMP
+                self.state = States.CONNECTED
                 if len(data) > self.handShake:
                     self.dataReceived(data[self.handShake:]) # put any extra data back through
             else:
@@ -85,7 +159,7 @@ class RTMPProtocol(protocol.Protocol):
                     raise Exception("Handshake verify failed")
                 self.transport.write(server_hs)
                 debug("Client finished handshake")
-                self.state = States.RTMP
+                self.state = States.CONNECTED
                 assert len(rest) == 0
                 #if len(rest):
                 #    self.dataReceived(data) # put the remaining data back through here
@@ -338,3 +412,57 @@ class RTMPProtocol(protocol.Protocol):
         packet = RTMPPacket(header, stream, notify)
         debug("Sending RTMP packet: %r", packet)
         
+class StatusObject:
+    """ Status object that is sent to client with every status event."""
+    def __init__(self, code, level, description=None):
+        self.code = code
+        self.level = level
+        self.description = description
+    
+    def __repr__(self):
+        return ("<StatusObject code=%r level=%r description=%r>"
+                % (self.code, self.level, self.description))
+
+class Notify:
+    """ Stream notification event."""
+    def __init__(self):
+        self.name = None
+        self.id = None
+        self.argv = None
+    
+    def __repr__(self):
+        return ("<Notify name=%r id=%r argv=%r>"
+                % (self.name, self.id, self.argv))
+
+class Ping:
+    """ Ping event, actually combination of different events"""
+    def __init__(self):
+        self.value1 = None
+        self.value2 = None
+        self.value3 = None
+        self.value4 = None
+    
+    def __repr__(self):
+        return ("<Ping value1=%r value2=%r value3=%r value4=%r>"
+                % (self.value1, self.value2, self.value3, self.value4))
+    
+class SharedObjectTypeMapping:
+    """Shared Object event types mapping"""
+    def __init__(self):
+        # Types map
+        self.typeMap = ["SERVER_CONNECT"]
+        
+    def toType(self, rtmpType):
+        """Convert byte value of RTMP marker to event type"""
+        # Return corresponding Shared Object event type
+        return self.typeMap[rtmpType]
+
+    def toByte(self, type):
+        """Convert SO event type to byte representation that RTMP uses"""
+        # Return byte representation of given event type
+        return 0x01
+    
+    def __repr__(self, type):
+        """String representation of type"""
+        return ("<SharedObjectTypeMapping type=%r>"
+                % ("server connect"))
