@@ -7,6 +7,7 @@
 
 import struct
 import datetime
+from types import *
 
 try:
     import xml.etree.ElementTree as ET
@@ -167,6 +168,25 @@ class AMF0Parser:
         data = readLongString()
         return ET.fromstring(data)
 
+class AMF0Encoder:
+
+    def __init__(self, data):
+        if isinstance(data, ByteStream):
+            self.output = data
+        else:
+            self.output = ByteStream(data)
+        
+    def writeElement(self, input):
+        """Writes the data type."""
+        if isinstance(input, StringTypes):
+            return self.writeString()
+
+        elif isinstance(input, BooleanType):
+            return bool(self.input.read_uchar())
+                
+    def writeString(self):
+        return None
+    
 class AMF3Types:
     UNDEFINED       =           0x00
     NULL            =           0x01
@@ -454,6 +474,16 @@ class AMFMessageParser:
             body.length = self.input.read_ulong()
             body.data = parser_class(self.input).readElement()
             msg.bodies.append(body)
+        
+        return msg
+
+class AMFMessageEncoder:
+    
+    def __init__(self, data):
+        self.input = ByteStream(data)
+    
+    def encode(self):
+        msg = AMFMessage()
         
         return msg
 

@@ -1,10 +1,10 @@
 class RTMPHeader:
-    def __init__(self, channel):
+    def __init__(self, channel, timer=0, size=None, type=None, streamId=0):
         self.channel = channel
-        self.timer = None
-        self.size = None
-        self.type = None
-        self.streamId = None
+        self.timer = timer
+        self.size = size
+        self.type = type
+        self.streamId = streamId
     
     def __repr__(self):
         return ("<RTMPHeader channel=%r timer=%r size=%r type=%r (0x%02x) streamId=%r>"

@@ -7,6 +7,11 @@ import util
 from util import ByteStream, hexdump, Enum, uptime
 from message.constants import Constants
 from message.header import RTMPHeader
+from message.packet import RTMPPacket
+from event.notify import Notify
+from status.statusobject import StatusObject
+from status.statuscodes import StatusCodes
+import amf
 
 Modes = Enum('SERVER', 'CLIENT')
 States = Enum('HANDSHAKE', 'HANDSHAKE_VERIFY', 'RTMP')
@@ -15,16 +20,18 @@ class RTMPProtocol(protocol.Protocol):
 
     def __init__(self):
         self.chunkSize = Constants.DEFAULT_CHUNK_SIZE
+        self.handShake = Constants.HANDSHAKE_SIZE
         # initialize the uptime
         uptime()
                 
     def connectionMade(self):
-        self.buffer = None
+        self.input = None
+        self.output = None
         self.bytesNeeded = 0
         self.lastReadHeader = dict() # indexed on channel name
         self.incompletePackets = dict() # indexed on channel name
         self.state = States.HANDSHAKE
-        info("Connected to %s." % (self.transport.getPeer( ).host))
+        info("Client connecting to %s." % (self.transport.getPeer( ).host))
         if self.factory.mode == Modes.CLIENT:
             # begin handshake for client
             self.beginHandshake()
@@ -36,7 +43,7 @@ class RTMPProtocol(protocol.Protocol):
         if self.factory.mode == Modes.SERVER:
             if self.state == States.HANDSHAKE:
                 debug("Handshake 2nd phase")
-                debug("handshake size: %d", len(data))
+                debug("Handshake size: %d", len(data))
                 assert data[0] == "\x03"
                 client_hs = data[1:]
                 #if not self._verifyHandshake(client_hs):
@@ -48,46 +55,46 @@ class RTMPProtocol(protocol.Protocol):
                 self.state = States.HANDSHAKE_VERIFY
             elif self.state == States.HANDSHAKE_VERIFY:
                 debug("Handshake verify")
-                debug("handshake size: %d", len(data))
-                if not self._verifyHandshake(data[:Constants.HANDSHAKE_SIZE], self._my_hs_uptime):
+                debug("Handshake size: %d", len(data))
+                if not self._verifyHandshake(data[:self.handShake], self._my_hs_uptime):
                     raise Exception("Handshake verify failed")
-                debug("server finished handshake")
+                debug("Server finished handshake")
                 self.state = States.RTMP
-                if len(data) > Constants.HANDSHAKE_SIZE:
-                    self.dataReceived(data[Constants.HANDSHAKE_SIZE:]) # put any extra data back through
+                if len(data) > self.handShake:
+                    self.dataReceived(data[self.handShake:]) # put any extra data back through
             else:
                 # TODO: start waiting for a valid handshake during maxHandshakeTimeout
                 # milliseconds.
-                if self.buffer is None:
-                    self.buffer = ByteStream(data)
+                if self.input is None:
+                    self.input = ByteStream(data)
                 else:
-                    self.buffer.write(data)
-                while self.buffer and self.bytesNeeded < self.buffer.len:
+                    self.input.write(data)
+                while self.input and self.bytesNeeded < self.input.len:
                     self._parseRTMPPacket()
         else:
             if self.state == States.HANDSHAKE_VERIFY:
                 debug("Handshake 3d phase")
-                debug("handshake size: %d", len(data))
+                debug("Handshake size: %d", len(data))
                 assert data[0] == "\x03"
-                server_hs = data[1:Constants.HANDSHAKE_SIZE+1]
-                my_hs_back = data[Constants.HANDSHAKE_SIZE+1:2*Constants.HANDSHAKE_SIZE+1]
-                rest = data[2*Constants.HANDSHAKE_SIZE+1:]
+                server_hs = data[1:self.handShake+1]
+                my_hs_back = data[self.handShake+1:2*self.handShake+1]
+                rest = data[2*self.handShake+1:]
                 #if not self._verifyHandshake(server_hs):
                 #    raise Exception("Server handshake packet was invalid")
                 if not self._verifyHandshake(my_hs_back, self._my_hs_uptime):
                     raise Exception("Handshake verify failed")
                 self.transport.write(server_hs)
-                debug("client finished handshake")
+                debug("Client finished handshake")
                 self.state = States.RTMP
                 assert len(rest) == 0
                 #if len(rest):
                 #    self.dataReceived(data) # put the remaining data back through here
             else:
-                if self.buffer is None:
-                    self.buffer = ByteStream(data)
+                if self.input is None:
+                    self.input = ByteStream(data)
                 else:
-                    self.buffer.write(data)
-                while self.buffer and self.bytesNeeded < self.buffer.len:
+                    self.input.write(data)
+                while self.input and self.bytesNeeded < self.input.len:
                     self._parseRTMPPacket()
                     
     def beginHandshake(self):
@@ -106,14 +113,14 @@ class RTMPProtocol(protocol.Protocol):
         # version 9,0,28,0 at least.
         x = uptime
         handshake = struct.pack("!LL", x, 0)
-        for i in xrange(0, (Constants.HANDSHAKE_SIZE - 8)/2):
+        for i in xrange(0, (self.handShake - 8)/2):
             x = (x * 0xb8cd75 + 1) & 0xff
             handshake += struct.pack("!H", x << 8)
         return handshake
 
     def _verifyHandshake(self, handshake, expected_uptime=None):
         """Check if the handshake reply received from a client contains valid data."""
-        data = struct.unpack("!LL%dH" % ((Constants.HANDSHAKE_SIZE - 8)/2), handshake)
+        data = struct.unpack("!LL%dH" % ((self.handShake - 8)/2), handshake)
         if expected_uptime is not None and expected_uptime != data[0]:
             return False
         if data[1] != 0:
@@ -140,10 +147,10 @@ class RTMPProtocol(protocol.Protocol):
         This method will always exit ensuring that self.buffer is either None
         or positioned at the end.
         """
-        if self.buffer is None or self.bytesNeeded > self.buffer.len:
+        if self.input is None or self.bytesNeeded > self.input.len:
             raise Exception("_parseRTMPPacket called without enough data in buffer")
         
-        buf = self.buffer
+        buf = self.input
         buf.seek(0)
         
         try:
@@ -233,10 +240,10 @@ class RTMPProtocol(protocol.Protocol):
         # If there is still data left in the buffer, make a new one
         # with it
         if not buf.at_eof():
-            self.buffer = ByteStream(buf.read())
-            self.buffer.seek(self.buffer.len)
+            self.input = ByteStream(buf.read())
+            self.input.seek(self.input.len)
         else:
-            self.buffer = None
+            self.input = None
         
         # Are we done yet?
         if len(data) < header.size + add:
@@ -244,99 +251,90 @@ class RTMPProtocol(protocol.Protocol):
             self.incompletePackets[channel] = data
             return
         
+        packet = RTMPPacket(header, data)
+        
         # We're done - i.e. we have a whole packet. Decode and dispatch it.
-        self._decodeAndDispatchPacket(header, data)
+        self._decodeAndDispatchPacket(packet)
         if channel in self.incompletePackets:
             del self.incompletePackets[channel]
-    
-    def _decodeAndDispatchPacket(self, header, data):
-        """Decodes RTMP message event"""
-        debug("received RTMP packet: %r", header)
-        debug("packet data:\n%s", hexdump(data))
-        if header.timer == 0xffffff:
-            # TODO: Skip first four bytes
-            unknown = data;
-        headerDataType = header.type
-        if headerDataType == Constants.CHUNK_SIZE:
-            message = self.decodeChunkSize(data)
-        elif headerDataType == Constants.INVOKE:
-            message = self.decodeInvoke(data, self.state)
-        elif headerDataType == Constants.NOTIFY:
-            if header.streamId == 0:
-                message = self.decodeNotify(data, header, self.state)
-            else:
-                message = self.decodeStreamMetadata(data)
-        elif headerDataType == Constants.PING:
-            message = decodeBytesRead(data)
-        elif headerDataType == Constants.AUDIO_DATA:
-            message = decodeAudioData(data)
-        elif headerDataType == Constants.VIDEO_DATA:
-            message = decodeVideoData(data)
-        elif headerDataType == Constants.FLEX_SHARED_OBJECT:
-            message = decodeFlexSharedObject(data, self.state)
-        elif headerDataType == Constants.SO:
-            message = decodeSharedObject(data, self.state)
-        elif headerDataType == Constants.SERVER_BW:
-            message = decodeServerBW(data)
-        elif headerDataType == Constants.CLIENT_BW:
-            message = decodeClientBW(data)
-        elif headerDataType == Constants.FLEX_MESSAGE:
-            message = decodeFlexMessage(data, self.state)
-        else:
-	    message = decodeUnknown(header.type, data)
-        # message.setHeader(header)
-        # message.setTimestamp(header.timer)
-        # return message;
         
-    def decodeChunkSize(self, data):
-        # TODO
-        return data
+    def _decodeAndDispatchPacket(self, packet):
+        """Decodes RTMP message event"""
+        packetData = packet.data
+        packetHeader = packet.header
+        headerDataType = packetHeader.type
+        
+        if packetHeader.timer == 0xffffff:
+            # TODO: Skip first four bytes
+            unknown = packetData
+            
+        if headerDataType == Constants.INVOKE:
+            input = ByteStream(packetData)
+            invoke = Notify()
+            amfreader = amf.AMF0Parser(input)
+            invoke.name = amfreader.readElement()
+            invoke.id = amfreader.readElement()
+            invoke.argv = []
+            while input.peek() != None:
+                invoke.argv.append(amfreader.readElement())
+            packet.message = invoke
+            debug("Received RTMP packet: %r", packet)
+            actionType = invoke.name
+            debug(actionType)
+            if actionType == Constants.ACTION_CONNECT:
+                # Connect client
+                response = Notify()
+                response.id = invoke.id
+                response.name = "_result"
+                response.argv = [None,
+                    StatusObject("status",
+                                 StatusCodes.NC_CONNECT_SUCCESS,
+                                 "Connection succeeded.")]
+  
+                self._writeRTMPPacket(packetHeader.channel, response)
+                        
+            elif headerDataType == Constants.PING:
+                raise NotImplementedError
 
-    def decodeInvoke(self, data, state):
-        # TODO
-        return state
+            else:
+                raise Exception ("Unknown action type: %s" % actionType)
+            
+        else:
+            raise Exception ("Unknown header type: %s" % headerDataType)
+        
+        """     
+        elif headerDataType == Constants.CHUNK_SIZE:
+               
+        elif headerDataType == Constants.NOTIFY:
+            if packetHeader.streamId == 0:
+                
+            else:
+               
+        
+        elif headerDataType == Constants.AUDIO_DATA:
+            #
+        elif headerDataType == Constants.VIDEO_DATA:
+            #
+        elif headerDataType == Constants.FLEX_SHARED_OBJECT:
+            #
+        elif headerDataType == Constants.SO:
+            #  
+        elif headerDataType == Constants.SERVER_BW:
+            #
+        elif headerDataType == Constants.CLIENT_BW:
+            #
+        elif headerDataType == Constants.FLEX_MESSAGE:
+            #
+        
+        """
 
-    def decodeNotify(self, data, header, state):
-        # TODO
-        return data
-    
-    def decodeStreamMetadata(self, data):
-        # TODO
-        return data
-
-    def decodeBytesRead(self, data):
-        # TODO
-        return data
-
-    def decodeAudioData(self, data):
-        # TODO
-        return data
-    
-    def decodeVideoData(self, data):
-        # TODO
-        return data
-
-    def decodeFlexSharedObject(self, data, state):
-        # TODO
-        return data
-
-    def decodeSharedObject(self, data, state):
-        # TODO
-        return data
-
-    def decodeServerBW(self, data):
-        # TODO
-        return data
-
-    def decodeClientBW(self, data):
-        # TODO
-        return data
-
-    def decodeFlexMessage(self, data, state):
-        # TODO
-        return data
-
-    def decodeUnknown(self, headerType, data):
-        # TODO
-        warning("Unknown object type: %s", headerType)
-        return data
+    def _writeRTMPPacket(self, channel, notify, streamId=0):
+        stream = ByteStream()
+        # stream.writeElement(notify.name)
+        # stream.writeElement(notify.id)
+        # for arg in notify.argv:
+            # stream.writeElement(arg)
+        header = RTMPHeader(channel, 0, stream.len, Constants.INVOKE, 0)
+        packet = RTMPPacket(header, stream, notify)
+        debug("Sending RTMP packet: %r", packet)
+        
