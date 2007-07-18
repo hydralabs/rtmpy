@@ -1,6 +1,7 @@
 # -*- encoding: utf8 -*-
 
 import struct
+import time
 from StringIO import StringIO
 
 class ByteStream(StringIO):
@@ -118,6 +119,12 @@ def hexdump(data):
     if len(ascii):
         buf += "%04x:  %-24s %-24s %s\n" % (index, hex[:24], hex[24:], ascii)
     return buf
+
+def uptime():
+    """Returns uptime in milliseconds, starting at first call"""
+    if not hasattr(uptime, "t0") is None:
+        uptime.t0 = time.time()
+    return int((time.time() - uptime.t0)*1000)
 
 def decode_utf8_modified(data):
     """Decodes a unicode string from Modified UTF-8 data.
