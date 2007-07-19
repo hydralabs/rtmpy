@@ -17,8 +17,8 @@ except ImportError:
     except ImportError:
         import elementtree.ElementTree as ET
 
-import rtmpy.util
-from rtmpy.util import ByteStream
+from rtmpy import util
+from rtmpy.util import BufferedByteStream
 
 class AMF0Types:
     NUMBER      = 0x00
@@ -43,10 +43,10 @@ class AMF0Parser:
 
     def __init__(self, data):
         self.obj_refs = list()
-        if isinstance(data, ByteStream):
+        if isinstance(data, BufferedByteStream):
             self.input = data
         else:
-            self.input = ByteStream(data)
+            self.input = BufferedByteStream(data)
 
     def readElement(self):
         """Reads the data type."""
@@ -169,24 +169,75 @@ class AMF0Parser:
         return ET.fromstring(data)
 
 class AMF0Encoder:
-
-    def __init__(self, data):
-        if isinstance(data, ByteStream):
-            self.output = data
-        else:
-            self.output = ByteStream(data)
-        
-    def writeElement(self, input):
-        """Writes the data type."""
-        if isinstance(input, StringTypes):
-            return self.writeString()
-
-        elif isinstance(input, BooleanType):
-            return bool(self.input.read_uchar())
-                
-    def writeString(self):
-        return None
     
+    type_map = {
+        (int,long,float): "writeNumber", # Maybe add decimal ?
+        (bool,): "writeBoolean",
+        StringTypes: "writeString",
+        (InstanceType): "writeObject",
+        (datetime.date, datetime.datetime): "writeDate",
+    }
+
+    def __init__(self, output):
+        """Constructs a new AMF0Encoder. output should be a writable
+        file-like object."""
+        self.output = output
+        self.obj_refs = []
+        
+    def writeElement(self, data):
+        """Writes the data."""
+        for type, method in self.type_map.keys():
+            if isinstance(input, type):
+                getattr(self, method)(data)
+    
+    def writeNumber(self, n):
+        self.output.write_uchar(AMF0Types.NUMBER)
+        self.output.write_double(float(n))
+    
+    def writeBoolean(self, b):
+        self.output.write_uchar(AMF0Types.BOOL)
+        if b:
+            self.output.write_uchar(1)
+        else:
+            self.output.write_uchar(0)
+    
+    def writeString(self, s, writeType=True):
+        if len(s) > 0xffff:
+            if writeType:
+                self.output.write_uchar(AMF0Types.LONGSTRING)
+            self.output.write_ulong(len(s))
+        else:
+            if writeType:
+                self.output.write_uchar(AMF0Types.STRING)
+            self.output.write_ushort(len(s))
+        self.output.write_utf8_string(unicode(s))
+    
+    def writeObject(self, o):
+        if o in self.obj_refs:
+            self.output.write_uchar(AMF0Types.REFERENCE)
+            self.output.write_ushort(self.obj_refs.index(o))
+        else:
+            self.obj_refs.append(o)
+            self.output.write_uchar(AMF0Types.OBJECT)
+            o = o.__dict__ # TODO: give objects a chance of controlling what we send
+            for key, val in o:
+                self.writeString(key, False)
+                self.writeElement(o)
+            self.writeString("", False)
+            self.output.write_uchar(AMF0Types.OBJECTTERM)
+    
+    def writeDate(self, d):
+        if isinstance(d, datetime.date):
+            d = datetime.datetime.combine(d, datetime.time(0))
+        self.output.write_uchar(AMF0Types.DATE)
+        ms = time.mktime(d.timetuple)
+        if d.tzinfo:
+            tz = d.tzinfo.utcoffset.days*1440 + d.tzinfo.utcoffset.seconds/60
+        else:
+            tz = 0
+        self.output.write_double(ms)
+        self.output.write_short(tz)
+
 class AMF3Types:
     UNDEFINED       =           0x00
     NULL            =           0x01
@@ -236,10 +287,10 @@ class AMF3Parser:
         self.obj_refs = list()
         self.str_refs = list()
         self.class_refs = list()
-        if isinstance(data, ByteStream):
+        if isinstance(data, BufferedByteStream):
             self.input = data
         else:
-            self.input = ByteStream(data)
+            self.input = BufferedByteStream(data)
 
     def readElement(self):
         type = self.input.read_uchar()
@@ -439,7 +490,7 @@ class AMF3Object:
 class AMFMessageParser:
     
     def __init__(self, data):
-        self.input = ByteStream(data)
+        self.input = BufferedByteStream(data)
     
     def parse(self):
         msg = AMFMessage()
@@ -480,7 +531,7 @@ class AMFMessageParser:
 class AMFMessageEncoder:
     
     def __init__(self, data):
-        self.input = ByteStream(data)
+        self.input = BufferedByteStream(data)
     
     def encode(self):
         msg = AMFMessage()
