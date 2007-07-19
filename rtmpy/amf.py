@@ -17,8 +17,8 @@ except ImportError:
     except ImportError:
         import elementtree.ElementTree as ET
 
-import util
-from util import ByteStream
+import rtmpy.util
+from rtmpy.util import ByteStream
 
 class AMF0Types:
     NUMBER      = 0x00

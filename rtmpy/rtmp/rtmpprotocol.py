@@ -1,13 +1,12 @@
 import struct
 import time, os
 from twisted.internet import reactor, protocol
-from twisted.python import log, logfile, usage
+from twisted.python import log, logfile
 
-import util
-from util import ByteStream, hexdump, Enum, uptime
-
+import rtmpy.util
+from rtmpy.util import ByteStream, hexdump, Enum, uptime
+from rtmpy import amf
 from statuscodes import StatusCodes
-import amf
 
 Modes = Enum('SERVER', 'CLIENT')
 States = Enum('CONNECT', 'HANDSHAKE', 'HANDSHAKE_VERIFY', 'CONNECTED', 'ERROR', 'DISCONNECTED')
