@@ -1,7 +1,7 @@
 import struct
-import logging, time, os
-from logging import debug, info, warning
+import time, os
 from twisted.internet import reactor, protocol
+from twisted.python import log, logfile, usage
 
 import util
 from util import ByteStream, hexdump, Enum, uptime
@@ -105,19 +105,19 @@ class RTMPProtocol(protocol.Protocol):
         self.incompletePackets = dict() # indexed on channel name
         self.state = States.HANDSHAKE
         self.mode = self.factory.mode
-        info("Client connecting to %s." % (self.transport.getPeer( ).host))
+        log.msg("Client connecting: %s" % (self.transport.getPeer()))
         if self.mode == Modes.CLIENT:
             # begin handshake for client
             self.beginHandshake()
 
     def connectionLost(self, reason):
-        info("Connection with %s closed." % self.transport.getPeer( ).host)
+        log.msg("Connection with client %s closed." % self.transport.getPeer())
         
     def dataReceived(self, data):
         if self.mode == Modes.SERVER:
             if self.state == States.HANDSHAKE:
-                debug("Handshake 2nd phase")
-                debug("Handshake size: %d", len(data))
+                print "Handshake 2nd phase..."
+                print "Handshake size: %d" % len(data)
                 assert data[0] == "\x03"
                 client_hs = data[1:]
                 #if not self._verifyHandshake(client_hs):
@@ -128,11 +128,11 @@ class RTMPProtocol(protocol.Protocol):
                 self.transport.write(client_hs)
                 self.state = States.HANDSHAKE_VERIFY
             elif self.state == States.HANDSHAKE_VERIFY:
-                debug("Handshake verify")
-                debug("Handshake size: %d", len(data))
+                print "Handshake verify..."
+                print "Handshake size: %d" % len(data)
                 if not self._verifyHandshake(data[:self.handShake], self._my_hs_uptime):
                     raise Exception("Handshake verify failed")
-                debug("Server finished handshake")
+                print "Server finished handshake."
                 self.state = States.CONNECTED
                 if len(data) > self.handShake:
                     self.dataReceived(data[self.handShake:]) # put any extra data back through
@@ -147,8 +147,8 @@ class RTMPProtocol(protocol.Protocol):
                     self._parseRTMPPacket()
         else:
             if self.state == States.HANDSHAKE_VERIFY:
-                debug("Handshake 3d phase")
-                debug("Handshake size: %d", len(data))
+                print "Handshake 3d phase..."
+                print "Handshake size: %d" % len(data)
                 assert data[0] == "\x03"
                 server_hs = data[1:self.handShake+1]
                 my_hs_back = data[self.handShake+1:2*self.handShake+1]
@@ -158,7 +158,7 @@ class RTMPProtocol(protocol.Protocol):
                 if not self._verifyHandshake(my_hs_back, self._my_hs_uptime):
                     raise Exception("Handshake verify failed")
                 self.transport.write(server_hs)
-                debug("Client finished handshake")
+                print "Client finished handshake."
                 self.state = States.CONNECTED
                 assert len(rest) == 0
                 #if len(rest):
@@ -172,7 +172,7 @@ class RTMPProtocol(protocol.Protocol):
                     self._parseRTMPPacket()
                     
     def beginHandshake(self):
-        debug("Handshake 1st phase")
+        print "Handshake 1st phase..."
         # the first part of the handshake is a 0x03 byte,
         self.transport.write("\x03")
         self._my_hs_uptime = uptime()
@@ -208,7 +208,7 @@ class RTMPProtocol(protocol.Protocol):
 
     def waitForHandshake(self):
         """Wait for a valid handshake and disconnect the client if none is received."""
-        debug("waitForHandshake")
+        print "Wait for handshake..."
         # Client didn't send a valid handshake, disconnect.
         # onInactive()
         
@@ -321,7 +321,7 @@ class RTMPProtocol(protocol.Protocol):
         
         # Are we done yet?
         if len(data) < header.size + add:
-            debug("RTMP packet not complete (%d of %d received)", len(data), header.size + add)
+            print "RTMP packet not complete (%d of %d received)" % (len(data), header.size + add)
             self.incompletePackets[channel] = data
             return
         
@@ -352,9 +352,9 @@ class RTMPProtocol(protocol.Protocol):
             while input.peek() != None:
                 invoke.argv.append(amfreader.readElement())
             packet.message = invoke
-            debug("Received RTMP packet: %r", packet)
+            log.msg("Received RTMP packet: %r" % packet.header)
             actionType = invoke.name
-            debug(actionType)
+
             if actionType == Constants.ACTION_CONNECT:
                 # Connect client
                 response = Notify()
@@ -410,7 +410,7 @@ class RTMPProtocol(protocol.Protocol):
             # stream.writeElement(arg)
         header = RTMPHeader(channel, 0, stream.len, Constants.INVOKE, 0)
         packet = RTMPPacket(header, stream, notify)
-        debug("Sending RTMP packet: %r", packet)
+        log.msg("Sending RTMP packet: %r" % packet.header)
         
 class StatusObject:
     """ Status object that is sent to client with every status event."""
