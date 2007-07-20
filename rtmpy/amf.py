@@ -170,13 +170,13 @@ class AMF0Parser:
 
 class AMF0Encoder:
     
-    type_map = {
-        (int,long,float): "writeNumber", # Maybe add decimal ?
-        (bool,): "writeBoolean",
-        StringTypes: "writeString",
-        (InstanceType): "writeObject",
-        (datetime.date, datetime.datetime): "writeDate",
-    }
+    type_map = (
+        {(int,long,float): "writeNumber",}, # Maybe add decimal ?
+        {(bool,): "writeBoolean",},
+        {(StringTypes,): "writeString",},
+        {(InstanceType): "writeObject",},
+        {(datetime.date, datetime.datetime): "writeDate",},
+        )
 
     def __init__(self, output):
         """Constructs a new AMF0Encoder. output should be a writable
@@ -186,9 +186,16 @@ class AMF0Encoder:
         
     def writeElement(self, data):
         """Writes the data."""
+        for method in self.type_map:
+            types = method.keys()[0]
+            if isinstance(data, types):
+                func = method.values()[0]
+                print "%s : %s" % (func, data)
+                getattr(self, func)(data)
+        """Writes the data.
         for type, method in self.type_map.keys():
-            if isinstance(input, type):
-                getattr(self, method)(data)
+            if isinstance(data, type):
+                getattr(self, method)(data)"""
     
     def writeNumber(self, n):
         self.output.write_uchar(AMF0Types.NUMBER)
@@ -219,7 +226,7 @@ class AMF0Encoder:
         else:
             self.obj_refs.append(o)
             self.output.write_uchar(AMF0Types.OBJECT)
-            o = o.__dict__ # TODO: give objects a chance of controlling what we send
+            o = o.__dict__.iteritems() # TODO: give objects a chance of controlling what we send
             for key, val in o:
                 self.writeString(key, False)
                 self.writeElement(o)

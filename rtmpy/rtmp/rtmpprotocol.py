@@ -4,7 +4,7 @@ from twisted.internet import reactor, protocol
 from twisted.python import log, logfile
 
 import rtmpy.util
-from rtmpy.util import ByteStream, hexdump, Enum, uptime
+from rtmpy.util import BufferedByteStream, hexdump, Enum, uptime
 from rtmpy import amf
 from statuscodes import StatusCodes
 
@@ -16,6 +16,7 @@ class Constants:
     maxHandshakeTimeout = 5000
     HANDSHAKE_SIZE = 1536
     DEFAULT_CHUNK_SIZE = 128
+    HEADERSIZE=[12,8,4,1]
     
     CHUNK_SIZE  =               0x01
     # Unknown:                  0x02
@@ -139,7 +140,7 @@ class RTMPProtocol(protocol.Protocol):
                 # TODO: start waiting for a valid handshake during maxHandshakeTimeout
                 # milliseconds.
                 if self.input is None:
-                    self.input = ByteStream(data)
+                    self.input = BufferedByteStream(data)
                 else:
                     self.input.write(data)
                 while self.input and self.bytesNeeded < self.input.len:
@@ -164,7 +165,7 @@ class RTMPProtocol(protocol.Protocol):
                 #    self.dataReceived(data) # put the remaining data back through here
             else:
                 if self.input is None:
-                    self.input = ByteStream(data)
+                    self.input = BufferedByteStream(data)
                 else:
                     self.input.write(data)
                 while self.input and self.bytesNeeded < self.input.len:
@@ -313,7 +314,7 @@ class RTMPProtocol(protocol.Protocol):
         # If there is still data left in the buffer, make a new one
         # with it
         if not buf.at_eof():
-            self.input = ByteStream(buf.read())
+            self.input = BufferedByteStream(buf.read())
             self.input.seek(self.input.len)
         else:
             self.input = None
@@ -342,7 +343,7 @@ class RTMPProtocol(protocol.Protocol):
             unknown = packetData
             
         if headerDataType == Constants.INVOKE:
-            input = ByteStream(packetData)
+            input = BufferedByteStream(packetData)
             invoke = Notify()
             amfreader = amf.AMF0Parser(input)
             invoke.name = amfreader.readElement()
@@ -400,17 +401,46 @@ class RTMPProtocol(protocol.Protocol):
             #
         
         """
-
-    def _writeRTMPPacket(self, channel, notify, streamId=0):
-        stream = ByteStream()
-        # stream.writeElement(notify.name)
-        # stream.writeElement(notify.id)
-        # for arg in notify.argv:
-            # stream.writeElement(arg)
-        header = RTMPHeader(channel, 0, stream.len, Constants.INVOKE, 0)
-        packet = RTMPPacket(header, stream, notify)
-        log.msg("Sending RTMP packet: %r" % packet.header)
         
+    def getHeaderSize(self, header, length):
+        headerlength = length
+        return header.channel | (Constants.HEADERSIZE.index(headerlength) << 6)
+    
+    def _writeRTMPPacket(self, channel, notify, streamId=0):
+        self.output = BufferedByteStream()
+        amfwriter = amf.AMF0Encoder(self.output)
+        amfwriter.writeElement(notify.name)
+        amfwriter.writeElement(notify.id)
+        for arg in notify.argv:
+            amfwriter.writeElement(arg)
+            
+        header = RTMPHeader(channel, 0, self.output.len, Constants.INVOKE, 0)
+        
+        if header.streamId != None:
+            headerlength = 12
+        elif header.type != None:
+            headerlength = 8
+        elif header.timer != None:
+            headerlength = 4
+        else:
+            headerlength = 1
+            
+        amfwriter.writeElement(self.getHeaderSize(header, headerlength))
+                               
+        if headerlength >= 4:
+            amfwriter.writeElement(header.timer)
+        if headerlength >= 8:
+            amfwriter.writeElement(header.size)
+            amfwriter.writeElement(header.type)
+        if headerlength == 12:
+            amfwriter.writeElement(header.streamId)
+        
+        headerbyte = self.getHeaderSize(header, 1)
+        packet = RTMPPacket(header, self.output, notify)
+        log.msg("Sending RTMP packet: %r" % packet.header)
+        #self.transport.write(packet)
+        #self.output.reset()
+    
 class StatusObject:
     """ Status object that is sent to client with every status event."""
     def __init__(self, code, level, description=None):
