@@ -1,5 +1,30 @@
 # -*- encoding: utf8 -*-
 #
+# Copyright (c) 2007 The RTMPy Project. All rights reserved.
+# 
+# Arnar Birgisson
+# Thijs Triemstra
+# 
+# Permission is hereby granted, free of charge, to any person obtaining
+# a copy of this software and associated documentation files (the
+# "Software"), to deal in the Software without restriction, including
+# without limitation the rights to use, copy, modify, merge, publish,
+# distribute, sublicense, and/or sell copies of the Software, and to
+# permit persons to whom the Software is furnished to do so, subject to
+# the following conditions:
+# 
+# The above copyright notice and this permission notice shall be
+# included in all copies or substantial portions of the Software.
+# 
+# THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND,
+# EXPRESS OR IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES OF
+# MERCHANTABILITY, FITNESS FOR A PARTICULAR PURPOSE AND
+# NONINFRINGEMENT. IN NO EVENT SHALL THE AUTHORS OR COPYRIGHT HOLDERS BE
+# LIABLE FOR ANY CLAIM, DAMAGES OR OTHER LIABILITY, WHETHER IN AN ACTION
+# OF CONTRACT, TORT OR OTHERWISE, ARISING FROM, OUT OF OR IN CONNECTION
+# WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE SOFTWARE.
+#
+#
 # AMF parser
 # sources:
 #   http://www.vanrijkom.org/archives/2005/06/amf_format.html
@@ -170,13 +195,14 @@ class AMF0Parser:
 
 class AMF0Encoder:
     
-    type_map = {
-        (int,long,float): "writeNumber", # Maybe add decimal ?
-        (bool,): "writeBoolean",
-        (StringTypes,): "writeString",
-        (InstanceType): "writeObject",
-        (datetime.date, datetime.datetime): "writeDate",
-    }
+    type_map = [
+        ((bool,), "writeBoolean"),
+        ((int,long,float), "writeNumber"), # Maybe add decimal ?
+        ((StringTypes,), "writeString"),
+        ((InstanceType,), "writeObject"),
+        ((datetime.date, datetime.datetime), "writeDate"),
+        ((ET._ElementInterface,), "writeXML"),
+    ]
 
     def __init__(self, output):
         """Constructs a new AMF0Encoder. output should be a writable
@@ -186,10 +212,10 @@ class AMF0Encoder:
         
     def writeElement(self, data):
         """Writes the data."""
-        for types, method in self.type_map.items():
-            for type in types:
-                if isinstance(data, type):
-                    getattr(self, method)(data)
+        for tlist, method in self.type_map:
+            for t in tlist:
+                if isinstance(data, t):
+                    return getattr(self, method)(data)
     
     def writeNumber(self, n):
         self.output.write_uchar(AMF0Types.NUMBER)
@@ -203,6 +229,7 @@ class AMF0Encoder:
             self.output.write_uchar(0)
     
     def writeString(self, s, writeType=True):
+        s = unicode(s).encode('utf8')
         if len(s) > 0xffff:
             if writeType:
                 self.output.write_uchar(AMF0Types.LONGSTRING)
@@ -211,7 +238,7 @@ class AMF0Encoder:
             if writeType:
                 self.output.write_uchar(AMF0Types.STRING)
             self.output.write_ushort(len(s))
-        self.output.write_utf8_string(unicode(s))
+        self.output.write(s)
     
     def writeObject(self, o):
         if o in self.obj_refs:
@@ -238,6 +265,12 @@ class AMF0Encoder:
             tz = 0
         self.output.write_double(ms)
         self.output.write_short(tz)
+    
+    def writeXML(self, e):
+        self.output.write_uchar(AMF0Types.XML)
+        data = ET.tostring(e, 'utf8')
+        self.output.write_ulong(len(data))
+        self.output.write(data)
 
 class AMF3Types:
     UNDEFINED       =           0x00
