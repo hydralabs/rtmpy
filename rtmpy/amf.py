@@ -610,7 +610,7 @@ class AMFMessageEncoder:
             # Write header name.
             self.output.write_utf8_string(header.name)
             # Write header requirement.
-            self.output.write_uchar(header.required)
+            self.output.write_uchar(bool(header.required))
             # Write length in bytes of header.
             self.output.write_ulong(-1)
             # Header data.
@@ -648,7 +648,7 @@ class AMFMessage:
         self.bodies = []
     
     def __repr__(self):
-        r = "<AMFMessage\n"
+        r = "<AMFMessage version=" + str(self.amfVersion) + "\n"
         for h in self.headers:
             r += "   " + repr(h) + "\n"
         for b in self.bodies:
@@ -702,6 +702,6 @@ if __name__ == "__main__":
                 raise
                 print "   ---> FAILED"
             else:
+                print repr(obj)
                 print "   ---> OK"
-            #print repr(obj)
     
