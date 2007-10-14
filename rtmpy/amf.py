@@ -30,7 +30,6 @@
 #   http://www.vanrijkom.org/archives/2005/06/amf_format.html
 #   http://osflash.org/documentation/amf/astypes
 
-import struct
 import datetime
 from types import *
 
@@ -504,7 +503,6 @@ class AMF3Parser:
     def readByteArray(self):
         length = self.readInteger()
         return self.input.read(length >> 1)
-    
 
 class AMF3Class:
     def __init__(self, name=None, encoding=None, attrs=None):
@@ -589,24 +587,48 @@ class AMFMessageParser:
             body.data = parser_class(self.input).readElement()
             # Bodies contain actual Remoting requests and responses.
             msg.bodies.append(body)
-        # Return AMF message.
+        # Return Python object.
         return msg
     
 class AMFMessageEncoder:
 
-    def __init__(self, headers, bodies, data):
+    def __init__(self, headers, bodies):
         self.bodies = bodies
         self.headers = headers
-        self.output = BufferedByteStream(data)
+        self.output = BufferedByteStream()
     
     def encode(self):
-        
+        #
+        encoder_class = AMF0Encoder
+        # Write AMF version.
+        self.output.write_short(0)
+        # Write header length.
         header_count = len(self.headers)
-        self.output.write(struct.pack('>HH', 0, header_count))
-    
+        self.output.write_short(header_count)
+        # Write headers.
+        for header in self.headers:
+            # Write header name.
+            self.output.write_utf8_string(header.name)
+            # Write header requirement.
+            self.output.write_uchar(header.required)
+            # Write length in bytes of header.
+            self.output.write_ulong(-1)
+            # Header data.
+            encoder_class(self.output).writeElement(header.data)
+        # Write bodies length.
         bodies_count = len(self.bodies)
-        self.output.write(struct.pack('>H', bodies_count))
-        
+        self.output.write_short(bodies_count)
+        # Write bodies.
+        for body in self.bodies:
+            # Target (/1/onResult).
+            self.output.write_utf8_string(body.target)
+            # Response (null).
+            self.output.write_utf8_string(body.response)
+            # Body length in bytes.
+            self.output.write_ulong(-1)
+            # Actual Python result data.
+            encoder_class(self.output).writeElement(body.data)
+        # Return AMF data.
         return self.output
     
 class AMFMessage:

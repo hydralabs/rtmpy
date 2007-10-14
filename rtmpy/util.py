@@ -31,7 +31,7 @@ from StringIO import StringIO
 
 class NetworkIOMixIn:
     """Provides mix-in methods for file like objects to read and write basic
-    datatypes in network byte-order."""
+    datatypes in network (= big-endian) byte-order."""
     
     def read_uchar(self):
         return struct.unpack("!B", self.read(1))[0]
