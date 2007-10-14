@@ -528,55 +528,101 @@ class AMFMessageParser:
     
     def parse(self):
         msg = AMFMessage()
-        
+        # The first byte of the AMF file/stream is either 0×00 or 0×03.
         msg.amfVersion = self.input.read_uchar()
         if msg.amfVersion == 0:
+            # AMF0
             parser_class = AMF0Parser
         elif msg.amfVersion == 3:
+            # AMF3
             parser_class = AMF3Parser
         else:
             raise Exception("Invalid AMF version")
-        
+        # The second byte is a client byte, which is set to:
+        # - 0×00 for Flash Player 8 and below
+        # - 0×01 for FlashCom/FMS
+        # - 0×03 for Flash Player 9
         msg.clientType = self.input.read_uchar()
-        
+        # The third and fourth bytes form an integer value that specifies
+        # the number of headers.
         header_count = self.input.read_short()
+        # Headers are used to request debugging information, send 
+        # authentication info, tag transactions, etc.
         for i in range(header_count):
             header = AMFMessageHeader()
+            # UTF string (including length bytes) - header name.
             name_len = self.input.read_ushort()
             header.name = self.input.read_utf8_string(name_len)
+            # Specifies if understanding the header is "required".
             header.required = bool(self.input.read_uchar())
+            # Long - Length in bytes of header.
             msg.length = self.input.read_ulong()
+            # Variable - Actual data (including a type code).
             header.data = parser_class(self.input).readElement()
             msg.headers.append(header)
-        
+        # Between the headers and the start of the bodies is a int 
+        # specifying the number of bodies.
         bodies_count = self.input.read_short()
+        # A single AMF envelope can contain several requests/bodies; 
+        # AMF supports batching out of the box.
         for i in range(bodies_count):
             body = AMFMessageBody()
+            # The target may be one of the following:
+            # - An http or https URL. In that case the gateway should respond 
+            #   by sending a SOAP request to that URL with the specified data. 
+            #   In that case the data will be an Array and the first key 
+            #   (data[0]) contains the parameters to be sent.
+            # - A string with at least one period (.). The value to the right 
+            #   of the right-most period is the method to be called. The value 
+            #   to the left of that is the service to be invoked including package 
+            #   name. In that case data will be an Array of arguments to be sent 
+            #   to the method.
             target_len = self.input.read_ushort()
             body.target = self.input.read_utf8_string(target_len)
+            # The response is a string that gives the body an id so it can be 
+            # tracked by the client.
             response_len = self.input.read_ushort()
             body.response = self.input.read_utf8_string(response_len)
+            # Body length in bytes.
             body.length = self.input.read_ulong()
+            # Actual data (including a type code).
             body.data = parser_class(self.input).readElement()
+            # Bodies contain actual Remoting requests and responses.
             msg.bodies.append(body)
-        
+        # Return AMF message.
         return msg
-
-class AMFMessageEncoder:
     
-    def __init__(self, data):
-        self.input = BufferedByteStream(data)
+class AMFMessageEncoder:
+
+    def __init__(self, headers, bodies, data):
+        self.bodies = bodies
+        self.headers = headers
+        self.output = BufferedByteStream(data)
     
     def encode(self):
-        msg = AMFMessage()
         
-        return msg
-
+        header_count = len(self.headers)
+        self.output.write(struct.pack('>HH', 0, header_count))
+    
+        bodies_count = len(self.bodies)
+        self.output.write(struct.pack('>H', bodies_count))
+        
+        return self.output
+    
 class AMFMessage:
+    
     def __init__(self):
+        # AMF version (0 or 3)
         self.amfVersion = None
+        # The client type can be set to:
+        # - 0×00 for Flash Player 8 and below.
+        # - 0×01 for FlashCom/FMS.
+        # - 0×03 for Flash Player 9.
         self.clientType = None
+        # Headers are used to request debugging information, send 
+        # authentication info, tag transactions, etc.
         self.headers = []
+        # A single AMF message can contain several requests/bodies.
         self.bodies = []
     
     def __repr__(self):
@@ -589,20 +635,30 @@ class AMFMessage:
         return r
 
 class AMFMessageHeader:
+    
     def __init__(self):
+        # UTF string (including length bytes) - name.
         self.name = None
+        # Boolean - specifies if understanding the header is "required".
         self.required = None
+        # Long - Length in bytes of header.
         self.length = None
+        # Variable - Actual data (including a type code).
         self.data = None
     
     def __repr__(self):
         return "<AMFMessageHeader %s = %r>" % (self.name, self.data)
 
 class AMFMessageBody:
+    
     def __init__(self):
+        # UTF String - Target.
         self.target = None
+        # UTF String - Response.
         self.response = None
+        # Long - Body length in bytes.
         self.length = None
+        # Variable - Actual data (including a type code).
         self.data = None
 
     def __repr__(self):
