@@ -535,7 +535,7 @@ class AMFMessageParser:
             # AMF3
             parser_class = AMF3Parser
         else:
-            raise Exception("Invalid AMF version")
+            raise Exception("Invalid AMF version: " + str(msg.amfVersion))
         # The second byte is a client byte, which is set to:
         # - 0×00 for Flash Player 8 and below
         # - 0×01 for FlashCom/FMS
@@ -648,7 +648,7 @@ class AMFMessage:
         self.bodies = []
     
     def __repr__(self):
-        r = "<AMFMessage version=" + str(self.amfVersion) + "\n"
+        r = "<AMFMessage version=" + str(self.amfVersion) + " type=" + str(self.clientType) + "\n"
         for h in self.headers:
             r += "   " + repr(h) + "\n"
         for b in self.bodies:
@@ -684,24 +684,30 @@ class AMFMessageBody:
         self.data = None
 
     def __repr__(self):
-        return "<AMFMessageBody %s = %r>" % (self.target, self.data)
+        return "<AMFMessageBody target=%s data= %r>" % (self.target, self.data)
     
 if __name__ == "__main__":
     import sys, glob
+    debug = False
+    print "Starting AMF parser..."
     for arg in sys.argv[1:]:
+        if arg == 'debug':
+            debug = True
         for fname in glob.glob(arg):
             f = file(fname, "r")
             data = f.read()
+            size = str(f.tell())
             f.close()
             p = AMFMessageParser(data)
             #print "=" * 40
-            print "Parsing", fname.rsplit("\\",1)[-1], 
+            print "Parsing file", fname.rsplit("\\",1)[-1], 
             try:
                 obj = p.parse()
             except:
                 raise
                 print "   ---> FAILED"
             else:
-                print repr(obj)
                 print "   ---> OK"
-    
+                if debug:
+                    print repr(obj)
+            
