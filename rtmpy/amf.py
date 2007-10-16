@@ -214,6 +214,7 @@ class AMF0Encoder:
         for tlist, method in self.type_map:
             for t in tlist:
                 if isinstance(data, t):
+                    print "test"
                     return getattr(self, method)(data)
     
     def writeNumber(self, n):
@@ -314,6 +315,16 @@ class AMF3ObjectTypes:
     # Proxy object
     PROXY = 0x03
 
+    # Flex class mappings.
+    flex_mappings = [
+        # (RemotingMessage, "flex.messaging.messages.RemotingMessage"),
+        # (CommandMessage, "flex.messaging.messages.CommandMessage"),
+        # (AcknowledgeMessage, "flex.messaging.messages.AcknowledgeMessage"),
+        # (ErrorMessage, "flex.messaging.messages.ErrorMessage"),
+        # (ArrayCollection, "flex.messaging.io.ArrayCollection"),
+        # (ObjectProxy, "flex.messaging.io.ObjectProxy"),
+    ]
+    
 class AMF3Parser:
 
     def __init__(self, data):
@@ -465,9 +476,8 @@ class AMF3Parser:
             class_.name = self.readString()
             class_.encoding = type & 0x03
             class_.attrs = []
-        
+       
         type >>= 2
-        
         if class_.name:
             # TODO : do some class mapping?
             obj = AMF3Object(class_)
@@ -481,6 +491,7 @@ class AMF3Parser:
                 self.class_refs.append(class_)
             # TODO: implement externalizeable interface here
             obj.__amf_externalized_data = self.readElement()
+            
         else:
             if class_.encoding & AMF3ObjectTypes.VALUE:
                 if not class_ref:
@@ -505,12 +516,14 @@ class AMF3Parser:
         return self.input.read(length >> 1)
 
 class AMF3Class:
+    
     def __init__(self, name=None, encoding=None, attrs=None):
         self.name = name
         self.encoding = encoding
         self.attrs = attrs
-
+        
 class AMF3Object:
+    
     def __init__(self, class_=None):
         self.__amf_class = class_
     
@@ -601,8 +614,10 @@ class AMFMessageEncoder:
         #
         encoder_class = AMF0Encoder
         # Write AMF version.
-        self.output.write_short(0)
-        # Write header length.
+        self.output.write_uchar(0)
+        # Client type.
+        self.output.write_uchar(0)
+        # Header length.
         header_count = len(self.headers)
         self.output.write_short(header_count)
         # Write headers.
@@ -610,7 +625,7 @@ class AMFMessageEncoder:
             # Write header name.
             self.output.write_utf8_string(header.name)
             # Write header requirement.
-            self.output.write_uchar(bool(header.required))
+            self.output.write_uchar(header.required)
             # Write length in bytes of header.
             self.output.write_ulong(-1)
             # Header data.
@@ -648,7 +663,7 @@ class AMFMessage:
         self.bodies = []
     
     def __repr__(self):
-        r = "<AMFMessage version=" + str(self.amfVersion) + " type=" + str(self.clientType) + "\n"
+        r = "<AMFMessage amfVersion=" + str(self.amfVersion) + " clientType=" + str(self.clientType) + "\n"
         for h in self.headers:
             r += "   " + repr(h) + "\n"
         for b in self.bodies:
@@ -669,7 +684,7 @@ class AMFMessageHeader:
         self.data = None
     
     def __repr__(self):
-        return "<AMFMessageHeader %s = %r>" % (self.name, self.data)
+        return "<AMFMessageHeader name=%s data=%r>" % (self.name, self.data)
 
 class AMFMessageBody:
     
@@ -684,8 +699,91 @@ class AMFMessageBody:
         self.data = None
 
     def __repr__(self):
-        return "<AMFMessageBody target=%s data= %r>" % (self.target, self.data)
+        return "<AMFMessageBody target=%s data=%r>" % (self.target, self.data)
+
+class AbstractMessage:
     
+    def __init__(self):
+        # The body of the message.
+        self.data = None
+        # Unique client ID.
+        self.clientId = None
+        # Destination.
+        self.destination = None
+        # Message headers.
+        self.headers = []
+        # Unique message ID 
+        self.messageId = None
+        # timeToLive
+        self.timeToLive = None
+        # timestamp
+        self.timestamp = None
+    
+    def __repr__(self):
+        return "<AbstractMessage clientId=%s data=%r>" % (self.clientId, self.data)
+
+class AcknowledgeMessage(AbstractMessage):
+    
+    def __init__(self):
+        """
+        This is the receipt for any message thats being sent.
+        """
+        AbstractMessage.__init__(self)
+        # The ID of the message where this is a receipt of.
+        self.correlationId = None
+    
+    def __repr__(self):
+        return "<AcknowledgeMessage correlationId=%s>" % (self.correlationId)
+
+class CommandMessage(AbstractMessage):
+    
+    def __init__(self):
+        """
+        This class is used for service commands, like pinging the server.
+        """
+        AbstractMessage.__init__(self)
+        self.operation = None
+        # The ID of the message where this is a receipt of.
+        self.correlationId = None
+        self.messageRefType = None
+    
+    def __repr__(self):
+        return "<CommandMessage correlationId=%s operation=%r messageRefType=%d>" % (
+            self.correlationId, self.operation, self.messageRefType)
+        
+class ErrorMessage(AbstractMessage):
+    
+    def __init__(self):
+        """
+        This is the receipt for Error Messages.
+        """
+        AbstractMessage.__init__(self)
+        # Extended data that the remote destination has chosen to associate with 
+        # this error to facilitate custom error processing on the client.
+        self.extendedData = {}
+        # The fault code for the error. 
+        self.faultCode = None
+        # Detailed description of what caused the error. 
+        self.faultDetail = None
+        # A simple description of the error. 
+        self.faultString = None
+        # Should a root cause exist for the error, this property contains those details.
+        self.rootCause = {}
+        
+    def __repr__(self):
+        return "<ErrorMessage faultCode=%s faultString=%r>" % (
+            self.faultCode, self.faultString)
+                
+class RemotingMessage(AbstractMessage):
+    
+    def __init__(self):
+        AbstractMessage.__init__(self)
+        self.operation = None
+        self.source = None
+    
+    def __repr__(self):
+        return "<RemotingMessage operation=%s source=%r>" % (self.operation, self.source)
+             
 if __name__ == "__main__":
     import sys, glob
     debug = False
