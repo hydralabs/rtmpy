@@ -198,9 +198,11 @@ class AMF0Encoder:
         ((bool,), "writeBoolean"),
         ((int,long,float), "writeNumber"), # Maybe add decimal ?
         ((StringTypes,), "writeString"),
-        ((InstanceType,), "writeObject"),
+        ((InstanceType,DictType,), "writeObject"),
+        ((ListType,TupleType,), "writeArray"),
         ((datetime.date, datetime.datetime), "writeDate"),
         ((ET._ElementInterface,), "writeXML"),
+        ((NoneType,), "writeNull"),
     ]
 
     def __init__(self, output):
@@ -214,9 +216,17 @@ class AMF0Encoder:
         for tlist, method in self.type_map:
             for t in tlist:
                 if isinstance(data, t):
-                    print "test"
                     return getattr(self, method)(data)
     
+    def writeNull(self, n):
+        self.output.write_uchar(AMF0Types.NULL)
+                   
+    def writeArray(self, a):
+        self.output.write_uchar(AMF0Types.ARRAY)
+        self.output.write_ushort(len(a))
+        for data in a:
+            self.writeElement(data)
+        
     def writeNumber(self, n):
         self.output.write_uchar(AMF0Types.NUMBER)
         self.output.write_double(float(n))
