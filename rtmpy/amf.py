@@ -44,6 +44,29 @@ except ImportError:
 from rtmpy import util
 from rtmpy.util import BufferedByteStream
 
+class GeneralTypes:
+    """
+    RTMPy global constants
+    """
+    # Specifies aFlash Player 6.0 - 8.0 client.
+    AC_Flash           = 0
+    # Specifies a FlashCom / Flash Media Server client.
+    AC_FlashCom        = 1
+    # Specifies a Flash Player 9.0 client.
+    AC_Flash9          = 3
+    # Normal result to a methodcall.
+    REMOTING_RESULT    = 1
+    # Faulty result.
+    REMOTING_STATUS    = 2
+    # Result to a debug-header.
+    REMOTING_DEBUG     = 3
+    # AMF0 Encoding
+    AMF0               = 0
+    # AMF3 Encoding
+    AMF3               = 3
+    # AMF mimetype
+    AMF_MIMETYPE       = 'application/x-amf'
+    
 class AMF0Types:
     NUMBER      = 0x00
     BOOL        = 0x01
@@ -542,28 +565,25 @@ class AMF3Object:
             self.__amf_class and self.__amf_class.name or "no class",
             id(self))
 
-class AMFMessageParser:
+class AMFMessageDecoder:
     
     def __init__(self, data):
         self.input = BufferedByteStream(data)
-    
-    def parse(self):
-        msg = AMFMessage()
-        # The first byte of the AMF file/stream is either 0×00 or 0×03.
-        msg.amfVersion = self.input.read_uchar()
-        if msg.amfVersion == 0:
+        self.msg = AMFMessage()
+        
+    def decode(self):
+        # The first byte of the AMF file/stream is the AMF type.
+        self.msg.amfVersion = self.input.read_uchar()
+        if self.msg.amfVersion == GeneralTypes.AMF0:
             # AMF0
             parser_class = AMF0Parser
-        elif msg.amfVersion == 3:
+        elif self.msg.amfVersion == GeneralTypes.AMF3:
             # AMF3
             parser_class = AMF3Parser
         else:
-            raise Exception("Invalid AMF version: " + str(msg.amfVersion))
-        # The second byte is a client byte, which is set to:
-        # - 0×00 for Flash Player 8 and below
-        # - 0×01 for FlashCom/FMS
-        # - 0×03 for Flash Player 9
-        msg.clientType = self.input.read_uchar()
+            raise Exception("Invalid AMF version: " + str(self.msg.amfVersion))
+        # The second byte is the client type.
+        self.msg.clientType = self.input.read_uchar()
         # The third and fourth bytes form an integer value that specifies
         # the number of headers.
         header_count = self.input.read_short()
@@ -577,10 +597,10 @@ class AMFMessageParser:
             # Specifies if understanding the header is "required".
             header.required = bool(self.input.read_uchar())
             # Long - Length in bytes of header.
-            msg.length = self.input.read_ulong()
-            # Variable - Actual data (including a type code).
+            header.length = self.input.read_ulong()
+            # Variable - Actual self.input (including a type code).
             header.data = parser_class(self.input).readElement()
-            msg.headers.append(header)
+            self.msg.headers.append(header)
         # Between the headers and the start of the bodies is a int 
         # specifying the number of bodies.
         bodies_count = self.input.read_short()
@@ -609,29 +629,28 @@ class AMFMessageParser:
             # Actual data (including a type code).
             body.data = parser_class(self.input).readElement()
             # Bodies contain actual Remoting requests and responses.
-            msg.bodies.append(body)
-        # Return Python object.
-        return msg
+            self.msg.bodies.append(body)
+
+        return self.msg
     
 class AMFMessageEncoder:
 
-    def __init__(self, headers, bodies):
-        self.bodies = bodies
-        self.headers = headers
+    def __init__(self, msg):
         self.output = BufferedByteStream()
-    
+        self.msg = msg
+        
     def encode(self):
         #
         encoder_class = AMF0Encoder
         # Write AMF version.
-        self.output.write_uchar(0)
+        self.output.write_uchar(self.msg.amfVersion)
         # Client type.
-        self.output.write_uchar(0)
+        self.output.write_uchar(self.msg.clientType)
         # Header length.
-        header_count = len(self.headers)
+        header_count = len(self.msg.headers)
         self.output.write_short(header_count)
         # Write headers.
-        for header in self.headers:
+        for header in self.msg.headers:
             # Write header name.
             self.output.write_utf8_string(header.name)
             # Write header requirement.
@@ -641,10 +660,10 @@ class AMFMessageEncoder:
             # Header data.
             encoder_class(self.output).writeElement(header.data)
         # Write bodies length.
-        bodies_count = len(self.bodies)
+        bodies_count = len(self.msg.bodies)
         self.output.write_short(bodies_count)
         # Write bodies.
-        for body in self.bodies:
+        for body in self.msg.bodies:
             # Target (/1/onResult).
             self.output.write_utf8_string(body.target)
             # Response (null).
@@ -653,23 +672,73 @@ class AMFMessageEncoder:
             self.output.write_ulong(-1)
             # Actual Python result data.
             encoder_class(self.output).writeElement(body.data)
-        # Return AMF data.
+        
         return self.output
     
+class Server:
+    def __init__(self, data):
+        if data:
+            self.request = AMFMessageDecoder(data).decode()
+            self.response = AMFMessage()
+        else:
+            raise Exception("Invalid AMF request received")
+    
+    def __repr__(self):
+        return "<Server request=%s response=%d>" % (self.request, self.response)
+    
+    def setResponse(self, target, type, data):
+        """
+        Set a response based on a request you received through getRequests.
+        """
+        if type == GeneralTypes.REMOTING_RESULT:
+            target += '/onResult'
+
+        elif type == GeneralTypes.REMOTING_STATUS:
+            target += '/onStatus'
+
+        elif type == GeneralTypes.REMOTING_DEBUG:
+            target += '/onDebugEvents'
+        
+        body = AMFMessageBody()
+        body.target = target
+        body.response = ''
+        body.data = data
+
+        return self.response.bodies.append(body)
+
+    def getResponse(self):
+        """
+        Get all responses for the client. Call this after you answered all
+        the requests with setResponse.
+        """
+        self.response.clientType = self.request.clientType
+        data = AMFMessageEncoder(self.response).encode()
+        return data
+
+    def addHeader(self, name, required, data):
+            """
+            Add a header to the server response.
+            """
+            self.response.addHeader(name, required, data)
+
+    def getRequests(self):
+        """
+        Returns the requests that are made to the gateway.
+        """
+        return self.request.bodies
+    
+    def getHeaders(self):
+        """
+        Returns the request headers.
+        """
+        return self.request.headers
+                     
 class AMFMessage:
     
     def __init__(self):
-        # AMF version (0 or 3)
-        self.amfVersion = None
-        # The client type can be set to:
-        # - 0×00 for Flash Player 8 and below.
-        # - 0×01 for FlashCom/FMS.
-        # - 0×03 for Flash Player 9.
-        self.clientType = None
-        # Headers are used to request debugging information, send 
-        # authentication info, tag transactions, etc.
+        self.amfVersion = GeneralTypes.AMF0
+        self.clientType = GeneralTypes.AC_Flash
         self.headers = []
-        # A single AMF message can contain several requests/bodies.
         self.bodies = []
     
     def __repr__(self):
@@ -684,13 +753,9 @@ class AMFMessage:
 class AMFMessageHeader:
     
     def __init__(self):
-        # UTF string (including length bytes) - name.
         self.name = None
-        # Boolean - specifies if understanding the header is "required".
         self.required = None
-        # Long - Length in bytes of header.
         self.length = None
-        # Variable - Actual data (including a type code).
         self.data = None
     
     def __repr__(self):
@@ -699,13 +764,9 @@ class AMFMessageHeader:
 class AMFMessageBody:
     
     def __init__(self):
-        # UTF String - Target.
         self.target = None
-        # UTF String - Response.
         self.response = None
-        # Long - Body length in bytes.
         self.length = None
-        # Variable - Actual data (including a type code).
         self.data = None
 
     def __repr__(self):
@@ -793,11 +854,11 @@ class RemotingMessage(AbstractMessage):
     
     def __repr__(self):
         return "<RemotingMessage operation=%s source=%r>" % (self.operation, self.source)
-             
+
 if __name__ == "__main__":
     import sys, glob
     debug = False
-    print "Starting AMF parser..."
+    print "\nStarting AMF parser...\n"
     for arg in sys.argv[1:]:
         if arg == 'debug':
             debug = True
@@ -806,11 +867,12 @@ if __name__ == "__main__":
             data = f.read()
             size = str(f.tell())
             f.close()
-            p = AMFMessageParser(data)
-            #print "=" * 40
-            print "Parsing file", fname.rsplit("\\",1)[-1], 
+            p = AMFMessageDecoder(data)
+            if debug:
+                print "=" * 120
+            print " Parsing file:", fname.rsplit("\\",1)[-1], 
             try:
-                obj = p.parse()
+                obj = p.decode()
             except:
                 raise
                 print "   ---> FAILED"
