@@ -632,7 +632,7 @@ class AMFMessageDecoder:
             self.msg.bodies.append(body)
 
         return self.msg
-    
+
 class AMFMessageEncoder:
 
     def __init__(self, msg):
@@ -675,64 +675,6 @@ class AMFMessageEncoder:
         
         return self.output
     
-class Server:
-    def __init__(self, data):
-        if data:
-            self.request = AMFMessageDecoder(data).decode()
-            self.response = AMFMessage()
-        else:
-            raise Exception("Invalid AMF request received")
-    
-    def __repr__(self):
-        return "<Server request=%s response=%d>" % (self.request, self.response)
-    
-    def setResponse(self, target, type, data):
-        """
-        Set a response based on a request you received through getRequests.
-        """
-        if type == GeneralTypes.REMOTING_RESULT:
-            target += '/onResult'
-
-        elif type == GeneralTypes.REMOTING_STATUS:
-            target += '/onStatus'
-
-        elif type == GeneralTypes.REMOTING_DEBUG:
-            target += '/onDebugEvents'
-        
-        body = AMFMessageBody()
-        body.target = target
-        body.response = ''
-        body.data = data
-
-        return self.response.bodies.append(body)
-
-    def getResponse(self):
-        """
-        Get all responses for the client. Call this after you answered all
-        the requests with setResponse.
-        """
-        self.response.clientType = self.request.clientType
-        data = AMFMessageEncoder(self.response).encode()
-        return data
-
-    def addHeader(self, name, required, data):
-            """
-            Add a header to the server response.
-            """
-            self.response.addHeader(name, required, data)
-
-    def getRequests(self):
-        """
-        Returns the requests that are made to the gateway.
-        """
-        return self.request.bodies
-    
-    def getHeaders(self):
-        """
-        Returns the request headers.
-        """
-        return self.request.headers
-                     
 class AMFMessage:
     
     def __init__(self):
@@ -855,6 +797,89 @@ class RemotingMessage(AbstractMessage):
     def __repr__(self):
         return "<RemotingMessage operation=%s source=%r>" % (self.operation, self.source)
 
+class Server:
+    def __init__(self, data):
+        if data:
+            self.request = AMFMessageDecoder(data).decode()
+            self.response = AMFMessage()
+        else:
+            raise Exception("Invalid AMF request received")
+    
+    def __repr__(self):
+        return "<Server request=%s response=%d>" % (self.request, self.response)
+    
+    def setResponse(self, target, type, data):
+        """
+        Set a response based on a request you received through getRequests.
+        """
+        if type == GeneralTypes.REMOTING_RESULT:
+            target += '/onResult'
+
+        elif type == GeneralTypes.REMOTING_STATUS:
+            target += '/onStatus'
+
+        elif type == GeneralTypes.REMOTING_DEBUG:
+            target += '/onDebugEvents'
+        
+        body = AMFMessageBody()
+        body.target = target
+        body.response = ''
+        body.data = data
+
+        return self.response.bodies.append(body)
+
+    def getResponse(self):
+        """
+        Get all responses for the client. Call this after you answered all
+        the requests with setResponse.
+        """
+        self.response.clientType = self.request.clientType
+        data = AMFMessageEncoder(self.response).encode()
+        return data
+
+    def addHeader(self, name, required, data):
+            """
+            Add a header to the server response.
+            """
+            self.response.addHeader(name, required, data)
+
+    def getRequests(self):
+        """
+        Returns the requests that are made to the gateway.
+        """
+        return self.request.bodies
+    
+    def getHeaders(self):
+        """
+        Returns the request headers.
+        """
+        return self.request.headers
+
+class Client:
+    def __init__(self):
+        self.request = AMFMessage()
+        self.response = AMFMessage()
+    
+    def __repr__(self):
+        return "<Client endpoint=%s>" % (self.endpoint)
+    
+    def setRequest(self, servicePath, data):
+        """
+        setRequest creates the encoded AMF request for the server. It expects  
+        the servicepath and methodname, and the parameters of the methodcall.
+        """
+        body = AMFMessageBody()
+        body.target = servicePath
+        body.response = '/1'
+        body.data = data
+        self.request.bodies.append(body)
+        data = AMFMessageEncoder(self.request).encode()
+        return data.getvalue()
+    
+    def getResponse(self, data):
+        self.response = AMFMessageDecoder(data).decode()
+        return self.response.bodies
+        
 if __name__ == "__main__":
     import sys, glob
     debug = False

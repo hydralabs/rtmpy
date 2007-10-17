@@ -94,7 +94,7 @@ class handleHTTPRequest(http.Request):
             # HTTP404 - Page not found.
             self.setResponseCode(http.NOT_FOUND)
             self.write("""<html><head><title>Page Not Found</title></head>
-                    <h1>404</h1></html>""")
+                    <h1>404</h1><p>Page not found</p></html>""")
         self.finish()
 
 class MyHttp(http.HTTPChannel):
@@ -109,4 +109,4 @@ if __name__ == "__main__":
     reactor.listenTCP(port, MyHttpFactory())
     print "Started RTMPy AMF server on port " + str(port) + "."
     reactor.run()
-    print "\nStopped server."
+    print "\nServer stopped."
