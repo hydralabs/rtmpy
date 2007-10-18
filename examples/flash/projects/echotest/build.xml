@@ -1,0 +1,101 @@
+<?xml version="1.0"?>
+<!-- ======================================================================                                               
+     Echo Test application   
+     A Flex 2 application to test the AMF implementation of RTMPy.
+     
+     Joachim Bauch             
+     Thijs Triemstra (info@collab.nl)                                                                
+     ====================================================================== -->
+<project name="Echo Test" default="build" basedir=".">
+	
+	<!-- Flex config -->
+	<property file="../flex.properties" />
+
+	<!-- Application config -->
+	<property file="./build.properties" />
+	
+  	<taskdef resource="flexTasks.tasks" classpath="${flex.ant}" />  
+
+	<!-- dirs -->
+	<property 
+		name="release.build.dir" 
+		location="${build.dir}"/>
+
+	<!-- files -->
+	<property 
+		name="main.application.release.out" 
+		location="${release.build.dir}/${output.swf.name}.swf"/>
+	
+    <description>
+    	Echo test application
+    </description>
+
+    <!-- ================================= 
+          target: build              
+         ================================= -->
+    <target name="build" 
+    	depends="clean,init,compile,docs" 
+    	description="--> Echo test application">
+    </target>
+
+    <!-- - - - - - - - - - - - - - - - - - 
+          target: compile
+         - - - - - - - - - - - - - - - - - -->
+    <target name="compile">
+	<mxmlc 
+	file="${main.application}" 
+	output="${main.application.release.out}" 
+	actionscript-file-encoding="UTF-8" 
+	keep-generated-actionscript="false" 
+	incremental="true" benchmark="true"> 
+		<!-- Get default compiler options. --> 
+		<load-config filename="${flex.config}"/>            
+		<!-- List of path elements that form the roots of ActionScript class hierarchies. --> 
+		<source-path path-element="${FLEX_HOME}/frameworks"/> 
+		<source-path path-element="${src.dir}"/> 
+		<!-- Flex SDK core (locale is included in .swc with Flex 3) -->
+		<compiler.library-path dir="${FLEX_HOME}/frameworks" append="true"> 
+			<include name="libs" />  
+		</compiler.library-path> 
+	</mxmlc>
+    </target>
+	
+   <!-- - - - - - - - - - - - - - - - - - 
+          target: clean                      
+    - - - - - - - - - - - - - - - - - -->
+    <target name="clean">
+    	<delete 
+    		dir="${asdoc.output.dir}" 
+    		failOnError="false" 
+    		includeEmptyDirs="true" />
+    	<delete 
+    		dir="${build.dir}" 
+    		failOnError="false" 
+    		includeEmptyDirs="true" />
+    </target>
+	
+    <!-- - - - - - - - - - - - - - - - - - 
+          target: init                      
+    - - - - - - - - - - - - - - - - - -->
+    <target name="init">
+    	<mkdir 
+    		dir="${build.dir}"/>
+    </target>
+	
+    <!-- - - - - - - - - - - - - - - - - - 
+            target: docs
+    - - - - - - - - - - - - - - - - - -->
+    <target name="docs">
+    	<mkdir dir="${asdoc.output.dir}"/>
+    	<exec executable="${FLEX_HOME}/${flex.doc}" failonerror="true">
+		<arg line='-source-path ${src.dir}'/>
+		<arg line='-doc-sources ${asdoc.domainextensions}'/>
+    		<arg value='-load-config=${flex.config}'/>
+		<arg line='-output ${asdoc.output.dir}'/>
+		<arg line='-templates-path ${asdoc.templates.dir}'/>
+		<arg line='-left-frameset-width ${asdoc.framewidth}'/>
+		<arg line='-benchmark'/>
+	</exec>
+    </target>
+
+</project>

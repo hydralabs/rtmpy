@@ -1,0 +1,45 @@
+<?xml version="1.0"?>
+<echo:EchoTest xmlns:mx="http://www.adobe.com/2006/mxml"
+ 	       xmlns:echo="org.red5.samples.echo.*"
+	       pageTitle="AMF Echo Client" layout="vertical"
+	       backgroundColor="#F4F4F4" themeColor="haloBlue"
+		   width="780" height="580" horizontalScrollPolicy="off">
+	<mx:Form paddingBottom="0" paddingTop="0" paddingRight="0" paddingLeft="0">
+		<mx:FormItem label="setCredentials:" width="100%">
+			<mx:HBox width="100%">
+				<mx:Label text="Username"/>
+				<mx:TextInput id="username_txt" width="100%" text=""/>
+				<mx:Label text="Password"/>
+				<mx:TextInput id="password_txt" displayAsPassword="true" width="100%" text=""/>
+			</mx:HBox>
+		</mx:FormItem>
+		<mx:FormItem label="HTTP:" width="100%">
+			<mx:TextInput id="http_txt" width="100%" text="http://localhost:5080/echo/gateway"/>
+		</mx:FormItem>
+		<mx:FormItem label="RTMP:" width="100%">
+			<mx:TextInput id="rtmp_txt" width="100%" text="rtmp://localhost/echo"/>
+		</mx:FormItem>
+		<mx:FormItem label="Connect:" horizontalAlign="right" width="100%">
+			<mx:HBox width="100%">
+				<mx:Button id="btnConnectRTMP0" label="RTMP AMF0" labelPlacement="left" click="onConnect('rtmp', ObjectEncoding.AMF0)" />
+				<mx:Button id="btnConnectRTMP3" label="RTMP AMF3" labelPlacement="left" click="onConnect('rtmp', ObjectEncoding.AMF3)" />
+				<mx:Button id="btnConnectHTTP0" label="HTTP AMF0" labelPlacement="left" click="onConnect('http', ObjectEncoding.AMF0)" />
+				<mx:Button id="btnConnectHTTP3" label="HTTP AMF3" labelPlacement="left" click="onConnect('http', ObjectEncoding.AMF3)" />
+				<mx:Button id="btnConnectRemoteObject" label="mx:RemoteObject" labelPlacement="left" click="onConnect('remoteObject', ObjectEncoding.AMF3)" />
+				<mx:Text text="{ fpVersion }" paddingTop="2" fontSize="9"/>
+			</mx:HBox>
+		</mx:FormItem>
+	</mx:Form>
+	<mx:TextArea id="resultText" htmlText="{ testResult }" width="100%" height="100%" editable="false" 
+				 updateComplete="{ resultText.verticalScrollPosition = resultText.maxVerticalScrollPosition }"/>
+				 
+	<mx:RemoteObject 
+		id="echoService"
+		destination="Red5Echo"
+		source="EchoService"
+		result="onRemotingResult(event.result)"
+		fault="onRemotingError(event)">
+    	<mx:method name="echo" />
+    </mx:RemoteObject>
+    
+</echo:EchoTest>
