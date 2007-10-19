@@ -29,12 +29,8 @@ import unittest
 
 def suite():
     import rtmpy
-    from rtmpy.tests import amf
-    
-    suite = unittest.TestSuite()
-    suite.addTest(amf.suite())
-    
+
     return suite
 
 if __name__ == '__main__':
-    unittest.main(defaultTest='suite')
+    # unittest.main(defaultTest='suite')
