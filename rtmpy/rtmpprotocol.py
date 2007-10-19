@@ -29,9 +29,9 @@ import time, os
 from twisted.internet import reactor, protocol
 from twisted.python import log, logfile
 
-import rtmpy.util
-from rtmpy.util import BufferedByteStream, hexdump, Enum, uptime
-from rtmpy import amf
+import pyamf.util
+from pyamf.util import BufferedByteStream, hexdump, Enum, uptime
+from pyamf import amf
 from statuscodes import StatusCodes
 
 Modes = Enum('SERVER', 'CLIENT')

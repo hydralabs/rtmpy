@@ -31,13 +31,14 @@ use_setuptools()
 from setuptools import setup, find_packages
 
 setup(name = "RTMPy",
-    version = "0.0.1",
+    version = "0.0.2",
     description = "RTMP and AMF client/server Twisted implementation",
     url = "http://dev.collab.com/rtmpy",
-    packages = ["rtmpy", "rtmpy.rtmp"],
+    packages = ["rtmpy"],
     test_suite = "rtmpy.tests.suite",
     install_requires = [
-        'Twisted>=2.5'
+        'Twisted>=2.5',
+        'PyAMF>=0.0.1',
     ],
     license = "MIT License",
     classifiers = [
