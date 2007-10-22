@@ -26,7 +26,7 @@
 #
 
 from twisted.web import client
-from pyamf.amf import Client, GeneralTypes
+from pyamf import Client, GeneralTypes
 
 # Remoting gateway location.
 endPoint = 'http://localhost:8080/gateway'

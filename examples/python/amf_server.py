@@ -26,7 +26,7 @@
 #
 
 from twisted.web import http
-from pyamf.amf import Server, GeneralTypes
+from pyamf import Server, GeneralTypes
 
 # Server port.
 port = 8080
