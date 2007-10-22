@@ -30,9 +30,12 @@ from twisted.internet import reactor, protocol
 from twisted.python import log, logfile
 
 import pyamf.util
-from pyamf.util import BufferedByteStream, hexdump, Enum, uptime
-from pyamf import amf
-from statuscodes import StatusCodes
+from pyamf.util import BufferedByteStream, hexdump
+from pyamf import Server, amf0
+
+import rtmpy.util
+from rtmpy.util import Enum, uptime
+from rtmpy.statuscodes import StatusCodes
 
 Modes = Enum('SERVER', 'CLIENT')
 States = Enum('CONNECT', 'HANDSHAKE', 'HANDSHAKE_VERIFY', 'CONNECTED', 'ERROR', 'DISCONNECTED')
@@ -371,7 +374,7 @@ class RTMPProtocol(protocol.Protocol):
         if headerDataType == Constants.INVOKE:
             input = BufferedByteStream(packetData)
             invoke = Notify()
-            amfreader = amf.AMF0Parser(input)
+            amfreader = amf0.Parser(input)
             invoke.name = amfreader.readElement()
             invoke.id = amfreader.readElement()
             invoke.argv = []
@@ -434,7 +437,7 @@ class RTMPProtocol(protocol.Protocol):
     
     def _writeRTMPPacket(self, channel, notify, streamId=0):
         self.output = BufferedByteStream()
-        amfwriter = amf.AMF0Encoder(self.output)
+        amfwriter = amf0.Encoder(self.output)
         amfwriter.writeElement(notify.name)
         amfwriter.writeElement(notify.id)
         for arg in notify.argv:
