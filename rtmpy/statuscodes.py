@@ -54,129 +54,129 @@ class StatusCodes:
     #: the server.
     NC_CONNECT_REJECTED = "NetConnection.Connect.Rejected"
 
-    # The connection attempt succeeded.
+    #: The connection attempt succeeded.
     NC_CONNECT_SUCCESS = "NetConnection.Connect.Success"
 
-    # The application name specified during connect is invalid.
+    #: The application name specified during connect is invalid.
     NC_CONNECT_INVALID_APPLICATION = "NetConnection.Connect.InvalidApp"
 
-    # Invalid arguments were passed to a NetStream method.
+    #: Invalid arguments were passed to a NetStream method.
     NS_INVALID_ARGUMENT = "NetStream.InvalidArg"
 
     # A recorded stream was deleted successfully.
     NS_CLEAR_SUCCESS = "NetStream.Clear.Success"
 
-    # A recorded stream failed to delete.
+    #: A recorded stream failed to delete.
     NS_CLEAR_FAILED = "NetStream.Clear.Failed"
 
-    # An attempt to publish was successful.
+    #: An attempt to publish was successful.
     NS_PUBLISH_START = "NetStream.Publish.Start"
 
-    # An attempt was made to publish a stream that is already being published by someone else.
+    #: An attempt was made to publish a stream that is already being published by someone else.
     NS_PUBLISH_BADNAME = "NetStream.Publish.BadName"
     
-    # An attempt to use a Stream method (at client-side) failed.
+    #: An attempt to use a Stream method (at client-side) failed.
     NS_FAILED = "NetStream.Failed"
 	
-    # An attempt to unpublish was successful.
+    #: An attempt to unpublish was successful.
     NS_UNPUBLISHED_SUCCESS = "NetStream.Unpublish.Success"
     
-    # Recording was started.
+    #: Recording was started.
     NS_RECORD_START = "NetStream.Record.Start"
 
-    # An attempt was made to record a read-only stream.
+    #: An attempt was made to record a read-only stream.
     NS_RECORD_NOACCESS = "NetStream.Record.NoAccess"
     
-    # Recording was stopped
+    #: Recording was stopped
     NS_RECORD_STOP = "NetStream.Record.Stop"
 
-    # An attempt to record a stream failed.
+    #: An attempt to record a stream failed.
     NS_RECORD_FAILED = "NetStream.Record.Failed"
 
-    # Data is playing behind the normal speed.
+    #: Data is playing behind the normal speed.
     NS_PLAY_INSUFFICIENT_BW = "NetStream.Play.InsufficientBW"
 
-    # Play was started.
+    #: Play was started.
     NS_PLAY_START = "NetStream.Play.Start"
 
-    # An attempt was made to play a stream that does not exist.
+    #: An attempt was made to play a stream that does not exist.
     NS_PLAY_STREAMNOTFOUND = "NetStream.Play.StreamNotFound"
 
-    # Play was stopped.
+    #: Play was stopped.
     NS_PLAY_STOP = "NetStream.Play.Stop"
 
-    # An attempt to play back a stream failed.
+    #: An attempt to play back a stream failed.
     NS_PLAY_FAILED = "NetStream.Play.Failed"
 
-    # A playlist was reset.
+    #: A playlist was reset.
     NS_PLAY_RESET = "NetStream.Play.Reset"
 
-    # The initial publish to a stream was successful. This message is sent to all subscribers.
+    #: The initial publish to a stream was successful. This message is sent to all subscribers.
     NS_PLAY_PUBLISHNOTIFY = "NetStream.Play.PublishNotify"
 	
     # An unpublish from a stream was successful. This message is sent to all subscribers.
     NS_PLAY_UNPUBLISHNOTIFY = "NetStream.Play.UnpublishNotify"
 
-    # Playlist playback switched from one stream to another.
+    #: Playlist playback switched from one stream to another.
     NS_PLAY_SWITCH = "NetStream.Play.Switch"
 
-    # Playlist playback is complete.
+    #: Playlist playback is complete.
     NS_PLAY_COMPLETE = "NetStream.Play.Complete"
 
-    # The subscriber has used the seek command to move to a particular location in the recorded stream.
+    #: The subscriber has used the seek command to move to a particular location in the recorded stream.
     NS_SEEK_NOTIFY = "NetStream.Seek.Notify"
 
-    # The stream doesn't support seeking.
+    #: The stream doesn't support seeking.
     NS_SEEK_FAILED = "NetStream.Seek.Failed"
 
-    # The subscriber has used the seek command to move to a particular location in the recorded stream.
+    #: The subscriber has used the seek command to move to a particular location in the recorded stream.
     NS_PAUSE_NOTIFY = "NetStream.Pause.Notify"
 
-    # Publishing has stopped.
+    #: Publishing has stopped.
     NS_UNPAUSE_NOTIFY = "NetStream.Unpause.Notify"
 
-    # ?
+    #: --
     NS_DATA_START = "NetStream.Data.Start"
 	
-    # The ActionScript engine has encountered a runtime error. In addition to the standard infoObject
-    # properties, the following properties are set:
-    #
-    # filename: name of the offending ASC file.
-    # lineno: line number where the error occurred.
-    # linebuf: source code of the offending line.
+    #: The Python interpreter has encountered a runtime error. In addition to the standard infoObject
+    #: properties, the following properties are set:
+    #:
+    #: filename: name of the offending ASC file.
+    #: lineno: line number where the error occurred.
+    #: linebuf: source code of the offending line.
     APP_SCRIPT_ERROR = "Application.Script.Error"
 
-    # The ActionScript engine has encountered a runtime warning. In addition to the standard infoObject
-    # properties, the following properties are set:
-    # 
-    # filename: name of the offending ASC file.
-    # lineno: line number where the error occurred.
-    # linebuf: source code of the offending line.
+    #: The Python interpreter has encountered a runtime warning. In addition to the standard infoObject
+    #: properties, the following properties are set:
+    #: 
+    #: filename: name of the offending ASC file.
+    #v lineno: line number where the error occurred.
+    #: linebuf: source code of the offending line.
     APP_SCRIPT_WARNING = "Application.Script.Warning"
 
-    # The ActionScript engine is low on runtime memory. This provides an opportunity for the
-    # application instance to free some resources or take suitable action. If the application instance
-    # runs out of memory, it is unloaded and all users are disconnected. In this state, the server will
-    # not invoke the Application.onDisconnect event handler or the Application.onAppStop event handler.
+    #: The Python interpreter is low on runtime memory. This provides an opportunity for the
+    #: application instance to free some resources or take suitable action. If the application instance
+    #: runs out of memory, it is unloaded and all users are disconnected. In this state, the server will
+    #: not invoke the Application.onDisconnect event handler or the Application.onAppStop event handler.
     APP_RESOURCE_LOWMEMORY = "Application.Resource.LowMemory"
 
-    # This information object is passed to the onAppStop handler when the application is being shut down.
+    #: This information object is passed to the onAppStop handler when the application is being shut down.
     APP_SHUTDOWN = "Application.Shutdown"
 
-    # This information object is passed to the onAppStop event handler when the application instance
-    # is about to be destroyed by the server.
+    #: This information object is passed to the onAppStop event handler when the application instance
+    #: is about to be destroyed by the server.
     APP_GC = "Application.GC"
 
-    # Read access to a shared object was denied.
+    #: Read access to a shared object was denied.
     SO_NO_READ_ACCESS = "SharedObject.NoReadAccess"
 
-    # Write access to a shared object was denied.
+    #: Write access to a shared object was denied.
     SO_NO_WRITE_ACCESS = "SharedObject.NoWriteAccess"
 
-    # The creation of a shared object was denied.
+    #: The creation of a shared object was denied.
     SO_CREATION_FAILED = "SharedObject.ObjectCreationFailed"
 
-    # The persistence parameter passed to SharedObject.getRemote() is different from the one used
-    # when the shared object was created.
+    #: The persistence parameter passed to SharedObject.getRemote() is different from the one used
+    #: when the shared object was created.
     SO_PERSISTENCE_MISMATCH = "SharedObject.BadPersistence"
     
