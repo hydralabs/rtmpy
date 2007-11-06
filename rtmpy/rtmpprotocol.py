@@ -22,7 +22,10 @@
 # LIABLE FOR ANY CLAIM, DAMAGES OR OTHER LIABILITY, WHETHER IN AN ACTION
 # OF CONTRACT, TORT OR OTHERWISE, ARISING FROM, OUT OF OR IN CONNECTION
 # WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE SOFTWARE.
-#
+
+"""
+RTMP protocol for Twisted.
+"""
 
 import struct
 import time, os
@@ -31,7 +34,6 @@ from twisted.python import log, logfile
 
 import pyamf.util
 from pyamf.util import BufferedByteStream, hexdump
-from pyamf import Server, amf0
 
 import rtmpy.util
 from rtmpy.util import Enum, uptime
@@ -41,11 +43,13 @@ Modes = Enum('SERVER', 'CLIENT')
 States = Enum('CONNECT', 'HANDSHAKE', 'HANDSHAKE_VERIFY', 'CONNECTED', 'ERROR', 'DISCONNECTED')
 
 class Constants:
-    """AMF and RTMP marker values constants"""
-    maxHandshakeTimeout = 5000
-    HANDSHAKE_SIZE = 1536
-    DEFAULT_CHUNK_SIZE = 128
-    HEADERSIZE=[12,8,4,1]
+    """
+    RTMP marker values constants.
+    """
+    maxHandshakeTimeout =       5000
+    HANDSHAKE_SIZE =            1536
+    DEFAULT_CHUNK_SIZE =        128
+    HEADERSIZE =                [12,8,4,1]
 
     # RTMP Datatypes
     CHUNK_SIZE =                0x01
@@ -378,7 +382,7 @@ class RTMPProtocol(protocol.Protocol):
         if headerDataType == Constants.INVOKE:
             input = BufferedByteStream(packetData)
             invoke = Notify()
-            amfreader = amf0.Parser(input)
+            amfreader = pyamf.decode(input)
             invoke.name = amfreader.readElement()
             invoke.id = amfreader.readElement()
             invoke.argv = []
@@ -441,7 +445,7 @@ class RTMPProtocol(protocol.Protocol):
     
     def _writeRTMPPacket(self, channel, notify, streamId=0):
         self.output = BufferedByteStream()
-        amfwriter = amf0.Encoder(self.output)
+        amfwriter = pyamf.encode(self.output)
         amfwriter.writeElement(notify.name)
         amfwriter.writeElement(notify.id)
         for arg in notify.argv:

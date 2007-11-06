@@ -25,6 +25,10 @@
 # WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE SOFTWARE.
 #
 
+"""
+Tests for RTMPy.
+"""
+
 import unittest
 
 def suite():
@@ -33,4 +37,4 @@ def suite():
     return suite
 
 if __name__ == '__main__':
-    # unittest.main(defaultTest='suite')
+    unittest.main(defaultTest='suite')

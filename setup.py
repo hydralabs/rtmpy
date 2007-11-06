@@ -38,7 +38,7 @@ setup(name = "RTMPy",
     test_suite = "rtmpy.tests.suite",
     install_requires = [
         'Twisted>=2.5',
-        'PyAMF>=0.0.1',
+        'PyAMF>=0.0.2',
     ],
     license = "MIT License",
     classifiers = [

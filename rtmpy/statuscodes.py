@@ -23,34 +23,35 @@
 # LIABLE FOR ANY CLAIM, DAMAGES OR OTHER LIABILITY, WHETHER IN AN ACTION
 # OF CONTRACT, TORT OR OTHERWISE, ARISING FROM, OUT OF OR IN CONNECTION
 # WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE SOFTWARE.
-#
-#
-# Collection of commonly used constants with status codes.
+
+"""
+Collection of commonly used constants with status codes.
+"""
 
 class StatusCodes:
-    # The NetConnection.call method was not able to invoke the server-side method or
-    # command.
+    #: The NetConnection.call method was not able to invoke the server-side method or
+    #: command.
     NC_CALL_FAILED = "NetConnection.Call.Failed"
 
-    # The URI specified in the NetConnection.connect method did not
-    # specify 'rtmp' as the protocol. 'rtmp' must be specified when connecting to
-    # a RTMP server. Either not supported version of AMF was used (3 when only 0 is supported).
+    #: The URI specified in the NetConnection.connect method did not
+    #: specify 'rtmp' as the protocol. 'rtmp' must be specified when connecting to
+    #: a RTMP server. Either not supported version of AMF was used (3 when only 0 is supported).
     NC_CALL_BADVERSION = "NetConnection.Call.BadVersion"
 
-    # The application has been shut down (for example, if the application is out of
-    # memory resources and must shut down to prevent the server from crashing) or the server has shut down.
+    #: The application has been shut down (for example, if the application is out of
+    #: memory resources and must shut down to prevent the server from crashing) or the server has shut down.
     NC_CONNECT_APPSHUTDOWN = "NetConnection.Connect.AppShutdown"
 
-    # The connection was closed successfully.
+    #: The connection was closed successfully.
     NC_CONNECT_CLOSED = "NetConnection.Connect.Closed"
 
-    # The connection attempt failed.
+    #: The connection attempt failed.
     NC_CONNECT_FAILED = "NetConnection.Connect.Failed"
 
-    # The client does not have permission to connect to the application, the
-    # application expected different parameters from those that were passed,
-    # or the application name specified during the connection attempt was not found on
-    # the server.
+    #: The client does not have permission to connect to the application, the
+    #: application expected different parameters from those that were passed,
+    #: or the application name specified during the connection attempt was not found on
+    #: the server.
     NC_CONNECT_REJECTED = "NetConnection.Connect.Rejected"
 
     # The connection attempt succeeded.
