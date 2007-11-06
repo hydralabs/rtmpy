@@ -26,7 +26,7 @@
 #
 
 """
-Twisted RTMP/AMF server example.
+Twisted RTMP server example.
 """
 
 import sys
@@ -36,13 +36,11 @@ from twisted.python import usage
 import twisted.scripts.twistd as td
 
 import rtmpy.services
-from rtmpy.services import RTMPServer # RemotingServer, 
+from rtmpy.services import RTMPServer 
 
 rtmpMode = "server"
 rtmpHost = "0.0.0.0"
 rtmpPort = 1935
-httpHost = "0.0.0.0"
-httpPort = 8000
 
 if __name__ == '__main__':
     tdcmds = ["-no", "-y", __file__]
@@ -63,10 +61,6 @@ else:
     #: Create a MultiService, and hook up a the RTMP
     #: and HTTP TCPServers as children.
     flashServices = service.MultiService()
-
-    #: HTTP/AMF server.
-    # remotingServer = RemotingServer(httpHost, httpPort)
-    # remotingServer.setServiceParent(flashServices)
 
     #: RTMP server.
     rtmpServer = RTMPServer(rtmpHost, rtmpPort)

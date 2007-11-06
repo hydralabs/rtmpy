@@ -29,6 +29,10 @@ Collection of commonly used constants with status codes.
 """
 
 class StatusCodes:
+    """
+    Status codes for NetConnection, NetStream and SharedObject classes used in the Flash Player.
+    
+    """
     #: The NetConnection.call method was not able to invoke the server-side method or
     #: command.
     NC_CALL_FAILED = "NetConnection.Call.Failed"
@@ -87,7 +91,7 @@ class StatusCodes:
     #: An attempt was made to record a read-only stream.
     NS_RECORD_NOACCESS = "NetStream.Record.NoAccess"
     
-    #: Recording was stopped
+    #: Recording was stopped.
     NS_RECORD_STOP = "NetStream.Record.Stop"
 
     #: An attempt to record a stream failed.
@@ -96,13 +100,13 @@ class StatusCodes:
     #: Data is playing behind the normal speed.
     NS_PLAY_INSUFFICIENT_BW = "NetStream.Play.InsufficientBW"
 
-    #: Play was started.
+    #: Playback was started.
     NS_PLAY_START = "NetStream.Play.Start"
 
     #: An attempt was made to play a stream that does not exist.
     NS_PLAY_STREAMNOTFOUND = "NetStream.Play.StreamNotFound"
 
-    #: Play was stopped.
+    #: Playback was stopped.
     NS_PLAY_STOP = "NetStream.Play.Stop"
 
     #: An attempt to play back a stream failed.
@@ -135,23 +139,23 @@ class StatusCodes:
     #: Publishing has stopped.
     NS_UNPAUSE_NOTIFY = "NetStream.Unpause.Notify"
 
-    #: --
+    #: Unknown
     NS_DATA_START = "NetStream.Data.Start"
-	
+    
     #: The Python interpreter has encountered a runtime error. In addition to the standard infoObject
     #: properties, the following properties are set:
     #:
-    #: filename: name of the offending ASC file.
-    #: lineno: line number where the error occurred.
-    #: linebuf: source code of the offending line.
+    #:  filename - name of the offending ASC file.
+    #:  lineno - line number where the error occurred.
+    #:  linebuf - source code of the offending line.
     APP_SCRIPT_ERROR = "Application.Script.Error"
 
     #: The Python interpreter has encountered a runtime warning. In addition to the standard infoObject
     #: properties, the following properties are set:
     #: 
-    #: filename: name of the offending ASC file.
-    #v lineno: line number where the error occurred.
-    #: linebuf: source code of the offending line.
+    #:  filename - name of the offending ASC file.
+    #:  lineno - line number where the error occurred.
+    #:  linebuf - source code of the offending line.
     APP_SCRIPT_WARNING = "Application.Script.Warning"
 
     #: The Python interpreter is low on runtime memory. This provides an opportunity for the
