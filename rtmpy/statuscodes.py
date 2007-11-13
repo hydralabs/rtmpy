@@ -2,7 +2,6 @@
 #
 # Copyright (c) 2007 The RTMPy Project. All rights reserved.
 # 
-# Arnar Birgisson
 # Thijs Triemstra
 # 
 # Permission is hereby granted, free of charge, to any person obtaining
@@ -26,6 +25,10 @@
 
 """
 Collection of commonly used constants with status codes.
+
+@author: U{Thijs Triemstra<mailto:info@collab.nl>}
+
+@since: 0.1.0
 """
 
 class StatusCodes:

@@ -26,7 +26,12 @@
 #
 
 """
-Twisted RTMP server example.
+U{Twisted<http://twistedmatrix.com>} RTMP server example.
+
+@author: U{Arnar Birgisson<mailto:arnarbi@gmail.com>}
+@author: U{Thijs Triemstra<mailto:info@collab.nl>}
+
+@since: 0.1.0
 """
 
 import sys

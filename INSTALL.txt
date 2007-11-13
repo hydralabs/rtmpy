@@ -1,0 +1,32 @@
+====================
+ Installing RTMPy
+====================
+
+:Web-Site: http://rtmpy.org
+
+.. contents::
+
+
+Pre-requisites
+----------------
+
+The following software packages are pre-requisites:
+
+- **Python 2.4 or newer**
+- **Twisted 2.5.0 or newer**
+- **PyAMF 0.1.0 or newer**
+
+Installing
+-------------------------------------------------
+
+::
+
+    $ tar zxf RTMPy-<version>.tar.gz
+    $ cd RTMPy-<version>
+    $ python setup.py build
+    $ python setup.py install
+
+If you have installed setuptools you can also optionally run tests like this:
+
+    $ python setup.py test
+

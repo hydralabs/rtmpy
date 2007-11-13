@@ -1,3 +1,4 @@
+# -*- encoding: utf8 -*-
 #
 # Copyright (c) 2007 The RTMPy Project. All rights reserved.
 # 
@@ -25,5 +26,14 @@
 #
 
 """
-RTMPy is an RTMP implementation for Python.
+RTMPy is a Twisted protocol implementing U{RTMP<http://osflash.org/rtmp>}.
+
+@author: U{Arnar Birgisson<mailto:arnarbi@gmail.com>}
+@author: U{Thijs Triemstra<mailto:info@collab.nl>}
+
+@contact: U{rtmpy@collab.com<mailto:rtmpy@collab.com>}
+@copyright: Copyright (c) 2007 The RTMPy Project. All rights reserved.
+
+@since: July 2007
+@version: 0.1.0
 """

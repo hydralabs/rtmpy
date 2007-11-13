@@ -26,6 +26,10 @@
 
 """
 RTMP services.
+
+@author: U{Thijs Triemstra<mailto:info@collab.nl>}
+
+@since: 0.1.0
 """
 
 from twisted.application import internet
@@ -65,15 +69,3 @@ class RTMPClient(internet.TCPClient):
     """
     def __init__(self, host, port):
         internet.TCPClient.__init__(self, host, port, RTMPClientFactory())
-
-"""
-class RemotingServer(internet.TCPServer):
-    def __init__(self, host, port):
-        internet.TCPServer.__init__(self, port, RemotingServerFactory())
-        
-class FlashRemoting(http.HTTPChannel):
-    requestFactory = FlashRemotingGateway
-
-class RemotingServerFactory(http.HTTPFactory):
-    protocol = FlashRemoting
-"""

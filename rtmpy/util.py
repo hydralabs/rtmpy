@@ -24,7 +24,15 @@
 # OF CONTRACT, TORT OR OTHERWISE, ARISING FROM, OUT OF OR IN CONNECTION
 # WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE SOFTWARE.
 #
-#
+
+"""
+RTMPy Utilities.
+
+@author: U{Arnar Birgisson<mailto:arnarbi@gmail.com>}
+@author: U{Thijs Triemstra<mailto:info@collab.nl>}
+
+@since: 0.1.0
+"""
 
 import time
 
@@ -62,10 +70,13 @@ def Enum(*names):
       constants[i] = val
    constants = tuple(constants)
    EnumType = EnumClass()
+   
    return EnumType
 
 def uptime():
-    """Returns uptime in milliseconds, starting at first call"""
+    """
+   Returns uptime in milliseconds, starting at first call.
+   """
     if not hasattr(uptime, "t0") is None:
         uptime.t0 = time.time()
     return int((time.time() - uptime.t0)*1000)
