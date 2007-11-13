@@ -32,9 +32,10 @@ U{RTMP<http://osflash.org/rtmp>}.
 @author: U{Arnar Birgisson<mailto:arnarbi@gmail.com>}
 @author: U{Thijs Triemstra<mailto:info@collab.nl>}
 
-@contact: U{rtmpy@collab.com<mailto:rtmpy-dev@rtmpy.org>}
 @copyright: Copyright (c) 2007 The RTMPy Project. All rights reserved.
+@contact: U{rtmpy-dev@rtmpy.org<mailto:rtmpy-dev@rtmpy.org>}
 
+@status: -Pre-Alpha
 @since: July 2007
 @version: 0.1.0
 """
