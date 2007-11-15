@@ -34,8 +34,8 @@ RTMP protocol for Twisted.
 
 import struct
 import time, os
+
 from twisted.internet import reactor, protocol
-from twisted.python import log, logfile
 
 import pyamf.util
 from pyamf.util import BufferedByteStream, hexdump
@@ -128,7 +128,7 @@ class RTMPPacket:
     def __repr__(self):
         return ("<RTMPPacket message=%r header=%r>"
                 % (self.message, self.header))
-    
+     
 class RTMPProtocol(protocol.Protocol):
 
     def __init__(self):
@@ -147,13 +147,14 @@ class RTMPProtocol(protocol.Protocol):
         self.incompletePackets = dict() # indexed on channel name
         self.state = States.HANDSHAKE
         self.mode = self.factory.mode
-        log.msg("Client connecting: %s" % (self.transport.getPeer()))
+        print "Client connecting: %s" % (self.transport.getPeer())
+        print "Starting handshake..."
         if self.mode == Modes.CLIENT:
-            # begin handshake for client
+            # create client handshake
             self.beginHandshake()
 
     def connectionLost(self, reason):
-        log.msg("Connection with client %s closed." % self.transport.getPeer())
+        print("Connection with client %s closed." % self.transport.getPeer())
         
     def dataReceived(self, data):
         if self.mode == Modes.SERVER:
@@ -249,7 +250,9 @@ class RTMPProtocol(protocol.Protocol):
         return True
 
     def waitForHandshake(self):
-        """Wait for a valid handshake and disconnect the client if none is received."""
+        """
+        Wait for a valid handshake and disconnect the client if none is received.
+        """
         print "Wait for handshake..."
         # Client didn't send a valid handshake, disconnect.
         # onInactive()
@@ -375,7 +378,9 @@ class RTMPProtocol(protocol.Protocol):
             del self.incompletePackets[channel]
         
     def _decodeAndDispatchPacket(self, packet):
-        """Decodes RTMP message event"""
+        """
+        Decodes RTMP message event
+        """
         packetData = packet.data
         packetHeader = packet.header
         headerDataType = packetHeader.type
@@ -394,7 +399,7 @@ class RTMPProtocol(protocol.Protocol):
             while input.peek() != None:
                 invoke.argv.append(amfreader.readElement())
             packet.message = invoke
-            log.msg("Received RTMP packet: %r" % packet.header)
+            print "Received RTMP packet: %r" % packet.header
             actionType = invoke.name
 
             if actionType == Constants.ACTION_CONNECT:
@@ -479,9 +484,27 @@ class RTMPProtocol(protocol.Protocol):
         
         headerbyte = self.getHeaderSize(header, 1)
         packet = RTMPPacket(header, self.output, notify)
-        log.msg("Sending RTMP packet: %r" % packet.header)
+        print("Sending RTMP packet: %r" % packet.header)
         #self.transport.write(packet)
         #self.output.reset()
+
+class RTMPServerFactory(protocol.ServerFactory):
+    """
+    Construct RTMP servers.
+    """
+    #: protocol type
+    protocol = RTMPProtocol
+    #: handler type
+    mode = Modes.SERVER
+
+class RTMPClientFactory(protocol.ClientFactory):
+    """
+    Construct RTMP clients.
+    """
+    #: protocol type
+    protocol = RTMPProtocol
+    #: handler type
+    mode = Modes.CLIENT
     
 class StatusObject:
     """ Status object that is sent to client with every status event."""
@@ -537,3 +560,4 @@ class SharedObjectTypeMapping:
         """String representation of type"""
         return ("<SharedObjectTypeMapping type=%r>"
                 % ("server connect"))
+    

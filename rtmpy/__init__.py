@@ -27,7 +27,7 @@
 
 """
 U{RTMPy<http://rtmpy.org>} is a Twisted protocol implementing
-U{RTMP<http://osflash.org/rtmp>}.
+U{RTMP<http://osflash.org/documentation/rtmp>}.
 
 @author: U{Arnar Birgisson<mailto:arnarbi@gmail.com>}
 @author: U{Thijs Triemstra<mailto:info@collab.nl>}
@@ -35,7 +35,7 @@ U{RTMP<http://osflash.org/rtmp>}.
 @copyright: Copyright (c) 2007 The RTMPy Project. All rights reserved.
 @contact: U{rtmpy-dev@rtmpy.org<mailto:rtmpy-dev@rtmpy.org>}
 
-@status: -Pre-Alpha
+@status: Pre-Alpha
 @since: July 2007
 @version: 0.1.0
 """

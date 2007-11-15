@@ -39,18 +39,6 @@ U{PyAMF<http://pyamf.org>} website.
 
 import os, os.path
 
-def run_twisted_server(options, services):
-    """
-    Runs the RTMP services.
-
-    @param options: commandline options
-    @type options: dict
-    @param services: List of services for the RTMP server.
-    @type services: dict
-    @return: The function that will run the server.
-    @rtype: callable
-    """
-
 def run_server(name, options, services):
     """
     Starts the echo RTMP server.
@@ -59,22 +47,16 @@ def run_server(name, options, services):
     @type options: dict
     @param services: List of services for the RTMP server.
     @type services: dict
-    """
-    print "Started %s - Twisted Server on rtmp://%s:%d" % (name, options.host, int(options.port))
-    run_twisted_server(options, services)
-
-def run_twisted_client(options, service, result_func, fault_func):
-    """
-    Runs RTMP services for a Twisted echo client.
-
-    @param options: commandline options
-    @type options: dict
-    @param service: Target service on the RTMP server.
-    @type service: 
-    @return: The function that will run the client.
+    @return: The function that will run the server.
     @rtype: callable
     """
+    from twisted.internet import reactor
+    from rtmpy.rtmpprotocol import RTMPServerFactory
+
+    print "Started %s - RTMP Server on rtmp://%s:%d" % (name, options.host, int(options.port))
     
+    reactor.listenTCP(int(options.port), RTMPServerFactory(), 50, options.host)
+    reactor.run()
 
 def run_client(name, options, service, result_func, fault_func):
     """
@@ -85,7 +67,6 @@ def run_client(name, options, service, result_func, fault_func):
     @param service: Target service on the RTMP server.
     @type service: dict
     """
-    
     
 def parse_args(args):
     """
@@ -102,6 +83,6 @@ def parse_args(args):
     parser.add_option('--host', dest='host', default='localhost',
                       help='The host address for the RTMP server')
     parser.add_option('-p', '--port', dest='port', default=1935,
-                      help='The port number the server uses')
+                      help='The port number for the RTMP server')
 
     return parser.parse_args(args)

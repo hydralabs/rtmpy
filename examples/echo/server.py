@@ -132,10 +132,11 @@ register_class(ExternalizableClass, '%s.%s' % (ECHO_NS, 'ExternalizableClass'),
     write_func=write_ec, read_func=read_ec)
 
 if __name__ == '__main__':
+    
     import sys
     from __init__ import parse_args, run_server
-
+    
     options = parse_args(sys.argv[1:])
     services = {'echo': echo}
-
+    
     run_server('Echo Test', options[0], services)
