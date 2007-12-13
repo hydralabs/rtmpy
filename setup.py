@@ -1,4 +1,3 @@
-#
 # Copyright (c) 2007 The RTMPy Project. All rights reserved.
 # 
 # Arnar Birgisson
@@ -31,13 +30,14 @@ use_setuptools()
 from setuptools import setup, find_packages
 
 setup(name = "RTMPy",
-    version = "0.0.1",
-    description = "RTMP and AMF client/server Twisted implementation",
-    url = "http://dev.collab.com/rtmpy",
-    packages = ["rtmpy", "rtmpy.rtmp"],
+    version = "0.1.0",
+    description = "Twisted protocol for RTMP",
+    url = "http://rtmpy.org",
+    packages = ["rtmpy"],
     test_suite = "rtmpy.tests.suite",
     install_requires = [
-        'Twisted>=2.5'
+        'Twisted>=2.5.0',
+        'PyAMF>=0.1.0',
     ],
     license = "MIT License",
     classifiers = [

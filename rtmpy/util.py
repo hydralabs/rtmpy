@@ -25,98 +25,17 @@
 # WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE SOFTWARE.
 #
 
-import struct
+"""
+RTMPy Utilities.
+
+@author: U{Arnar Birgisson<mailto:arnarbi@gmail.com>}
+@author: U{Thijs Triemstra<mailto:info@collab.nl>}
+
+@since: 0.1.0
+"""
+
 import time
-from StringIO import StringIO
 
-class NetworkIOMixIn:
-    """Provides mix-in methods for file like objects to read and write basic
-    datatypes in network (= big-endian) byte-order."""
-    
-    def read_uchar(self):
-        return struct.unpack("!B", self.read(1))[0]
-    
-    def write_uchar(self, c):
-        self.write(struct.pack("!B", c))
-
-    def read_char(self):
-        return struct.unpack("!b", self.read(1))[0]
-    
-    def write_char(self, c):
-        self.write(struct.pack("!b", c))
-    
-    def read_ushort(self):
-        return struct.unpack("!H", self.read(2))[0]
-    
-    def write_ushort(self, s):
-        self.write(struct.pack("!H", s))
-    
-    def read_short(self):
-        return struct.unpack("!h", self.read(2))[0]
-    
-    def write_short(self, s):
-        self.write(struct.pack("!h", s))
-    
-    def read_ulong(self):
-        return struct.unpack("!L", self.read(4))[0]
-    
-    def write_ulong(self, l):
-        self.write(struct.pack("!L", l))
-    
-    def read_long(self):
-        return struct.unpack("!l", self.read(4))[0]
-    
-    def write_long(self, l):
-        self.write(struct.pack("!l", l))
-    
-    def read_double(self):
-        return struct.unpack("!d", self.read(8))[0]
-    
-    def write_double(self, d):
-        self.write(struct.pack("!d", d))
-    
-    def read_utf8_string(self, length):
-        str = struct.unpack("%ds" % length, self.read(length))[0]
-        return unicode(str, "utf8")
-    
-    def write_utf8_string(self, u):
-        self.write(u.encode("utf8"))
-
-
-class BufferedByteStream(StringIO, NetworkIOMixIn):
-    """An extension of StringIO that:
-        - Raises EOFError if reading past end
-        - Allows you to peek() at the next byte
-    """
-
-    def __init__(self, *args, **kwargs):
-        StringIO.__init__(self, *args, **kwargs)
-
-    def read(self, length=-1):
-        if length > 0 and self.at_eof():
-            raise EOFError
-        if length > 0 and self.tell() + length > self.len:
-            length = self.len - self.tell()
-        return StringIO.read(self, length)
-
-    def peek(self):
-        if self.at_eof():
-            return None
-        else:
-            c = self.read(1)
-            self.seek(self.tell()-1)
-            return c
-
-    def at_eof(self):
-        "Returns true if next .read(1) will trigger EOFError"
-        return self.tell() >= self.len
-    
-    def remaining(self):
-        "Returns number of remaining bytes"
-        return self.len - self.tell()
-
-
-# Enum from python cookbook
 def Enum(*names):
    ##assert names, "Empty enums are not supported" # <- Don't like empty enums? Uncomment!
 
@@ -151,54 +70,13 @@ def Enum(*names):
       constants[i] = val
    constants = tuple(constants)
    EnumType = EnumClass()
+   
    return EnumType
 
-def hexdump(data):
-    import string
-    hex = ascii = ""
-    buf = ""
-    index = 0
-    for c in data:
-        hex += "%02x " % ord(c)
-        if c in string.printable and c not in string.whitespace:
-            ascii += c
-        else:
-            ascii += "."
-        if len(ascii) == 16:
-            buf += "%04x:  %s %s %s\n" % (index, hex[:24], hex[24:], ascii)
-            hex = ascii = ""
-            index += 16
-    if len(ascii):
-        buf += "%04x:  %-24s %-24s %s\n" % (index, hex[:24], hex[24:], ascii)
-    return buf
-
 def uptime():
-    """Returns uptime in milliseconds, starting at first call"""
+    """
+   Returns uptime in milliseconds, starting at first call.
+   """
     if not hasattr(uptime, "t0") is None:
         uptime.t0 = time.time()
     return int((time.time() - uptime.t0)*1000)
-
-def decode_utf8_modified(data):
-    """Decodes a unicode string from Modified UTF-8 data.
-    See http://en.wikipedia.org/wiki/UTF-8#Java for details."""
-    # Ported from http://viewvc.rubyforge.mmmultiworks.com/cgi/viewvc.cgi/trunk/lib/ruva/class.rb
-    # Ruby version is Copyright (c) 2006 Ross Bamford (rosco AT roscopeco DOT co DOT uk).
-    # The string is first converted to UTF16 BE
-    utf16 = []
-    i = 0
-    while i < len(data):
-        c = ord(data[i])
-        if 0x00 < c < 0x80:
-            utf16.append(c)
-            i += 1
-        elif c & 0xc0 == 0xc0:
-            utf16.append(((c & 0x1f) << 6) | (ord(data[i+1]) & 0x3f))
-            i += 2
-        elif c & 0xe0 == 0xe0:
-            utf16.append(((c & 0x0f) << 12) | ((ord(data[i+1]) & 0x3f) << 6) | (ord(data[i+2]) & 0x3f))
-            i += 3
-        else:
-            raise ValueError("Data is not valid modified UTF-8")
-    
-    utf16 = "".join([chr((c >> 8) & 0xff) + chr(c & 0xff) for c in utf16])
-    return unicode(utf16, "utf_16_be")

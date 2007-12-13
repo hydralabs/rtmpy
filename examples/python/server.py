@@ -26,16 +26,50 @@
 #
 
 """
-U{RTMPy<http://rtmpy.org>} is a Twisted protocol implementing
-U{RTMP<http://osflash.org/documentation/rtmp>}.
+U{Twisted<http://twistedmatrix.com>} RTMP server example.
 
 @author: U{Arnar Birgisson<mailto:arnarbi@gmail.com>}
 @author: U{Thijs Triemstra<mailto:info@collab.nl>}
 
-@copyright: Copyright (c) 2007 The RTMPy Project. All rights reserved.
-@contact: U{rtmpy-dev@rtmpy.org<mailto:rtmpy-dev@rtmpy.org>}
-
-@status: Pre-Alpha
-@since: July 2007
-@version: 0.1.0
+@since: 0.1.0
 """
+
+import sys
+
+from twisted.application import service
+from twisted.python import usage
+import twisted.scripts.twistd as td
+
+import rtmpy.services
+from rtmpy.services import RTMPServer 
+
+rtmpMode = "server"
+rtmpHost = "0.0.0.0"
+rtmpPort = 1935
+
+if __name__ == '__main__':
+    tdcmds = ["-no", "-y", __file__]
+    tdoptions = td.ServerOptions()
+    try:
+        tdoptions.parseOptions(tdcmds)
+    except usage.UsageError, errortext:
+        print '%s' % (errortext)
+        sys.exit(1)
+        
+    #: run app with twistd
+    td.runApp(tdoptions)
+
+else:
+    # Normal twistd startup.
+    application = service.Application("RTMPy")
+
+    #: Create a MultiService, and hook up a the RTMP
+    #: and HTTP TCPServers as children.
+    flashServices = service.MultiService()
+
+    #: RTMP server.
+    rtmpServer = RTMPServer(rtmpHost, rtmpPort)
+    rtmpServer.setServiceParent(flashServices)
+
+    #: Connect services to the application.
+    flashServices.setServiceParent(application)

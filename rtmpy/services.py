@@ -2,7 +2,6 @@
 #
 # Copyright (c) 2007 The RTMPy Project. All rights reserved.
 # 
-# Arnar Birgisson
 # Thijs Triemstra
 # 
 # Permission is hereby granted, free of charge, to any person obtaining
@@ -25,38 +24,48 @@
 # WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE SOFTWARE.
 #
 
-from twisted.web import client
-from rtmpy.amf import Client, GeneralTypes
+"""
+RTMP services.
 
-# Remoting gateway location.
-endPoint = 'http://localhost:8080/gateway'
+@author: U{Thijs Triemstra<mailto:info@collab.nl>}
 
-def handleResult(data):
-    result = amfClient.getResponse(data)
-    # Loop through result(s).
-    for res in result:
-        print "Response:", res
-    reactor.stop()
+@since: 0.1.0
+"""
 
-def handleError(failure):
-    print "Error:", failure.getErrorMessage()
-    reactor.stop()
+from twisted.application import internet
+from twisted.internet import protocol
+from twisted.web import http
 
-if __name__ == "__main__":
-    from twisted.internet import reactor
-    # Set up the client object.
-    amfClient = Client()
-    # Send a request to myService.myMethod and send as only 
-    # parameter 'myParameter'.
-    data = amfClient.setRequest('myService.myMethod', 'myParameter')
-    postRequest = client.getPage(
-        endPoint,
-        method='POST',
-        headers={'Content-Type': GeneralTypes.AMF_MIMETYPE,
-                 'Content-Length': str(len(data))},
-        postdata=data)
-    # Handle result.
-    postRequest.addCallback(handleResult).addErrback(handleError)
-    print "\nStarted RTMPy AMF client with endpoint: " + endPoint + ".\n"
-    reactor.run()
-    print "\nClient stopped."
+from rtmpy.rtmpprotocol import RTMPProtocol, Modes
+
+class RTMPServerFactory(protocol.ServerFactory):
+    """
+    Construct RTMP servers.
+    """
+    #: protocol type
+    protocol = RTMPProtocol
+    #: handler type
+    mode = Modes.SERVER
+
+class RTMPClientFactory(protocol.ClientFactory):
+    """
+    Construct RTMP clients.
+    """
+    #: protocol type
+    protocol = RTMPProtocol
+    #: handler type
+    mode = Modes.CLIENT
+
+class RTMPServer(internet.TCPServer):
+    """
+    Twisted RTMP server.
+    """
+    def __init__(self, host, port):
+        internet.TCPServer.__init__(self, port, RTMPServerFactory())
+
+class RTMPClient(internet.TCPClient):
+    """
+    Twisted RTMP client.
+    """
+    def __init__(self, host, port):
+        internet.TCPClient.__init__(self, host, port, RTMPClientFactory())

@@ -25,15 +25,20 @@
 # WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE SOFTWARE.
 #
 
+"""
+Tests for RTMPy.
+
+@author: U{Arnar Birgisson<mailto:arnarbi@gmail.com>}
+@author: U{Thijs Triemstra<mailto:info@collab.nl>}
+
+@since: 0.1.0
+"""
+
 import unittest
 
 def suite():
     import rtmpy
-    from rtmpy.tests import amf
-    
-    suite = unittest.TestSuite()
-    suite.addTest(amf.suite())
-    
+
     return suite
 
 if __name__ == '__main__':

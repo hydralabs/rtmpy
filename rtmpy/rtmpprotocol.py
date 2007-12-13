@@ -22,60 +22,76 @@
 # LIABLE FOR ANY CLAIM, DAMAGES OR OTHER LIABILITY, WHETHER IN AN ACTION
 # OF CONTRACT, TORT OR OTHERWISE, ARISING FROM, OUT OF OR IN CONNECTION
 # WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE SOFTWARE.
-#
+
+"""
+RTMP protocol for Twisted.
+
+@author: U{Arnar Birgisson<mailto:arnarbi@gmail.com>}
+@author: U{Thijs Triemstra<mailto:info@collab.nl>}
+
+@since: 0.1.0
+"""
 
 import struct
 import time, os
+
 from twisted.internet import reactor, protocol
-from twisted.python import log, logfile
+
+import pyamf.util
+from pyamf.util import BufferedByteStream, hexdump
 
 import rtmpy.util
-from rtmpy.util import BufferedByteStream, hexdump, Enum, uptime
-from rtmpy import amf
-from statuscodes import StatusCodes
+from rtmpy.util import Enum, uptime
+from rtmpy.statuscodes import StatusCodes
 
 Modes = Enum('SERVER', 'CLIENT')
 States = Enum('CONNECT', 'HANDSHAKE', 'HANDSHAKE_VERIFY', 'CONNECTED', 'ERROR', 'DISCONNECTED')
 
 class Constants:
-    """AMF and RTMP marker values constants"""
-    maxHandshakeTimeout = 5000
-    HANDSHAKE_SIZE = 1536
-    DEFAULT_CHUNK_SIZE = 128
-    HEADERSIZE=[12,8,4,1]
-    
-    CHUNK_SIZE  =               0x01
+    """
+    RTMP marker values constants.
+    """
+    maxHandshakeTimeout =       5000
+    HANDSHAKE_SIZE =            1536
+    DEFAULT_CHUNK_SIZE =        128
+    HEADERSIZE =                [12,8,4,1]
+
+    # RTMP Datatypes
+    CHUNK_SIZE =                0x01
     # Unknown:                  0x02
-    BYTES_READ  =               0x03
-    PING        =               0x04
-    SERVER_BW   =               0x05
-    CLIENT_BW   =               0x06
+    BYTES_READ =                0x03
+    PING =                      0x04
+    SERVER_BW =                 0x05
+    CLIENT_BW =                 0x06
     # Unknown:                  0x07
     AUDIO_DATA  =               0x08
     VIDEO_DATA  =               0x09
-    # Unknown:                  0x0A ... 0x0F
+    # Unknown:                  0x0A ... 0x0E
+    FLEX_STREAM =               0x0F
     FLEX_SHARED_OBJECT =        0x10
     FLEX_MESSAGE =              0x11
-    NOTIFY      =               0x12
+    NOTIFY =                    0x12
     STREAM_METADATA =           0x12
-    SO          =               0x13
-    INVOKE      =               0x14
+    SO =                        0x13
+    INVOKE =                    0x14
+    #
     HEADER_NEW =                0x00
     SAME_SOURCE =               0x01
     HEADER_TIMER_CHANGE =       0x02
     HEADER_CONTINUE =           0x03
-    CLIENT_UPDATE_DATA =        0x04
-    CLIENT_UPDATE_ATTRIBUTE =   0x05
-    CLIENT_SEND_MESSAGE =       0x06
-    CLIENT_STATUS =             0x07
-    CLIENT_CLEAR_DATA =         0x08
-    CLIENT_DELETE_DATA =        0x09
-    CLIENT_INITIAL_DATA =       0x0B
+    # Shared Object DataTypes
     SO_CONNECT =                0x01
     SO_DISCONNECT =             0x02
     SET_ATTRIBUTE =             0x03
+    UPDATE_DATA =               0x04
+    UPDATE_ATTRIBUTE =          0x05
     SEND_MESSAGE =              0x06
+    CLIENT_STATUS =             0x07
+    CLEAR_DATA =                0x08
+    DELETE_DATA =               0x09
     DELETE_ATTRIBUTE =          0x0A
+    INITIAL_DATA =              0x0B
+    #
     ACTION_CONNECT =            "connect"
     ACTION_DISCONNECT =         "disconnect"
     ACTION_CREATE_STREAM =      "createStream"
@@ -112,7 +128,7 @@ class RTMPPacket:
     def __repr__(self):
         return ("<RTMPPacket message=%r header=%r>"
                 % (self.message, self.header))
-    
+     
 class RTMPProtocol(protocol.Protocol):
 
     def __init__(self):
@@ -131,13 +147,14 @@ class RTMPProtocol(protocol.Protocol):
         self.incompletePackets = dict() # indexed on channel name
         self.state = States.HANDSHAKE
         self.mode = self.factory.mode
-        log.msg("Client connecting: %s" % (self.transport.getPeer()))
+        print "Client connecting: %s" % (self.transport.getPeer())
+        print "Starting handshake..."
         if self.mode == Modes.CLIENT:
-            # begin handshake for client
+            # create client handshake
             self.beginHandshake()
 
     def connectionLost(self, reason):
-        log.msg("Connection with client %s closed." % self.transport.getPeer())
+        print("Connection with client %s closed." % self.transport.getPeer())
         
     def dataReceived(self, data):
         if self.mode == Modes.SERVER:
@@ -233,7 +250,9 @@ class RTMPProtocol(protocol.Protocol):
         return True
 
     def waitForHandshake(self):
-        """Wait for a valid handshake and disconnect the client if none is received."""
+        """
+        Wait for a valid handshake and disconnect the client if none is received.
+        """
         print "Wait for handshake..."
         # Client didn't send a valid handshake, disconnect.
         # onInactive()
@@ -359,7 +378,9 @@ class RTMPProtocol(protocol.Protocol):
             del self.incompletePackets[channel]
         
     def _decodeAndDispatchPacket(self, packet):
-        """Decodes RTMP message event"""
+        """
+        Decodes RTMP message event
+        """
         packetData = packet.data
         packetHeader = packet.header
         headerDataType = packetHeader.type
@@ -371,14 +392,14 @@ class RTMPProtocol(protocol.Protocol):
         if headerDataType == Constants.INVOKE:
             input = BufferedByteStream(packetData)
             invoke = Notify()
-            amfreader = amf.AMF0Parser(input)
+            amfreader = pyamf.decode(input)
             invoke.name = amfreader.readElement()
             invoke.id = amfreader.readElement()
             invoke.argv = []
             while input.peek() != None:
                 invoke.argv.append(amfreader.readElement())
             packet.message = invoke
-            log.msg("Received RTMP packet: %r" % packet.header)
+            print "Received RTMP packet: %r" % packet.header
             actionType = invoke.name
 
             if actionType == Constants.ACTION_CONNECT:
@@ -434,7 +455,7 @@ class RTMPProtocol(protocol.Protocol):
     
     def _writeRTMPPacket(self, channel, notify, streamId=0):
         self.output = BufferedByteStream()
-        amfwriter = amf.AMF0Encoder(self.output)
+        amfwriter = pyamf.encode(self.output)
         amfwriter.writeElement(notify.name)
         amfwriter.writeElement(notify.id)
         for arg in notify.argv:
@@ -463,9 +484,27 @@ class RTMPProtocol(protocol.Protocol):
         
         headerbyte = self.getHeaderSize(header, 1)
         packet = RTMPPacket(header, self.output, notify)
-        log.msg("Sending RTMP packet: %r" % packet.header)
+        print("Sending RTMP packet: %r" % packet.header)
         #self.transport.write(packet)
         #self.output.reset()
+
+class RTMPServerFactory(protocol.ServerFactory):
+    """
+    Construct RTMP servers.
+    """
+    #: protocol type
+    protocol = RTMPProtocol
+    #: handler type
+    mode = Modes.SERVER
+
+class RTMPClientFactory(protocol.ClientFactory):
+    """
+    Construct RTMP clients.
+    """
+    #: protocol type
+    protocol = RTMPProtocol
+    #: handler type
+    mode = Modes.CLIENT
     
 class StatusObject:
     """ Status object that is sent to client with every status event."""
@@ -521,3 +560,4 @@ class SharedObjectTypeMapping:
         """String representation of type"""
         return ("<SharedObjectTypeMapping type=%r>"
                 % ("server connect"))
+    
