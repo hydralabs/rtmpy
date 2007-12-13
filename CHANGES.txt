@@ -1,7 +1,10 @@
-0.1.0 (unreleased)
------
- -
+===============
+RTMPy Changelog
+===============
 
-2007-07-12
--------------------
- - Started project.
+This file contains information about the changes between the different versions
+of RTMPy.
+
+0.1.0 (unreleased)
+------------------
+
