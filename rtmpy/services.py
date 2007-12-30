@@ -1,4 +1,4 @@
-# Copyright (c) 2007 The RTMPy Project.
+# Copyright (c) 2007-2008 The RTMPy Project.
 # See LICENSE for details.
 
 """
@@ -11,7 +11,6 @@ RTMP services.
 
 from twisted.application import internet
 from twisted.internet import protocol
-from twisted.web import http
 
 from rtmpy.rtmpprotocol import RTMPProtocol, Modes
 

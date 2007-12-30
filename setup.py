@@ -1,4 +1,4 @@
-# Copyright (c) 2007 The RTMPy Project.
+# Copyright (c) 2007-2008 The RTMPy Project.
 # See LICENSE for details.
 
 from ez_setup import use_setuptools

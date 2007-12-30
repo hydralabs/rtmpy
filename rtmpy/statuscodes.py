@@ -1,4 +1,4 @@
-# Copyright (c) 2007 The RTMPy Project.
+# Copyright (c) 2007-2008 The RTMPy Project.
 # See LICENSE for details.
 
 """
@@ -125,7 +125,6 @@ class StatusCodes:
     
     #: The Python interpreter has encountered a runtime error. In addition to the standard infoObject
     #: properties, the following properties are set:
-    #:
     #:  filename - name of the offending ASC file.
     #:  lineno - line number where the error occurred.
     #:  linebuf - source code of the offending line.

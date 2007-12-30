@@ -1,4 +1,4 @@
-# Copyright (c) 2007 The RTMPy Project.
+# Copyright (c) 2007-2008 The RTMPy Project.
 # See LICENSE for details.
 
 """
@@ -11,14 +11,11 @@ RTMP protocol for Twisted.
 """
 
 import struct
-import time, os
 
-from twisted.internet import reactor, protocol
+from twisted.internet import protocol
 
-import pyamf.util
-from pyamf.util import BufferedByteStream, hexdump
+from pyamf.util import BufferedByteStream
 
-import rtmpy.util
 from rtmpy.util import Enum, uptime
 from rtmpy.statuscodes import StatusCodes
 
