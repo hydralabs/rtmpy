@@ -12,7 +12,7 @@ Collection of commonly used constants with status codes.
 class StatusCodes:
     """
     Status codes for NetConnection, NetStream and SharedObject classes used in the Flash Player.
-    
+
     """
     #: The NetConnection.call method was not able to invoke the server-side method or
     #: command.
@@ -59,19 +59,19 @@ class StatusCodes:
 
     #: An attempt was made to publish a stream that is already being published by someone else.
     NS_PUBLISH_BADNAME = "NetStream.Publish.BadName"
-    
+
     #: An attempt to use a Stream method (at client-side) failed.
     NS_FAILED = "NetStream.Failed"
-	
+
     #: An attempt to unpublish was successful.
     NS_UNPUBLISHED_SUCCESS = "NetStream.Unpublish.Success"
-    
+
     #: Recording was started.
     NS_RECORD_START = "NetStream.Record.Start"
 
     #: An attempt was made to record a read-only stream.
     NS_RECORD_NOACCESS = "NetStream.Record.NoAccess"
-    
+
     #: Recording was stopped.
     NS_RECORD_STOP = "NetStream.Record.Stop"
 
@@ -98,7 +98,7 @@ class StatusCodes:
 
     #: The initial publish to a stream was successful. This message is sent to all subscribers.
     NS_PLAY_PUBLISHNOTIFY = "NetStream.Play.PublishNotify"
-	
+
     # An unpublish from a stream was successful. This message is sent to all subscribers.
     NS_PLAY_UNPUBLISHNOTIFY = "NetStream.Play.UnpublishNotify"
 
@@ -122,7 +122,7 @@ class StatusCodes:
 
     #: Unknown
     NS_DATA_START = "NetStream.Data.Start"
-    
+
     #: The Python interpreter has encountered a runtime error. In addition to the standard infoObject
     #: properties, the following properties are set:
     #:  filename - name of the offending ASC file.
@@ -132,7 +132,7 @@ class StatusCodes:
 
     #: The Python interpreter has encountered a runtime warning. In addition to the standard infoObject
     #: properties, the following properties are set:
-    #: 
+    #:
     #:  filename - name of the offending ASC file.
     #:  lineno - line number where the error occurred.
     #:  linebuf - source code of the offending line.
@@ -163,4 +163,4 @@ class StatusCodes:
     #: The persistence parameter passed to SharedObject.getRemote() is different from the one used
     #: when the shared object was created.
     SO_PERSISTENCE_MISMATCH = "SharedObject.BadPersistence"
-    
+

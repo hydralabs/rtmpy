@@ -1,5 +1,5 @@
 # Copyright (c) 2007-2008 The RTMPy Project.
-# See LICENSE for details.
+# See LICENSE.txt for details.
 
 """
 Tests for RTMPy.
@@ -9,13 +9,3 @@ Tests for RTMPy.
 
 @since: 0.1.0
 """
-
-import unittest
-
-def suite():
-    import rtmpy
-
-    return suite
-
-if __name__ == '__main__':
-    unittest.main(defaultTest='suite')
