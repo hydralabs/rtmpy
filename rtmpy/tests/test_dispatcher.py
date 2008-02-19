@@ -6,6 +6,7 @@ Tests for L{rtmpy.dispatcher}
 """
 
 from twisted.trial import unittest
+from twisted.internet import defer
 
 from rtmpy.tests import util 
 from rtmpy import dispatcher
@@ -303,3 +304,109 @@ class EventDispatcherTestCase(unittest.TestCase):
         cbl = x.listeners[0]['spam']
         self.assertEquals(cbl.callbacks.keys(), [])
 
+    def test_has_event_listener(self):
+        x = dispatcher.EventDispatcher()
+
+        self.assertFalse(x.hasEventListener('xyz'))
+        x.addEventListener('xyz', lambda: None)
+        self.assertTrue(x.hasEventListener('xyz'))
+
+
+class DispatchEventTestCase(unittest.TestCase):
+    def test_priorities(self):
+        self.order = []
+        def a():
+            self.order.append('a')
+
+        def b():
+            self.order.append('b')
+
+        x = dispatcher.EventDispatcher()
+
+        x.addEventListener('abc', a, 0)
+        x.addEventListener('abc', b, 10)
+
+        x._dispatchEvent('abc')
+
+        self.assertEquals(self.order, ['b', 'a'])
+
+    def test_multiple(self):
+        self.order = []
+        def a():
+            self.order.append('a')
+
+        def b():
+            self.order.append('b')
+
+        x = dispatcher.EventDispatcher()
+
+        x.addEventListener('abc', a)
+        x.addEventListener('abc', b)
+
+        x._dispatchEvent('abc')
+
+        self.assertTrue('a' in self.order)
+        self.assertTrue('b' in self.order)
+
+    def test_dispatch_depth(self):
+        self.order = []
+        def a(ev):
+            self.order.append('a')
+            self.assertTrue(ev._dispatchDepth, 1)
+
+        def b(ev):
+            self.order.append('b')
+            ev._dispatchEvent('xyz')
+
+        def c(ev):
+            self.order.append('c')
+            self.assertTrue(ev._dispatchDepth, 2)
+
+        x = dispatcher.EventDispatcher()
+        x.addEventListener('123', a, 0, x)
+        x.addEventListener('123', b, 0, x)
+        x.addEventListener('xyz', c, 0, x)
+
+        x._dispatchEvent('123')
+        self.assertTrue('a' in self.order)
+        self.assertTrue('b' in self.order)
+        self.assertTrue('c' in self.order)
+
+    def test_empty_list(self):
+        x = dispatcher.EventDispatcher()
+
+        cbl = dispatcher.CallbackList()
+        x.listeners = {0: {'foo': cbl}}
+
+        x._dispatchEvent('foo')
+
+        self.assertEquals(x.listeners, {0: {}})
+
+    def test_update_queue(self):
+        x = dispatcher.EventDispatcher()
+
+        self.called = False
+
+        def cb():
+            self.called = True
+
+        x._updateQueue = [cb]
+
+        x._dispatchEvent('123')
+
+        self.assertEquals(x._updateQueue, [])
+        self.assertTrue(self.called)
+        self.assertEquals(x._dispatchDepth, 0)
+
+    def test_main_func(self):
+        d = defer.Deferred()
+
+        def cb():
+            d.callback(None)
+
+        x = dispatcher.EventDispatcher()
+
+        x.addEventListener('123', cb)
+        x.dispatchEvent('123')
+
+        return d
