@@ -279,3 +279,27 @@ class EventDispatcherTestCase(unittest.TestCase):
 
         self.assertTrue(10 in x.listeners)
         self.assertTrue('foo' in x.listeners[10])
+
+    def test_remove_in_dispatch(self):
+        x = dispatcher.EventDispatcher()
+
+        fn = lambda: None
+        x.addEventListener('spam', fn)
+
+        x._dispatchDepth = 1
+        self.assertEquals(x._updateQueue, [])
+        x.removeEventListener('spam', fn)
+
+        self.assertNotEquals(x._updateQueue, [])
+        self.assertEquals(len(x._updateQueue), 1)
+
+        cb = x._updateQueue[0]
+        x._dispatchDepth = 0
+
+        cb()
+
+        self.assertEquals(x.listeners.keys(), [0])
+        self.assertEquals(['spam'], x.listeners[0].keys())
+        cbl = x.listeners[0]['spam']
+        self.assertEquals(cbl.callbacks.keys(), [])
+

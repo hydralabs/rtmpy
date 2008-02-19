@@ -208,7 +208,7 @@ class EventDispatcher:
         # processing after the dispatch completes
         if self._dispatchDepth > 0:
             self._updateQueue.append(
-                lambda: self.removeObserver(event, listener))
+                lambda: self.removeEventListener(event, listener))
 
             return
 
