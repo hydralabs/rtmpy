@@ -28,7 +28,7 @@ class HandshakeTestCase(unittest.TestCase):
         def onEvent(reason):
             self.assertFalse(self.transport.connected)
 
-        self.protocol.addObserver(rtmp.HANDSHAKE_FAILURE, onEvent)
+        self.protocol.addEventListener(rtmp.HANDSHAKE_FAILURE, onEvent)
         self.protocol.dataReceived('\x00' * (rtmp.HANDSHAKE_LENGTH + 1))
 
     def test_receive_no_data(self):
@@ -51,7 +51,7 @@ class HandshakeTestCase(unittest.TestCase):
         def event_listener(reason):
             d.callback(None)
 
-        self.protocol.addObserver(rtmp.HANDSHAKE_FAILURE, event_listener)
+        self.protocol.addEventListener(rtmp.HANDSHAKE_FAILURE, event_listener)
         self.protocol.dataReceived(bad_client_handshake)
 
         return d
@@ -73,6 +73,6 @@ class HandshakeTestCase(unittest.TestCase):
         def onEvent():
             d.callback(None)
 
-        self.protocol.addObserver(rtmp.HANDSHAKE_SUCCESS, onEvent)
+        self.protocol.addEventListener(rtmp.HANDSHAKE_SUCCESS, onEvent)
 
         return d

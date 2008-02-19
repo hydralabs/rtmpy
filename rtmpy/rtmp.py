@@ -121,8 +121,8 @@ class RTMPBaseProtocol(protocol.Protocol, EventDispatcher):
         self.received_handshake = None
 
         # setup event observers
-        self.addOnetimeObserver(HANDSHAKE_SUCCESS, self.onHandshakeSuccess)
-        self.addOnetimeObserver(HANDSHAKE_FAILURE, self.onHandshakeFailure)
+        self.addEventListener(HANDSHAKE_SUCCESS, self.onHandshakeSuccess)
+        self.addEventListener(HANDSHAKE_FAILURE, self.onHandshakeFailure)
 
     def _consumeBuffer(self):
         """
@@ -188,7 +188,8 @@ class RTMPBaseProtocol(protocol.Protocol, EventDispatcher):
         packet streaming can commence
         """
         self.state = RTMPBaseProtocol.STREAM
-        self.removeObserver(HANDSHAKE_FAILURE, self.onHandshakeFailure)
+        self.removeEventListener(HANDSHAKE_SUCCESS, self.onHandshakeSuccess)
+        self.removeEventListener(HANDSHAKE_FAILURE, self.onHandshakeFailure)
         self.my_handshake = None
         self.received_handshake = None
 

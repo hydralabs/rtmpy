@@ -34,7 +34,7 @@ class HandshakeTestCase(unittest.TestCase):
             self.assertFalse(self.transport.connected)
             d.callback(None)
 
-        self.protocol.addObserver(rtmp.HANDSHAKE_FAILURE, fire_event)
+        self.protocol.addEventListener(rtmp.HANDSHAKE_FAILURE, fire_event)
         self.protocol.makeConnection(self.transport)
         self.protocol.dataReceived('f')
 
@@ -58,7 +58,7 @@ class HandshakeTestCase(unittest.TestCase):
         def event_listener(reason):
             d.callback(None)
 
-        self.protocol.addObserver(rtmp.HANDSHAKE_FAILURE, event_listener)
+        self.protocol.addEventListener(rtmp.HANDSHAKE_FAILURE, event_listener)
         self.protocol.dataReceived(rtmp.HEADER_BYTE + ('\x00' * rtmp.HANDSHAKE_LENGTH) + bad_client_handshake)
 
         return d

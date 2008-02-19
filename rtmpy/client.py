@@ -38,7 +38,7 @@ class RTMPClientProtocol(rtmp.RTMPBaseProtocol):
             return
 
         if buffer.read(1) != rtmp.HEADER_BYTE:
-            self.dispatch(rtmp.HANDSHAKE_FAILURE, 'Invalid header byte received')
+            self.dispatchEvent(rtmp.HANDSHAKE_FAILURE, 'Invalid header byte received')
 
             return
 
@@ -49,13 +49,13 @@ class RTMPClientProtocol(rtmp.RTMPBaseProtocol):
         self.received_handshake = buffer.read(rtmp.HANDSHAKE_LENGTH)
 
         if buffer.read(rtmp.HANDSHAKE_LENGTH) != self.my_handshake:
-            self.dispatch(rtmp.HANDSHAKE_FAILURE, 'Handshake mismatch')
+            self.dispatchEvent(rtmp.HANDSHAKE_FAILURE, 'Handshake mismatch')
 
             return
 
         self._consumeBuffer()
         self.transport.write(self.received_handshake)
-        self.dispatch(rtmp.HANDSHAKE_SUCCESS)
+        self.dispatchEvent(rtmp.HANDSHAKE_SUCCESS)
 
     def dataReceived(self, data):
         """

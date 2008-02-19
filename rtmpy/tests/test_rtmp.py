@@ -71,7 +71,7 @@ class BaseProtocolTestCase(unittest.TestCase):
                 self.assertEquals(observerfn, p.onHandshakeSuccess)
                 self.registered_success = True
 
-        p.addOnetimeObserver = check_observers
+        p.addEventListener = check_observers
         p.makeConnection(transport)
 
         self.assertEquals(p.channels, {})
@@ -105,9 +105,9 @@ class BaseProtocolTestCase(unittest.TestCase):
 
             d.callback(None)
 
-        p.removeObserver = remove_event
-        p.addObserver(rtmp.HANDSHAKE_SUCCESS, onHandshake)
-        p.dispatch(rtmp.HANDSHAKE_SUCCESS)
+        p.removeEventListener = remove_event
+        p.addEventListener(rtmp.HANDSHAKE_SUCCESS, onHandshake)
+        p.dispatchEvent(rtmp.HANDSHAKE_SUCCESS)
 
         return d
 
@@ -125,10 +125,10 @@ class BaseProtocolTestCase(unittest.TestCase):
 
             d.callback(None)
 
-        p.addObserver(rtmp.HANDSHAKE_FAILURE, onEvent)
+        p.addEventListener(rtmp.HANDSHAKE_FAILURE, onEvent)
 
         self.assertTrue(transport.connected)
-        p.dispatch(rtmp.HANDSHAKE_FAILURE, None)
+        p.dispatchEvent(rtmp.HANDSHAKE_FAILURE, None)
 
         return d
 
