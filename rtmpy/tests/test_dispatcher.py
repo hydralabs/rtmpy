@@ -253,3 +253,29 @@ class EventDispatcherTestCase(unittest.TestCase):
         func = cbl.callbacks[fn]
         self.assertEquals(func.args, tuple())
         self.assertEquals(func.kwargs, {})
+
+    def test_remove_simple(self):
+        x = dispatcher.EventDispatcher()
+        x.addEventListener('foo', ord)
+
+        cbl = x.listeners[0]['foo']
+        self.assertTrue(ord in cbl.callbacks)
+
+        x.removeEventListener('foo', ord)
+        self.assertFalse(ord in cbl.callbacks)
+
+        self.assertTrue(0 in x.listeners)
+        self.assertTrue('foo' in x.listeners[0])
+
+    def test_remove_priority(self):
+        x = dispatcher.EventDispatcher()
+        x.addEventListener('foo', ord, 10)
+
+        cbl = x.listeners[10]['foo']
+        self.assertTrue(ord in cbl.callbacks)
+
+        x.removeEventListener('foo', ord)
+        self.assertFalse(ord in cbl.callbacks)
+
+        self.assertTrue(10 in x.listeners)
+        self.assertTrue('foo' in x.listeners[10])
