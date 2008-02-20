@@ -313,6 +313,23 @@ class EventDispatcherTestCase(unittest.TestCase):
 
 
 class DispatchEventTestCase(unittest.TestCase):
+    def test_order(self):
+        self.order = []
+        def a():
+            self.order.append('a')
+
+        def b():
+            self.order.append('b')
+
+        x = dispatcher.EventDispatcher()
+
+        x.addEventListener('abc', a)
+        x.addEventListener('abc', b)
+
+        x._dispatchEvent('abc')
+
+        self.assertEquals(self.order, ['a', 'b'])
+
     def test_priorities(self):
         self.order = []
         def a():

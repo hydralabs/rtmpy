@@ -84,6 +84,7 @@ class CallbackList:
 
     def __init__(self):
         self.callbacks = {}
+        self.order = []
 
     def addCallback(self, method, *args, **kwargs):
         """
@@ -99,6 +100,7 @@ class CallbackList:
         """
         if not method in self.callbacks:
             self.callbacks[method] = _MethodWrapper(method, *args, **kwargs)
+            self.order.append(method)
 
     def removeCallback(self, method):
         """
@@ -108,6 +110,7 @@ class CallbackList:
         """
         if method in self.callbacks:
             del self.callbacks[method]
+            self.order.remove(method)
 
     def callback(self, *args, **kwargs):
         """
@@ -125,7 +128,9 @@ class CallbackList:
         @param kwargs: Keyword arguments to the callable.
         @type kwargs: C{dict}
         """
-        for key, methodwrapper in self.callbacks.items():
+        for key in self.order:
+            methodwrapper = self.callbacks[key]
+
             try:
                 methodwrapper(*args, **kwargs)
             except:
