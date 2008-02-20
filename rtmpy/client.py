@@ -61,16 +61,10 @@ class RTMPClientProtocol(rtmp.RTMPBaseProtocol):
         """
         Called when some data has been received from the underlying transport
         """
-        self.buffer.seek(0, 2)
-        self.buffer.write(data)
-        self.buffer.seek(0)
+        rtmp.RTMPBaseProtocol.dataReceived(self, data)
 
         if self.state == rtmp.RTMPBaseProtocol.HANDSHAKE:
             self.decodeHandshake()
-        elif self.state == rtmp.RTMPBaseProtocol.STREAM:
-            rtmp.RTMPBaseProtocol.dataReceived(data)
-        else:
-            self.transport.loseConnection()
 
     def onHandshakeSuccess(self):
         rtmp.RTMPBaseProtocol.onHandshakeSuccess(self)

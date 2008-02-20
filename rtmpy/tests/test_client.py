@@ -34,8 +34,8 @@ class HandshakeTestCase(unittest.TestCase):
             self.assertFalse(self.transport.connected)
             d.callback(None)
 
-        self.protocol.addEventListener(rtmp.HANDSHAKE_FAILURE, fire_event)
         self.protocol.makeConnection(self.transport)
+        self.protocol.addEventListener(rtmp.HANDSHAKE_FAILURE, fire_event)
         self.protocol.dataReceived('f')
 
         return d

@@ -4,8 +4,10 @@
 # See LICENSE for details.
 
 from twisted.internet import reactor, protocol
+from twisted.python import log
 
 from rtmpy import rtmp, util
+
 
 class RTMPServerProtocol(rtmp.RTMPBaseProtocol):
     """
@@ -20,13 +22,12 @@ class RTMPServerProtocol(rtmp.RTMPBaseProtocol):
         """
         buffer = self.buffer
 
+        # check there is enough data to proceed ..
         if self.received_handshake is not None:
             if len(buffer) < rtmp.HANDSHAKE_LENGTH:
-                # buffer is too small, wait for more data
                 return
         else:
             if len(buffer) < rtmp.HANDSHAKE_LENGTH + 1:
-                # buffer is too small, wait for more data
                 return
 
         buffer.seek(0)
@@ -40,10 +41,8 @@ class RTMPServerProtocol(rtmp.RTMPBaseProtocol):
             self.received_handshake = buffer.read(rtmp.HANDSHAKE_LENGTH)
             self.my_handshake = rtmp.generate_handshake()
 
-            self.transport.write(rtmp.HEADER_BYTE)
-            self.transport.write(self.my_handshake)
-            self.transport.write(self.received_handshake)
-
+            self.transport.write(
+                rtmp.HEADER_BYTE + self.my_handshake + self.received_handshake)
             self._consumeBuffer()
         elif buffer.read(rtmp.HANDSHAKE_LENGTH) != self.my_handshake:
             self.dispatchEvent(rtmp.HANDSHAKE_FAILURE, 'Handshake mismatch')
@@ -55,14 +54,19 @@ class RTMPServerProtocol(rtmp.RTMPBaseProtocol):
         """
         Called when some data has been received from the underlying transport
         """
-        # seek to the end of the stream
-        self.buffer.seek(0, 2)
-        self.buffer.write(data)
+        rtmp.RTMPBaseProtocol.dataReceived(self, data)
 
         if self.state == rtmp.RTMPBaseProtocol.HANDSHAKE:
             self.decodeHandshake()
-        else:
-            rtmp.RTMPBaseProtocol.dataReceived(data)
+
+    def onHandshakeSuccess(self):
+        rtmp.RTMPBaseProtocol.onHandshakeSuccess(self)
+
+        if self.buffer.remaining() > 0:
+            bytes = self.buffer.read()
+            self.buffer.truncate()
+
+            self._callLater(0, self.dataReceived, bytes)
 
 
 class RTMPServerFactory(protocol.ServerFactory):

@@ -19,10 +19,11 @@ from twisted.internet import reactor, protocol, defer
 from rtmpy.dispatcher import EventDispatcher
 from rtmpy import util
 
+from pyamf.util import hexdump
+
 RTMP_PORT = 1935
 
 HEADER_SIZES = [12, 8, 4, 1]
-HEADER_LENGTH_MASK = 0xc0
 
 HANDSHAKE_LENGTH = 1536
 HANDSHAKE_SUCCESS = 'rtmp.handshake-success'
@@ -50,6 +51,7 @@ def generate_handshake(uptime=None):
 
     return handshake
 
+
 def decode_handshake(data):
     """
     Decodes a handshake packet into a tuple (uptime, data)
@@ -68,7 +70,31 @@ def decode_handshake(data):
 
     return uptime, body
 
-class RTMPChannel(object):
+
+def read_header(channel, stream, byte_len):
+    """
+    Reads a header from the incoming stream.
+
+    @type channel: L{RTMPChannel}
+    @param stream: The input buffer to read from
+    @type stream: L{BufferedByteStream}
+    @type byte_len: C{int}
+    """
+    if byte_len == 1:
+        return
+
+    if byte_len >= 4:
+       channel.unknown = stream.read(3)
+
+    if byte_len >= 8:
+       channel.length = (stream.read_ushort() << 8) + stream.read_uchar()
+       channel.type = stream.read_uchar()
+
+    if byte_len >= 12:
+       channel.destination = stream.read_ulong()
+
+
+class RTMPChannel:
     """
     @ivar length: Length of the body.
     @type length: C{int}
@@ -85,15 +111,18 @@ class RTMPChannel(object):
         self.channel_id = channel_id
         self.chunk_size = 128
         self.read = 0
+        self.destination = 0
 
-    def remaining(self):
+    def _remaining(self):
         """
         Returns the number of bytes left to read from the stream.
         """
         return self.length - self.read
 
+    remaining = property(_remaining)
+
     def write(self, data):
-        pass
+        self.read += len(data)
 
 
 class RTMPBaseProtocol(protocol.Protocol, EventDispatcher):
@@ -129,21 +158,12 @@ class RTMPBaseProtocol(protocol.Protocol, EventDispatcher):
         A helper function that chops off the data that has already been read
         from the stream.
         """
-        self.buffer = util.BufferedByteStream(self.buffer.read())
+        bytes = self.buffer.read()
+        self.buffer.truncate()
 
-    def _readHeader(self, stream, channel, header_len):
-        """
-        Reads a header from the incoming stream.
-        """
-        if header_len >= 4:
-            channel.unknown = stream.read(3)
-
-        if header_len >= 8:
-            channel.length = stream.read_ushort() << 8 + stream.read_uchar()
-            channel.type = stream.read_uchar()
-
-        if header_len >= 12:
-            channel.destination = stream.read_ulong()
+        if len(bytes) > 0:
+            self.buffer.write(bytes)
+            self.buffer.seek(0)
 
     def getChannel(self, channel_id):
         try:
@@ -158,29 +178,31 @@ class RTMPBaseProtocol(protocol.Protocol, EventDispatcher):
         Called when data is received from the underlying transport. Splits the
         data stream into chunks and delivers them to each channel.
         """
-        stream = util.BufferedByteStream(data)
+        stream = self.buffer
+        # seek to the end of the stream
+        stream.seek(0, 2)
+        stream.write(data)
+        stream.seek(0)
+
+        if self.state != RTMPBaseProtocol.STREAM:
+            return
 
         while stream.remaining() > 0:
             header_byte = stream.read_uchar()
-            header_len = HEADER_SIZES[header_byte & HEADER_LENGTH_MASK]
+            header_len = HEADER_SIZES[header_byte >> 6]
 
-            if stream.remaining() < header_len - 1:
-                self.buffer.write(stream.read())
-
+            if stream.remaining() < header_len:
                 return
 
-            channel = self.getChannel(header_byte & 0xff)
-            stream = self.buffer + stream
-            stream.seek(1)
+            channel = self.getChannel(header_byte & 0x3f)
+            read_header(channel, stream, header_len)
 
-            self._readHeader(stream, channel, header_len)
-
-            chunk_length = min(channel.chunk_size, channel.remaining(), stream.remaining())
+            chunk_length = min(channel.chunk_size, channel.remaining, stream.remaining())
 
             if chunk_length > 0:
                 channel.write(stream.read(chunk_length))
 
-        self.buffer.truncate()
+        self._consumeBuffer()
 
     def onHandshakeSuccess(self):
         """
@@ -192,13 +214,6 @@ class RTMPBaseProtocol(protocol.Protocol, EventDispatcher):
         self.removeEventListener(HANDSHAKE_FAILURE, self.onHandshakeFailure)
         self.my_handshake = None
         self.received_handshake = None
-
-        # There shouldn't be any more data left in the buffer at this point -
-        # it's our move next
-        # XXX nick - what to do here? push any data back through dataReceived,
-        #     be strict and disconnect, or truncate the buffer?
-        if self.buffer.remaining() > 0:
-            self.buffer.truncate()
 
     def onHandshakeFailure(self, reason):
         """

@@ -2,7 +2,7 @@
 # See LICENSE.txt for details.
 
 """
-Tests for L{rtmpy.protocol}
+Tests for L{rtmpy.rtmp}
 """
 
 from twisted.trial import unittest
@@ -10,6 +10,7 @@ from twisted.internet import defer
 
 from rtmpy.tests import util
 from rtmpy import rtmp
+from rtmpy.util import BufferedByteStream
 
 class ConstTestCase(unittest.TestCase):
     def test_all(self):
@@ -50,7 +51,85 @@ class RTMPChannelTestCase(unittest.TestCase):
     """
 
     def test_create(self):
-        pass
+        channel = rtmp.RTMPChannel(ord, 324)
+
+        self.assertEquals(channel.protocol, ord)
+        self.assertEquals(channel.channel_id, 324)
+        self.assertEquals(channel.chunk_size, 128)
+        self.assertEquals(channel.read, 0)
+
+    def test_remaining(self):
+        channel = rtmp.RTMPChannel(str, 0)
+        channel.length = 1000
+
+        self.assertEquals(channel.remaining, 1000)
+        channel.read += 50
+
+        self.assertEquals(channel.remaining, 950)
+
+        channel.write('\x00' * 32)
+        self.assertEquals(channel.remaining, 918)
+
+    def test_write(self):
+        channel = rtmp.RTMPChannel(str, 0)
+        channel.length = 10
+
+        self.assertEquals(channel.read, 0)
+        channel.write('abc')
+        self.assertEquals(channel.read, 3)
+
+
+class ReadHeaderTestCase(unittest.TestCase):
+    def test_12byte_header(self):
+        channel = rtmp.RTMPChannel(None, 0)
+        stream = BufferedByteStream('\x00\x00\x01\x00\x01\x05\x14\x00\x00\x00\x00')
+
+        rtmp.read_header(channel, stream, 12)
+
+        self.assertEquals(channel.destination, 0)
+        self.assertEquals(channel.unknown, '\x00\x00\x01')
+        self.assertEquals(channel.type, 20)
+        self.assertEquals(channel.channel_id, 0)
+        self.assertEquals(channel.protocol, None)
+
+    def test_8byte_header(self):
+        channel = rtmp.RTMPChannel(None, 0)
+        stream = BufferedByteStream('\x00\x00\x01\x00\x01\x05\x14\x00\x00\x00\x00')
+
+        rtmp.read_header(channel, stream, 12)
+        rtmp.read_header(channel, BufferedByteStream('\x03\x02\x01\x01\x02\x03\x12'), 8)
+
+        self.assertEquals(channel.destination, 0)
+        self.assertEquals(channel.unknown, '\x03\x02\x01')
+        self.assertEquals(channel.type, 18)
+        self.assertEquals(channel.channel_id, 0)
+        self.assertEquals(channel.protocol, None)
+
+    def test_4byte_header(self):
+        channel = rtmp.RTMPChannel(None, 0)
+        stream = BufferedByteStream('\x00\x00\x01\x00\x01\x05\x14\x00\x00\x00\x00')
+
+        rtmp.read_header(channel, stream, 12)
+        rtmp.read_header(channel, BufferedByteStream('\x88\x77\x66'), 4)
+
+        self.assertEquals(channel.destination, 0)
+        self.assertEquals(channel.unknown, '\x88\x77\x66')
+        self.assertEquals(channel.type, 20)
+        self.assertEquals(channel.channel_id, 0)
+        self.assertEquals(channel.protocol, None)
+
+    def test_1byte_header(self):
+        channel = rtmp.RTMPChannel(None, 0)
+        stream = BufferedByteStream('\x00\x00\x01\x00\x01\x05\x14\x00\x00\x00\x00')
+
+        rtmp.read_header(channel, stream, 12)
+        rtmp.read_header(channel, BufferedByteStream(''), 1)
+
+        self.assertEquals(channel.destination, 0)
+        self.assertEquals(channel.unknown, '\x00\x00\x01')
+        self.assertEquals(channel.type, 20)
+        self.assertEquals(channel.channel_id, 0)
+        self.assertEquals(channel.protocol, None)
 
 
 class BaseProtocolTestCase(unittest.TestCase):
@@ -132,18 +211,23 @@ class BaseProtocolTestCase(unittest.TestCase):
 
         return d
 
-    def test_read_full_header(self):
+    def test_consume_buffer(self):
         p = rtmp.RTMPBaseProtocol()
+        p.connectionMade()
+        stream = p.buffer
 
-        p.makeConnection(util.StringTransport())
-        p.state = rtmp.RTMPBaseProtocol.STREAM
+        stream.write('abcdefg')
+        stream.seek(2)
+        p._consumeBuffer()
+        self.assertEquals(stream.getvalue(), 'cdefg')
+        self.assertEquals(stream.tell(), 0)
 
-        p.dataReceived('\x03\x00\x00\x01\x00\x01\x05\x14\x00\x00\x00\x00')
+        stream.seek(2)
+        p._consumeBuffer()
+        self.assertEquals(stream.getvalue(), 'efg')
+        self.assertEquals(stream.tell(), 0)
 
-        self.assertTrue(3 in p.channels)
-        channel = p.channels[3]
-
-        self.assertEquals(channel.unknown, '\x00\x00\x01')
-        self.assertEquals(channel.type, 20)
-        self.assertEquals(channel.channel_id, 3)
-        self.assertEquals(channel.protocol, p)
+        stream.seek(0, 2)
+        p._consumeBuffer()
+        self.assertEquals(stream.getvalue(), '')
+        self.assertEquals(stream.tell(), 0)
