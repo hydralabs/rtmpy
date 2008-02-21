@@ -48,7 +48,7 @@ def uptime_linux():
 
     return float(time.time()) - float(buffer.split(" ")[0])
 
-def uptime_mac():
+def uptime_darwin():
     """
     Returns the number of milliseconds since the kernel was started.
     """ 
