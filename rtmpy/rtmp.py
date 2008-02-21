@@ -28,8 +28,11 @@ HEADER_SIZES = [12, 8, 4, 1]
 HANDSHAKE_LENGTH = 1536
 HANDSHAKE_SUCCESS = 'rtmp.handshake-success'
 HANDSHAKE_FAILURE = 'rtmp.handshake-failure'
+HANDSHAKE_TIMEOUT = 'rtmp.handshake-timeout'
 
 HEADER_BYTE = '\x03'
+
+DEFAULT_HANDSHAKE_TIMEOUT = 30 # seconds
 
 def generate_handshake(uptime=None):
     """
@@ -139,6 +142,8 @@ class RTMPBaseProtocol(protocol.Protocol, EventDispatcher):
     HANDSHAKE = 'handshake'
     STREAM = 'stream'
 
+    handshakeTimeout = DEFAULT_HANDSHAKE_TIMEOUT
+
     def connectionMade(self):
         protocol.Protocol.connectionMade(self)
 
@@ -152,6 +157,8 @@ class RTMPBaseProtocol(protocol.Protocol, EventDispatcher):
         # setup event observers
         self.addEventListener(HANDSHAKE_SUCCESS, self.onHandshakeSuccess)
         self.addEventListener(HANDSHAKE_FAILURE, self.onHandshakeFailure)
+        
+        self._timeout = reactor.callLater(self.handshakeTimeout, lambda: self.dispatchEvent(HANDSHAKE_TIMEOUT))
 
     def _consumeBuffer(self):
         """
@@ -197,7 +204,8 @@ class RTMPBaseProtocol(protocol.Protocol, EventDispatcher):
             channel = self.getChannel(header_byte & 0x3f)
             read_header(channel, stream, header_len)
 
-            chunk_length = min(channel.chunk_size, channel.remaining, stream.remaining())
+            chunk_length = min(channel.chunk_size,
+                channel.remaining, stream.remaining())
 
             if chunk_length > 0:
                 channel.write(stream.read(chunk_length))
@@ -209,6 +217,10 @@ class RTMPBaseProtocol(protocol.Protocol, EventDispatcher):
         Called when the RTMP handshake was successful. Once this is called,
         packet streaming can commence
         """
+        # Remove the handshake timeout
+        self._timeout.cancel()
+        del self._timeout
+
         self.state = RTMPBaseProtocol.STREAM
         self.removeEventListener(HANDSHAKE_SUCCESS, self.onHandshakeSuccess)
         self.removeEventListener(HANDSHAKE_FAILURE, self.onHandshakeFailure)
@@ -221,3 +233,14 @@ class RTMPBaseProtocol(protocol.Protocol, EventDispatcher):
         connection immediately.
         """
         self.transport.loseConnection()
+        self._timeout.cancel()
+        del self._timeout
+
+    def onHandshakeTimeout(self):
+        """
+        Called if the handshake was not successful within
+        C{self.handshakeTimeout} seconds. Disconnects the peer.
+        """
+        self.transport.lostConnection()
+        self._timeout.cancel()
+        del self._timeout

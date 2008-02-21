@@ -5,6 +5,7 @@
 Tests for L{rtmpy.util}
 """
 
+import __builtin__
 import sys, time, warnings
 
 from twisted.internet import reactor, defer
@@ -12,35 +13,43 @@ from twisted.trial import unittest
 
 from rtmpy import util
 
-
 class UptimeTestCase(unittest.TestCase):
-    def test_uptime(self):
-        util.uptime()
+    def setUp(self):
         util.boottime = None
 
-    if sys.platform.startswith('linux'):
-        def test_linux(self):
-            now = time.time()
-            ut = util.uptime_linux()
 
-            self.assertTrue(type(ut), float)
-            self.assertTrue(now > ut)
+if sys.platform.startswith('linux'):
+    class LinuxUptimeTestCase(UptimeTestCase):
+        def setUp(self):
+            UptimeTestCase.setUp(self)
 
-    elif sys.platform.startswith('win'):
-        def test_win32(self):
-            now = time.time()
-            ut = util.uptime_win32()
+            self.orig_open = __builtin__.open
 
-            self.assertTrue(type(ut), float)
-            self.assertTrue(now > ut)
+        def tearDown(self):
+            __builtin__.open = self.orig_open
 
-    elif sys.platform.startswith('darwin'):
-        def test_darwin(self):
-            now = time.time()
-            ut = util.uptime_darwin()
+        def test_error_open(self):
+            def open_error(path, mode=None):
+                raise IOError
 
-            self.assertTrue(type(ut), float)
-            self.assertTrue(now > ut)
+            __builtin__.open = open_error
+            self.assertEquals(util.uptime_linux(), 0)
+
+        def test_bad_content(self):
+            def open_error(path, mode=None):
+                class BadContentFileObject:
+                    read = lambda _: '123.bar'
+                    close = lambda _: None
+                    readlines = lambda _: []
+
+                return BadContentFileObject()
+
+            __builtin__.open = open_error
+
+            self.assertEquals(util.uptime_linux(), 0)
+
+        def test_okay(self):
+            self.assertNotEquals(util.uptime_linux(), 0)
 
 
 class UnknownPlatformUptimeTestCase(unittest.TestCase):

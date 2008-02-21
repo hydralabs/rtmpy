@@ -10,7 +10,8 @@ RTMPy Utilities.
 @since: 0.1
 """
 
-import os, sys, time
+import os, os.path
+import sys, time
 
 # the number of milliseconds since the epoch
 boottime = None
@@ -22,9 +23,30 @@ except ImportError:
 
 from pyamf.util import BufferedByteStream
 
+def _find_command(command):
+    """
+    Searches the environment path for the specified C{command}.
+    """
+    if not isinstance(command, str):
+        command = str(command)
+
+    assert os.path.sep not in command, "%s found in command" % os.path.sep
+
+    if not os.environ.has_key('PATH'):
+        raise EnvironmentError, 'No PATH found in os.environ'
+
+    for entry in os.environ['PATH'].split(os.pathsep):
+        file_name = os.path.join(entry, command)
+
+        if os.path.isfile(file_name):
+            return file_name
+
+    raise LookupError, "command %s not found" % command
+
 def uptime_win32():
     """
-    Returns the number of seconds since the epoch.
+    Returns the number of seconds between the epoch and when the system was
+    booted.
 
     @rtype: C{float}
     """ 
@@ -34,37 +56,60 @@ def uptime_win32():
 
 def uptime_linux():
     """
-    Returns the number of seconds since the epoch.
+    Returns the number of seconds between the epoch and when the system was
+    booted.
+
+    @rtype: C{float}
+    """
+    import re
+
+    try:
+        fp = open('%s%s' % (os.path.sep, os.path.join('proc', 'uptime')))
+    except IOError:
+        return 0
+
+    buffer = fp.read()
+    fp.close()
+
+    match = re.compile('^([0-9]+\.[0-9]{2})').match(buffer, 0)
+
+    if match is None:
+        return 0
+
+    if len(match.groups()) < 1:
+        return 0
+
+    return float(time.time()) - float(match.groups()[0])
+
+def uptime_darwin():
+    """
+    Returns the number of seconds between the epoch and when the system was
+    booted.
 
     @rtype: C{float}
     """ 
     try:
-        fp = open('/proc/uptime')
-    except IOError:
+        fp = os.popen('%s -nb kern.boottime' % _find_command('sysctl'))
+    except LookupError, EnvironmentError:
         return 0
 
     buffer = fp.read()
     fp.close()
 
-    return float(time.time()) - float(buffer.split(" ")[0])
+    match = re.compile('^([0-9]+)').match(buffer, 1)
 
-def uptime_darwin():
-    """
-    Returns the number of milliseconds since the kernel was started.
-    """ 
-    try:
-        fp = os.popen('sysctl -nb kern.boottime')
-    except IOError:
+    if match is None:
         return 0
-
-    buffer = fp.read()
-    fp.close()
 
     return float(time.time()) - float(buffer.strip())
 
 def uptime():
     """
-    Returns the number of milliseconds since the system was booted.
+    Returns the number of milliseconds since the system was booted. This is
+    system dependant, currently supported are Windows, Linux and Darwin.
+
+    If a value cannot be calculated, a default value of when this function was
+    first called is returned.
 
     @rtype: C{int}
     """
@@ -87,8 +132,11 @@ def uptime():
         warnings.warn("Could not find a platform specific uptime " \
             "function for '%s'" % sys.platform, RuntimeWarning)
 
-        up_func = lambda: time.time()
+        up_func = lambda: 0
 
     boottime = int(up_func() * 1000)
+
+    if boottime == 0:
+        boottime = now
 
     return now - boottime
