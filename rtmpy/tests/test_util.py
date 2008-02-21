@@ -56,8 +56,6 @@ class UnknownPlatformUptimeTestCase(unittest.TestCase):
         warnings.filterwarnings('error', category=RuntimeWarning)
         self.assertRaises(RuntimeWarning, util.uptime)
 
-        warnings.filterwarnings('ignore', category=RuntimeWarning)
-        self.assertEquals(util.uptime(), 0)
         warnings.filterwarnings('default', category=RuntimeWarning)
 
         self.assertNotEquals(util.boottime, None)
