@@ -80,7 +80,7 @@ def uptime():
     elif sys.platform.startswith('win'):
         up_func = uptime_win32
     elif sys.platform.startswith('darwin'):
-        up_func = uptime_mac
+        up_func = uptime_darwin
     else:
         import warnings
 
