@@ -179,7 +179,7 @@ class RTMPChannelTestCase(unittest.TestCase):
         channel.length = 280
         channel.chunk_size = 128
         channel.read = 0
-        
+
         for x in xrange(128, 0, -1):
             self.assertEquals(channel.chunk_remaining, x)
             channel.read += 1
@@ -560,7 +560,7 @@ class ReadHeaderReplacingParsingTestCase(BaseRTMPParsingTestCase):
         self.assertFalse(hasattr(self.protocol, '_timeout'))
         self.assertTrue(self.to.cancelled)
 
-    def test_create_channel(self):        
+    def test_create_channel(self):
         self.executed = False
 
         def run_checks(a, b, c):
@@ -641,12 +641,6 @@ class RTMPHeaderLengthTestCase(BaseRTMPParsingTestCase):
     def tearDown(self):
         rtmp.HEADER_SIZES = self.header_sizes
         self.assertTrue(self.executed)
-
-    def _getitem(self, item):
-        self.assertEquals(item, self.expected_value)
-        self.executed = True
-
-        return self.header_sizes[item]
 
     def test_12bytes(self):
         self.expected_value = 0

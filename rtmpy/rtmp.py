@@ -19,8 +19,6 @@ from twisted.internet import reactor, protocol, defer
 from rtmpy.dispatcher import EventDispatcher
 from rtmpy import util
 
-from pyamf.util import hexdump
-
 RTMP_PORT = 1935
 
 HEADER_BYTE = '\x03'

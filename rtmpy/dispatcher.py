@@ -143,7 +143,7 @@ class CallbackList:
         @rtype: C{bool}
         """
         return len(self.callbacks) == 0
- 
+
 
 class EventDispatcher:
     """
@@ -184,7 +184,7 @@ class EventDispatcher:
         """
         Adds a listener to this event dispatcher. If L{dispatchEvent} is called
         with the corresponding C{event} then listener will be called with the
-        supplied C{*args} and C{**kwargs} 
+        supplied C{*args} and C{**kwargs}
         """
         if self._dispatchDepth > 0:
             self._updateQueue.append(

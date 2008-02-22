@@ -8,7 +8,7 @@ Tests for L{rtmpy.dispatcher}
 from twisted.trial import unittest
 from twisted.internet import defer
 
-from rtmpy.tests import util 
+from rtmpy.tests import util
 from rtmpy import dispatcher
 
 class MethodWrapperTestCase(unittest.TestCase):
@@ -174,7 +174,7 @@ class EventDispatcherTestCase(unittest.TestCase):
         self.assertEquals(['test'], x.listeners[0].keys())
         cbl = x.listeners[0]['test']
         self.assertEquals(cbl.callbacks.keys(), [fn])
-        
+
         func = cbl.callbacks[fn]
         self.assertEquals(func.args, tuple())
         self.assertEquals(func.kwargs, {})

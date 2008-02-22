@@ -68,7 +68,7 @@ def uptime_win32():
     booted.
 
     @rtype: C{float}
-    """ 
+    """
     import win32api
 
     return float(time.time()) - float(win32api.GetTickCount() / 1000)
@@ -106,7 +106,9 @@ def uptime_darwin():
     booted.
 
     @rtype: C{float}
-    """ 
+    """
+    import re
+
     try:
         fp = os.popen('%s -nb kern.boottime' % _find_command('sysctl'))
     except LookupError, EnvironmentError:
