@@ -348,6 +348,7 @@ class BaseProtocolTestCase(unittest.TestCase):
         p.makeConnection(util.StringTransport())
         p.decodeHandshake = check
         p.dataReceived('')
+        p._timeout.cancel()
 
         self.assertTrue(self.executed)
 
