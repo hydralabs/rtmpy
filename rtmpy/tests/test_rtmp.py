@@ -333,6 +333,24 @@ class BaseProtocolTestCase(unittest.TestCase):
         self.assertTrue(self.registered_failure)
         self.assertEquals(p.current_channel, None)
 
+    def test_decode_handshake(self):
+        p = rtmp.RTMPBaseProtocol()
+
+        self.assertRaises(NotImplementedError, p.decodeHandshake)
+
+    def test_send_data_handshake(self):
+        self.executed = False
+
+        def check():
+            self.executed = True
+
+        p = rtmp.RTMPBaseProtocol()
+        p.makeConnection(util.StringTransport())
+        p.decodeHandshake = check
+        p.dataReceived('')
+
+        self.assertTrue(self.executed)
+
 
 class ChannelManagementTestCase(unittest.TestCase):
     def setUp(self):

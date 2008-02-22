@@ -57,15 +57,6 @@ class RTMPClientProtocol(rtmp.RTMPBaseProtocol):
         self.transport.write(self.received_handshake)
         self.dispatchEvent(rtmp.HANDSHAKE_SUCCESS)
 
-    def dataReceived(self, data):
-        """
-        Called when some data has been received from the underlying transport
-        """
-        rtmp.RTMPBaseProtocol.dataReceived(self, data)
-
-        if self.state == rtmp.RTMPBaseProtocol.HANDSHAKE:
-            self.decodeHandshake()
-
     def onHandshakeSuccess(self):
         rtmp.RTMPBaseProtocol.onHandshakeSuccess(self)
 

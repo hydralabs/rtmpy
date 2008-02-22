@@ -243,6 +243,14 @@ class RTMPBaseProtocol(protocol.Protocol, EventDispatcher):
 
         return channel
 
+    def decodeHandshake(self):
+        """
+        Negotiates the handshake phase of the protocol.
+
+        @see L{http://osflash.org/documentation/rtmp#handshake} for more info.
+        """
+        raise NotImplementedError
+
     def dataReceived(self, data):
         """
         Called when data is received from the underlying transport. Splits the
@@ -254,7 +262,11 @@ class RTMPBaseProtocol(protocol.Protocol, EventDispatcher):
         stream.write(data)
         stream.seek(0)
 
-        if self.state != RTMPBaseProtocol.STREAM:
+        if self.state == RTMPBaseProtocol.HANDSHAKE:
+            self.decodeHandshake()
+
+            return
+        elif self.state != RTMPBaseProtocol.STREAM:
             return
 
         while stream.remaining() > 0:
