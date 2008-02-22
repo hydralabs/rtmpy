@@ -96,21 +96,6 @@ def read_header(channel, stream, byte_len):
     if byte_len >= 12:
        channel.destination = stream.read_ulong()
 
-def consume_buffer(stream):
-    """
-    A helper function that chops off the data that has already been read from
-    the stream.
-
-    Leaves the internal pointer at the end of the stream of any of the previous
-    trailing data.
-    """
-    bytes = stream.read()
-    stream.truncate()
-
-    if len(bytes) > 0:
-        stream.write(bytes)
-        stream.seek(0, 2)
-
 
 class RTMPChannel:
     """
@@ -157,7 +142,6 @@ class RTMPChannel:
         if self.read == self.length:
             self.body.seek(0)
             self.protocol.dispatchEvent(CHANNEL_BODY_COMPLETE, self)
-            print hexdump(self.body.getvalue())
 
     def _chunk_remaining(self):
         if self.read >= self.length - (self.length % self.chunk_size):
@@ -314,7 +298,7 @@ class RTMPBaseProtocol(protocol.Protocol, EventDispatcher):
 
             read_header(self.current_channel, stream, header_len)
 
-        consume_buffer(self.buffer)
+        self.buffer.consume()
 
     def onHandshakeSuccess(self):
         """

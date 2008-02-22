@@ -13,6 +13,27 @@ from twisted.trial import unittest
 
 from rtmpy import util
 
+class BufferedByteStreamTestCase(unittest.TestCase):
+    def test_consume(self):
+        stream = util.BufferedByteStream()
+
+        stream.write('abcdefg')
+        stream.seek(2)
+        stream.consume()
+        self.assertEquals(stream.getvalue(), 'cdefg')
+        self.assertEquals(stream.tell(), 5)
+
+        stream.seek(2)
+        stream.consume()
+        self.assertEquals(stream.getvalue(), 'efg')
+        self.assertEquals(stream.tell(), 3)
+
+        stream.seek(0, 2)
+        stream.consume()
+        self.assertEquals(stream.getvalue(), '')
+        self.assertEquals(stream.tell(), 0)
+
+
 class UptimeTestCase(unittest.TestCase):
     def setUp(self):
         util.boottime = None

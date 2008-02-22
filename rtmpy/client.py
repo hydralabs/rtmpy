@@ -53,7 +53,7 @@ class RTMPClientProtocol(rtmp.RTMPBaseProtocol):
 
             return
 
-        rtmp.consume_buffer(self.buffer)
+        self.buffer.consume()
         self.transport.write(self.received_handshake)
         self.dispatchEvent(rtmp.HANDSHAKE_SUCCESS)
 

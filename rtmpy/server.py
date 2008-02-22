@@ -42,7 +42,7 @@ class RTMPServerProtocol(rtmp.RTMPBaseProtocol):
 
             self.transport.write(
                 rtmp.HEADER_BYTE + self.my_handshake + self.received_handshake)
-            rtmp.consume_buffer(self.buffer)
+            self.buffer.consume()
         elif buffer.read(rtmp.HANDSHAKE_LENGTH) != self.my_handshake:
             self.dispatchEvent(rtmp.HANDSHAKE_FAILURE, 'Handshake mismatch')
         else:
@@ -60,7 +60,7 @@ class RTMPServerProtocol(rtmp.RTMPBaseProtocol):
     def onHandshakeSuccess(self):
         rtmp.RTMPBaseProtocol.onHandshakeSuccess(self)
         
-        rtmp.consume_buffer(self.buffer)
+        self.buffer.consume()
 
         if len(self.buffer) > 0:
             bytes = self.buffer.getvalue()

@@ -23,27 +23,6 @@ class ConstantsTestCase(unittest.TestCase):
         self.assertEquals(rtmp.CHANNEL_BODY_COMPLETE, 'rtmp.channel.body-complete')
 
 
-class ConsumeBufferTestCase(unittest.TestCase):
-    def test_consume_buffer(self):
-        stream = BBS()
-
-        stream.write('abcdefg')
-        stream.seek(2)
-        rtmp.consume_buffer(stream)
-        self.assertEquals(stream.getvalue(), 'cdefg')
-        self.assertEquals(stream.tell(), 5)
-
-        stream.seek(2)
-        rtmp.consume_buffer(stream)
-        self.assertEquals(stream.getvalue(), 'efg')
-        self.assertEquals(stream.tell(), 3)
-
-        stream.seek(0, 2)
-        rtmp.consume_buffer(stream)
-        self.assertEquals(stream.getvalue(), '')
-        self.assertEquals(stream.tell(), 0)
-
-
 class ReadHeaderTestCase(unittest.TestCase):
     def test_12byte_header(self):
         channel = rtmp.RTMPChannel(None, 0)

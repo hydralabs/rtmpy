@@ -21,7 +21,26 @@ try:
 except ImportError:
     from StringIO import StringIO
 
-from pyamf.util import BufferedByteStream
+from pyamf.util import BufferedByteStream as _BufferedByteStream
+
+class BufferedByteStream(_BufferedByteStream):
+    """
+    Contains specific functionality not available in L{PyAMF}
+    """
+
+    def consume(self):
+        """
+        Chops off the data that has already been read from the stream.
+
+        @note: Leaves the internal pointer at the end of the stream.
+        """
+        bytes = self.read()
+        self.truncate()
+
+        if len(bytes) > 0:
+            self.write(bytes)
+            self.seek(0, 2)
+
 
 def _find_command(command):
     """
