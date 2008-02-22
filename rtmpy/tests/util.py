@@ -59,3 +59,10 @@ class StringTransportWithDisconnection(StringTransport):
         if self.connected:
             self.connected = False
             self.protocol.connectionLost(error.ConnectionDone("Bye."))
+
+
+class DummyDelayedCall:
+    cancelled = False
+
+    def cancel(self):
+        self.cancelled = True

@@ -8,7 +8,6 @@ from twisted.python import log
 
 from rtmpy import rtmp, util
 
-
 class RTMPServerProtocol(rtmp.RTMPBaseProtocol):
     """
     Server RTMP Protocol.
@@ -43,11 +42,10 @@ class RTMPServerProtocol(rtmp.RTMPBaseProtocol):
 
             self.transport.write(
                 rtmp.HEADER_BYTE + self.my_handshake + self.received_handshake)
-            self._consumeBuffer()
+            rtmp.consume_buffer(self.buffer)
         elif buffer.read(rtmp.HANDSHAKE_LENGTH) != self.my_handshake:
             self.dispatchEvent(rtmp.HANDSHAKE_FAILURE, 'Handshake mismatch')
         else:
-            self._consumeBuffer()
             self.dispatchEvent(rtmp.HANDSHAKE_SUCCESS)
 
     def dataReceived(self, data):
@@ -61,9 +59,11 @@ class RTMPServerProtocol(rtmp.RTMPBaseProtocol):
 
     def onHandshakeSuccess(self):
         rtmp.RTMPBaseProtocol.onHandshakeSuccess(self)
+        
+        rtmp.consume_buffer(self.buffer)
 
-        if self.buffer.remaining() > 0:
-            bytes = self.buffer.read()
+        if len(self.buffer) > 0:
+            bytes = self.buffer.getvalue()
             self.buffer.truncate()
 
             self._callLater(0, self.dataReceived, bytes)

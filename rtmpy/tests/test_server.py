@@ -33,6 +33,7 @@ class HandshakeTestCase(unittest.TestCase):
 
     def test_receive_no_data(self):
         self.protocol.makeConnection(self.transport)
+        self.protocol._timeout.cancel()
         self.protocol.decodeHandshake()
 
         self.assertTrue(self.transport.connected)

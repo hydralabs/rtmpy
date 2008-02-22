@@ -20,6 +20,7 @@ class HandshakeTestCase(unittest.TestCase):
 
     def test_make_connection(self):
         self.protocol.makeConnection(self.transport)
+        self.protocol._timeout.cancel()
 
         buffer = self.transport.value()
         self.assertEquals(buffer[0], rtmp.HEADER_BYTE)
@@ -42,6 +43,7 @@ class HandshakeTestCase(unittest.TestCase):
 
     def test_send_no_data(self):
         self.protocol.makeConnection(self.transport)
+        self.protocol._timeout.cancel()
         self.protocol.decodeHandshake()
 
         self.assertTrue(self.transport.connected)

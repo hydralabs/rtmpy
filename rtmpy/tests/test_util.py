@@ -17,39 +17,103 @@ class UptimeTestCase(unittest.TestCase):
     def setUp(self):
         util.boottime = None
 
+class LinuxUptimeTestCase(UptimeTestCase):
+    def setUp(self):
+        UptimeTestCase.setUp(self)
 
-if sys.platform.startswith('linux'):
-    class LinuxUptimeTestCase(UptimeTestCase):
-        def setUp(self):
-            UptimeTestCase.setUp(self)
+        self.orig_open = __builtin__.open
 
-            self.orig_open = __builtin__.open
+    def tearDown(self):
+        __builtin__.open = self.orig_open
 
-        def tearDown(self):
-            __builtin__.open = self.orig_open
+    def test_error_open(self):
+        def open_error(path, mode=None):
+            raise IOError
 
-        def test_error_open(self):
-            def open_error(path, mode=None):
-                raise IOError
+        __builtin__.open = open_error
+        self.assertEquals(util.uptime_linux(), 0)
 
-            __builtin__.open = open_error
-            self.assertEquals(util.uptime_linux(), 0)
+    def test_bad_content(self):
+        def open_error(path, mode=None):
+            class BadContentFileObject:
+                read = lambda _: '123.bar'
+                close = lambda _: None
+                readlines = lambda _: []
 
-        def test_bad_content(self):
-            def open_error(path, mode=None):
-                class BadContentFileObject:
-                    read = lambda _: '123.bar'
-                    close = lambda _: None
-                    readlines = lambda _: []
+            return BadContentFileObject()
 
-                return BadContentFileObject()
+        __builtin__.open = open_error
 
-            __builtin__.open = open_error
+        self.assertEquals(util.uptime_linux(), 0)
 
-            self.assertEquals(util.uptime_linux(), 0)
+    def test_okay(self):
+        self.assertNotEquals(util.uptime_linux(), 0)
 
-        def test_okay(self):
-            self.assertNotEquals(util.uptime_linux(), 0)
+
+class Win32UptimeTestCase(UptimeTestCase):
+    def setUp(self):
+        UptimeTestCase.setUp(self)
+
+        self.orig_open = __builtin__.open
+
+    def tearDown(self):
+        __builtin__.open = self.orig_open
+
+    def test_error_open(self):
+        def open_error(path, mode=None):
+            raise IOError
+
+        __builtin__.open = open_error
+        self.assertEquals(util.uptime_win32(), 0)
+
+    def test_bad_content(self):
+        def open_error(path, mode=None):
+            class BadContentFileObject:
+                read = lambda _: '123.bar'
+                close = lambda _: None
+                readlines = lambda _: []
+
+            return BadContentFileObject()
+
+        __builtin__.open = open_error
+
+        self.assertEquals(util.uptime_win32(), 0)
+
+    def test_okay(self):
+        self.assertNotEquals(util.uptime_win32(), 0)
+
+
+class DarwinUptimeTestCase(UptimeTestCase):
+    def setUp(self):
+        UptimeTestCase.setUp(self)
+
+        self.orig_open = __builtin__.open
+
+    def tearDown(self):
+        __builtin__.open = self.orig_open
+
+    def test_error_open(self):
+        def open_error(path, mode=None):
+            raise IOError
+
+        __builtin__.open = open_error
+        self.assertEquals(util.uptime_darwin(), 0)
+
+    def test_bad_content(self):
+        def open_error(path, mode=None):
+            class BadContentFileObject:
+                read = lambda _: '123.bar'
+                close = lambda _: None
+                readlines = lambda _: []
+
+            return BadContentFileObject()
+
+        __builtin__.open = open_error
+
+        self.assertEquals(util.uptime_darwin(), 0)
+
+    def test_okay(self):
+        self.assertNotEquals(util.uptime_darwin(), 0)
 
 
 class UnknownPlatformUptimeTestCase(unittest.TestCase):
@@ -69,3 +133,13 @@ class UnknownPlatformUptimeTestCase(unittest.TestCase):
         util.uptime()
 
         self.assertNotEquals(util.boottime, None)
+
+
+if not sys.platform.startswith('linux'):
+    LinuxUptimeTestCase.skip = 'Tested platform is not linux'
+
+if not sys.platform.startswith('win32'):
+    Win32UptimeTestCase.skip = 'Tested platform is not win32'
+
+if not sys.platform.startswith('darwin'):
+    DarwinUptimeTestCase.skip = 'Tested platform is not darwin'

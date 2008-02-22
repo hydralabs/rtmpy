@@ -9,13 +9,92 @@ from twisted.trial import unittest
 from twisted.internet import defer
 
 from rtmpy.tests import util
-from rtmpy import rtmp
-from rtmpy.util import BufferedByteStream
+from rtmpy import rtmp, dispatcher
+from rtmpy.util import BufferedByteStream as BBS
 
-class ConstTestCase(unittest.TestCase):
+class ConstantsTestCase(unittest.TestCase):
     def test_all(self):
+        self.assertEquals(rtmp.HEADER_SIZES, [12, 8, 4, 1])
         self.assertEquals(rtmp.HANDSHAKE_LENGTH, 1536)
         self.assertEquals(rtmp.HEADER_BYTE, '\x03')
+        self.assertEquals(rtmp.HANDSHAKE_SUCCESS, 'rtmp.handshake.success')
+        self.assertEquals(rtmp.HANDSHAKE_FAILURE, 'rtmp.handshake.failure')
+        self.assertEquals(rtmp.HANDSHAKE_TIMEOUT, 'rtmp.handshake.timeout')
+        self.assertEquals(rtmp.CHANNEL_BODY_COMPLETE, 'rtmp.channel.body-complete')
+
+
+class ConsumeBufferTestCase(unittest.TestCase):
+    def test_consume_buffer(self):
+        stream = BBS()
+
+        stream.write('abcdefg')
+        stream.seek(2)
+        rtmp.consume_buffer(stream)
+        self.assertEquals(stream.getvalue(), 'cdefg')
+        self.assertEquals(stream.tell(), 5)
+
+        stream.seek(2)
+        rtmp.consume_buffer(stream)
+        self.assertEquals(stream.getvalue(), 'efg')
+        self.assertEquals(stream.tell(), 3)
+
+        stream.seek(0, 2)
+        rtmp.consume_buffer(stream)
+        self.assertEquals(stream.getvalue(), '')
+        self.assertEquals(stream.tell(), 0)
+
+
+class ReadHeaderTestCase(unittest.TestCase):
+    def test_12byte_header(self):
+        channel = rtmp.RTMPChannel(None, 0)
+        stream = BBS('\x00\x00\x01\x00\x01\x05\x14\x00\x00\x00\x00')
+
+        rtmp.read_header(channel, stream, 12)
+
+        self.assertEquals(channel.destination, 0)
+        self.assertEquals(channel.unknown, '\x00\x00\x01')
+        self.assertEquals(channel.type, 20)
+        self.assertEquals(channel.channel_id, 0)
+        self.assertEquals(channel.protocol, None)
+
+    def test_8byte_header(self):
+        channel = rtmp.RTMPChannel(None, 0)
+        stream = BBS('\x00\x00\x01\x00\x01\x05\x14\x00\x00\x00\x00')
+
+        rtmp.read_header(channel, stream, 12)
+        rtmp.read_header(channel, BBS('\x03\x02\x01\x01\x02\x03\x12'), 8)
+
+        self.assertEquals(channel.destination, 0)
+        self.assertEquals(channel.unknown, '\x03\x02\x01')
+        self.assertEquals(channel.type, 18)
+        self.assertEquals(channel.channel_id, 0)
+        self.assertEquals(channel.protocol, None)
+
+    def test_4byte_header(self):
+        channel = rtmp.RTMPChannel(None, 0)
+        stream = BBS('\x00\x00\x01\x00\x01\x05\x14\x00\x00\x00\x00')
+
+        rtmp.read_header(channel, stream, 12)
+        rtmp.read_header(channel, BBS('\x88\x77\x66'), 4)
+
+        self.assertEquals(channel.destination, 0)
+        self.assertEquals(channel.unknown, '\x88\x77\x66')
+        self.assertEquals(channel.type, 20)
+        self.assertEquals(channel.channel_id, 0)
+        self.assertEquals(channel.protocol, None)
+
+    def test_1byte_header(self):
+        channel = rtmp.RTMPChannel(None, 0)
+        stream = BBS('\x00\x00\x01\x00\x01\x05\x14\x00\x00\x00\x00')
+
+        rtmp.read_header(channel, stream, 12)
+        rtmp.read_header(channel, BBS(''), 1)
+
+        self.assertEquals(channel.destination, 0)
+        self.assertEquals(channel.unknown, '\x00\x00\x01')
+        self.assertEquals(channel.type, 20)
+        self.assertEquals(channel.channel_id, 0)
+        self.assertEquals(channel.protocol, None)
 
 
 class HandshakeHelperTestCase(unittest.TestCase):
@@ -57,6 +136,8 @@ class RTMPChannelTestCase(unittest.TestCase):
         self.assertEquals(channel.channel_id, 324)
         self.assertEquals(channel.chunk_size, 128)
         self.assertEquals(channel.read, 0)
+        self.assertEquals(channel.length, 0)
+        self.assertTrue(isinstance(channel.body, BBS))
 
     def test_remaining(self):
         channel = rtmp.RTMPChannel(str, 0)
@@ -78,96 +159,129 @@ class RTMPChannelTestCase(unittest.TestCase):
         channel.write('abc')
         self.assertEquals(channel.read, 3)
 
+    def test_write_too_much(self):
+        channel = rtmp.RTMPChannel(str, 0)
+        channel.length = 2
 
-class ReadHeaderTestCase(unittest.TestCase):
-    def test_12byte_header(self):
+        self.assertRaises(OverflowError, channel.write, 'abc')
+
+    def test_write_complete(self):
+        protocol = dispatcher.EventDispatcher()
+        channel = rtmp.RTMPChannel(protocol, 0)
+        channel.length = 2
+
+        d = defer.Deferred()
+
+        def complete(chan):
+            self.assertIdentical(channel, chan)
+            self.assertEquals(channel.body.tell(), 0)
+            self.assertEquals(channel.body.getvalue(), '12')
+
+            d.callback(None)
+
+        protocol.addEventListener(rtmp.CHANNEL_BODY_COMPLETE, complete)
+        channel.write('12')
+
+        return d
+
+    def test_write_no_complete_event(self):
+        protocol = dispatcher.EventDispatcher()
+        channel = rtmp.RTMPChannel(protocol, 0)
+        channel.length = 2
+
+        d = defer.Deferred()
+
+        protocol.dispatchEvent = lambda _: self.fail("event dispatched")
+        channel.write('2')
+
+    def test_chunk_remaining(self):
         channel = rtmp.RTMPChannel(None, 0)
-        stream = BufferedByteStream('\x00\x00\x01\x00\x01\x05\x14\x00\x00\x00\x00')
 
-        rtmp.read_header(channel, stream, 12)
+        channel.length = 280
+        channel.chunk_size = 128
+        channel.read = 0
+        
+        for x in xrange(128, 0, -1):
+            self.assertEquals(channel.chunk_remaining, x)
+            channel.read += 1
 
-        self.assertEquals(channel.destination, 0)
-        self.assertEquals(channel.unknown, '\x00\x00\x01')
-        self.assertEquals(channel.type, 20)
-        self.assertEquals(channel.channel_id, 0)
-        self.assertEquals(channel.protocol, None)
+        self.assertEquals(channel.read, 128)
 
-    def test_8byte_header(self):
+        for x in xrange(128, 0, -1):
+            self.assertEquals(channel.chunk_remaining, x)
+            channel.read += 1
+
+        self.assertEquals(channel.read, 256)
+
+        for x in xrange(24, 0, -1):
+            self.assertEquals(channel.chunk_remaining, x)
+            channel.read += 1
+
+        self.assertEquals(channel.read, 280)
+
+    def test_received_chunks(self):
         channel = rtmp.RTMPChannel(None, 0)
-        stream = BufferedByteStream('\x00\x00\x01\x00\x01\x05\x14\x00\x00\x00\x00')
 
-        rtmp.read_header(channel, stream, 12)
-        rtmp.read_header(channel, BufferedByteStream('\x03\x02\x01\x01\x02\x03\x12'), 8)
+        channel.length = 280
+        channel.chunk_size = 128
 
-        self.assertEquals(channel.destination, 0)
-        self.assertEquals(channel.unknown, '\x03\x02\x01')
-        self.assertEquals(channel.type, 18)
-        self.assertEquals(channel.channel_id, 0)
-        self.assertEquals(channel.protocol, None)
+        channel.read = 0
+        self.assertEquals(channel.chunks_received, 0)
 
-    def test_4byte_header(self):
+        channel.read = 127
+        self.assertEquals(channel.chunks_received, 0)
+
+        channel.read = 128
+        self.assertEquals(channel.chunks_received, 1)
+
+        channel.read = 255
+        self.assertEquals(channel.chunks_received, 1)
+
+        channel.read = 256
+        self.assertEquals(channel.chunks_received, 2)
+
+        channel.read = 280
+        self.assertEquals(channel.chunks_received, 3)
+
         channel = rtmp.RTMPChannel(None, 0)
-        stream = BufferedByteStream('\x00\x00\x01\x00\x01\x05\x14\x00\x00\x00\x00')
 
-        rtmp.read_header(channel, stream, 12)
-        rtmp.read_header(channel, BufferedByteStream('\x88\x77\x66'), 4)
+        channel.length = 10
+        channel.chunk_size = 128
 
-        self.assertEquals(channel.destination, 0)
-        self.assertEquals(channel.unknown, '\x88\x77\x66')
-        self.assertEquals(channel.type, 20)
-        self.assertEquals(channel.channel_id, 0)
-        self.assertEquals(channel.protocol, None)
+        channel.read = 0
+        self.assertEquals(channel.chunks_received, 0)
 
-    def test_1byte_header(self):
-        channel = rtmp.RTMPChannel(None, 0)
-        stream = BufferedByteStream('\x00\x00\x01\x00\x01\x05\x14\x00\x00\x00\x00')
+        channel.read = 9
+        self.assertEquals(channel.chunks_received, 0)
 
-        rtmp.read_header(channel, stream, 12)
-        rtmp.read_header(channel, BufferedByteStream(''), 1)
-
-        self.assertEquals(channel.destination, 0)
-        self.assertEquals(channel.unknown, '\x00\x00\x01')
-        self.assertEquals(channel.type, 20)
-        self.assertEquals(channel.channel_id, 0)
-        self.assertEquals(channel.protocol, None)
+        channel.read = 10
+        self.assertEquals(channel.chunks_received, 1)
 
 
-class BaseProtocolTestCase(unittest.TestCase):
+class HandshakeProtocolTestCase(unittest.TestCase):
     """
-    Test for L{RTMPProtocol}
+    Test for L{RTMPBaseProtocol} handshake phase
     """
 
-    def test_make_connection(self):
+    def test_timeout_handshake(self):
         p = rtmp.RTMPBaseProtocol()
         transport = util.StringTransport()
-        self.registered_success = self.registered_failure = False
+        d = defer.Deferred()
 
-        def check_observers(event, observerfn, priority=0, *args, **kwargs):
-            if event == rtmp.HANDSHAKE_FAILURE:
-                self.assertEquals(observerfn, p.onHandshakeFailure)
-                self.registered_failure = True
-            if event == rtmp.HANDSHAKE_SUCCESS:
-                self.assertEquals(observerfn, p.onHandshakeSuccess)
-                self.registered_success = True
+        def onTimeout():
+            d.callback(None)
 
-        p.addEventListener = check_observers
+        p.addEventListener(rtmp.HANDSHAKE_TIMEOUT, onTimeout)
+        p.handshakeTimeout = 0
         p.makeConnection(transport)
 
-        self.assertEquals(p.channels, {})
-        self.assertEquals(p.buffer.getvalue(), '')
-        self.assertEquals(p.buffer.tell(), 0)
-        self.assertEquals(p.state, rtmp.RTMPBaseProtocol.HANDSHAKE)
-        self.assertEquals(p.my_handshake, None)
-        self.assertEquals(p.received_handshake, None)
-        self.assertTrue(self.registered_success)
-        self.assertTrue(self.registered_failure)
+        return d
 
     def test_successful_handshake(self):
         p = rtmp.RTMPBaseProtocol()
         transport = util.StringTransport()
         d = defer.Deferred()
         self.removed_event = False
-        transport.write('blah')
 
         p.makeConnection(transport)
 
@@ -211,23 +325,332 @@ class BaseProtocolTestCase(unittest.TestCase):
 
         return d
 
-    def test_consume_buffer(self):
+
+class BaseProtocolTestCase(unittest.TestCase):
+    def test_make_connection(self):
         p = rtmp.RTMPBaseProtocol()
-        p.connectionMade()
-        stream = p.buffer
+        transport = util.StringTransport()
+        self.registered_success = self.registered_failure = False
 
-        stream.write('abcdefg')
-        stream.seek(2)
-        p._consumeBuffer()
-        self.assertEquals(stream.getvalue(), 'cdefg')
-        self.assertEquals(stream.tell(), 0)
+        def check_observers(event, observerfn, priority=0, *args, **kwargs):
+            if event == rtmp.HANDSHAKE_FAILURE:
+                self.assertEquals(observerfn, p.onHandshakeFailure)
+                self.registered_failure = True
+            if event == rtmp.HANDSHAKE_SUCCESS:
+                self.assertEquals(observerfn, p.onHandshakeSuccess)
+                self.registered_success = True
 
-        stream.seek(2)
-        p._consumeBuffer()
-        self.assertEquals(stream.getvalue(), 'efg')
-        self.assertEquals(stream.tell(), 0)
+        p.addEventListener = check_observers
+        p.makeConnection(transport)
+        p._timeout.cancel()
 
-        stream.seek(0, 2)
-        p._consumeBuffer()
-        self.assertEquals(stream.getvalue(), '')
-        self.assertEquals(stream.tell(), 0)
+        self.assertEquals(p.channels, {})
+        self.assertEquals(p.buffer.getvalue(), '')
+        self.assertEquals(p.buffer.tell(), 0)
+        self.assertEquals(p.state, rtmp.RTMPBaseProtocol.HANDSHAKE)
+        self.assertEquals(p.my_handshake, None)
+        self.assertEquals(p.received_handshake, None)
+        self.assertTrue(self.registered_success)
+        self.assertTrue(self.registered_failure)
+        self.assertEquals(p.current_channel, None)
+
+
+class ChannelManagementTestCase(unittest.TestCase):
+    def setUp(self):
+        self.protocol = rtmp.RTMPBaseProtocol()
+        self.protocol.connectionMade()
+        self.protocol._timeout.cancel()
+
+        self.channels = self.protocol.channels
+
+    def test_retrieve(self):
+        self.assertRaises(IndexError, self.protocol.getChannel, -1)
+        self.assertRaises(IndexError, self.protocol.getChannel, rtmp.MAX_CHANNELS)
+        self.assertRaises(KeyError, self.protocol.getChannel, 0)
+
+        x = object()
+        self.channels[0] = x
+
+        self.assertIdentical(self.protocol.getChannel(0), x)
+
+    def test_create(self):
+        self.assertRaises(IndexError, self.protocol.createChannel, -1)
+        self.assertRaises(IndexError, self.protocol.createChannel, rtmp.MAX_CHANNELS)
+
+        x = object()
+        self.channels[0] = x
+
+        self.assertRaises(KeyError, self.protocol.createChannel, 0)
+
+        channel = self.protocol.createChannel(63)
+
+        self.assertTrue(isinstance(channel, rtmp.RTMPChannel))
+        self.assertEquals(channel.channel_id, 63)
+        self.assertIdentical(channel.protocol, self.protocol)
+
+
+class BaseRTMPParsingTestCase(unittest.TestCase):
+    def setUp(self):
+        self.protocol = rtmp.RTMPBaseProtocol()
+        self.transport = util.StringTransportWithDisconnection()
+
+        self.protocol.makeConnection(self.transport)
+        self.transport.protocol = self.protocol
+        self.buffer = self.protocol.buffer
+
+        self.protocol._timeout.cancel()
+        self.protocol.state = rtmp.RTMPBaseProtocol.STREAM
+
+
+class RTMPParsingTestCase(BaseRTMPParsingTestCase):
+    def test_receive_header_only(self):
+        self.protocol.getChannel = lambda prot, channel_id: self.fail()
+
+        self.protocol.dataReceived('\x00\x00\x00\x00')
+        self.assertEquals(self.buffer.tell(), 4)
+        self.assertEquals(self.protocol.current_channel, None)
+
+    def test_single_channel_multiple_chunks(self):
+        # 12 byte header
+        for byte in '\x00\x00\x00\x00\x00\x01\x22\x14\x00\x00\x00\x00':
+            self.protocol.dataReceived(byte)
+
+        channel = self.protocol.channels[0]
+        self.assertIdentical(self.protocol.current_channel, channel)
+
+        # first 128 byte body
+        for byte in '\x01' * 128:
+            self.protocol.dataReceived(byte)
+
+        self.assertIdentical(self.protocol.current_channel, None)
+        self.assertEquals(channel.chunks_received, 1)
+        self.assertEquals(channel.chunk_remaining, channel.chunk_size)
+        self.assertEquals(channel.body.getvalue(), '\x01' * 128)
+
+        # 1 byte header
+        for byte in '\xc0':
+            self.protocol.dataReceived(byte)
+
+        self.assertIdentical(self.protocol.current_channel, channel)
+
+        # second 128 byte body
+        for byte in '\x02' * 128:
+            self.protocol.dataReceived(byte)
+
+        self.assertIdentical(self.protocol.current_channel, None)
+        self.assertEquals(channel.chunks_received, 2)
+        self.assertEquals(channel.chunk_remaining, 34)
+        self.assertEquals(channel.body.getvalue(), '\x01' * 128 + '\x02' * 128)
+
+        # 1 byte header
+        for byte in '\xc0':
+            self.protocol.dataReceived(byte)
+
+        self.assertIdentical(self.protocol.current_channel, channel)
+
+        # finaly 34 byte body
+        for byte in '\x03' * 34:
+            self.protocol.dataReceived(byte)
+
+        self.assertIdentical(self.protocol.current_channel, None)
+        self.assertEquals(channel.chunks_received, 3)
+        self.assertEquals(channel.chunk_remaining, 0)
+        self.assertEquals(channel.body.getvalue(),
+            '\x01' * 128 + '\x02' * 128 + '\x03' * 34)
+
+    def test_multiple_channel_multiple_chunks(self):
+        # 12 byte header - channel 0
+        for byte in '\x00\x00\x00\x00\x00\x00\x8a\x14\x00\x00\x00\x00':
+            self.protocol.dataReceived(byte)
+
+        channel0 = self.protocol.channels[0]
+        self.assertIdentical(self.protocol.current_channel, channel0)
+
+        # first 128 byte body
+        for byte in '\x05' * 128:
+            self.protocol.dataReceived(byte)
+
+        self.assertEqual(channel0.body.getvalue(), '\x05' * 128)
+        self.assertEqual(channel0.chunks_received, 1)
+        self.assertEqual(channel0.chunk_remaining, 10)
+        self.assertEqual(self.protocol.current_channel, None)
+
+        # 12 byte header - channel 12 - body length = 34 base 10
+        for byte in '\x0c\x00\x00\x00\x00\x00\x22\x14\x00\x00\x00\x00':
+            self.protocol.dataReceived(byte)
+
+        channel12 = self.protocol.channels[12]
+        self.assertIdentical(self.protocol.current_channel, channel12)
+
+        # channel 12 body
+        for byte in '\x04' * 34:
+            self.protocol.dataReceived(byte)
+
+        self.assertEqual(channel12.body.getvalue(), '\x04' * 34)
+        self.assertEqual(channel12.chunks_received, 1)
+        self.assertEqual(channel12.chunk_remaining, 0)
+        self.assertEqual(self.protocol.current_channel, None)
+
+        # 1 byte header for channel 0
+        for byte in '\xc0':
+            self.protocol.dataReceived(byte)
+
+        self.assertIdentical(self.protocol.current_channel, channel0)
+
+        # second 10 byte body
+        for byte in '\x05' * 10:
+            self.protocol.dataReceived(byte)
+
+        self.assertEquals(channel0.body.getvalue(), '\x05' * 138)
+        self.assertEqual(channel0.chunks_received, 2)
+        self.assertEqual(channel0.chunk_remaining, 0)
+        self.assertEqual(self.protocol.current_channel, None)
+
+    def test_receive_full_header(self):
+        for byte in '\x00\x00\x00\x00\x00\x01\x8a\x14\x00\x00\x00\x00':
+            self.protocol.dataReceived(byte)
+
+        self.assertTrue(0 in self.protocol.channels)
+        self.assertIdentical(self.protocol.channels[0], self.protocol.current_channel)
+
+    def test_receive_full_chunk(self):
+        channel = rtmp.RTMPChannel(self.protocol, 0)
+        channel.length = 14
+
+        self.protocol.channels[0] = channel
+        self.protocol.current_channel = channel
+
+        self.protocol.dataReceived('\x00' * 14)
+
+        self.assertEquals(self.protocol.current_channel, None)
+        self.assertEquals(self.protocol.buffer.remaining(), 0)
+
+    def test_receive_multiple_chunks(self):
+        channel = rtmp.RTMPChannel(self.protocol, 0)
+        channel.length = 14 + channel.chunk_size
+
+        self.protocol.channels[0] = channel
+        self.protocol.current_channel = channel
+
+        self.protocol.dataReceived('\x00' * channel.chunk_size)
+
+        self.assertEquals(self.protocol.current_channel, None)
+        self.assertEquals(self.protocol.buffer.remaining(), 0)
+
+
+class ReadHeaderReplacingParsingTestCase(BaseRTMPParsingTestCase):
+    def setUp(self):
+        BaseRTMPParsingTestCase.setUp(self)
+        self.read_header = rtmp.read_header
+
+    def tearDown(self):
+        BaseRTMPParsingTestCase.tearDown(self)
+        rtmp.read_header = self.read_header
+
+    def test_invalid_channel(self):
+        rtmp.read_header = lambda a, b,c: self.fail("Function continued ..")
+
+        def _getChannel(channel_id):
+            raise IndexError
+
+        self.protocol.getChannel = _getChannel
+        self.to = self.protocol._timeout = util.DummyDelayedCall()
+
+        self.protocol.dataReceived('\x00' + '\x00' * 12)
+
+        self.assertFalse(self.transport.connected)
+        self.assertFalse(hasattr(self.protocol, '_timeout'))
+        self.assertTrue(self.to.cancelled)
+
+    def test_create_channel(self):        
+        self.executed = False
+
+        def run_checks(a, b, c):
+            self.executed = True
+            self.assertTrue(0 in self.protocol.channels.keys())
+            channel = self.protocol.channels[0]
+
+            self.assertTrue(isinstance(channel, rtmp.RTMPChannel))
+
+        def create_channel(channel_id):
+            self.assertEquals(channel_id, 0)
+
+            return create_channel.orig_func(channel_id)
+
+        create_channel.orig_func = self.protocol.createChannel
+        self.protocol.createChannel = create_channel
+        rtmp.read_header = run_checks
+
+        self.protocol.dataReceived('\x00' + '\x00' * 12)
+
+    def test_read_header(self):
+        self.executed = False
+
+        def read_header(a, b, c):
+            self.executed = True
+            self.assertEquals(a, self.protocol.channels[0])
+            self.assertEquals(b, self.protocol.buffer)
+            self.assertEquals(c, 12)
+
+        rtmp.read_header = read_header
+
+        self.protocol.dataReceived('\x00' + '\x00' * 12)
+        self.assertTrue(self.executed)
+
+    def test_write_to_channel(self):
+        self.executed = False
+
+        def check_chunk(length=None):
+            self.executed = True
+            self.assertEquals(length, 4)
+            self.buffer.read = check_chunk.orig_func
+
+            return check_chunk.orig_func(length)
+
+        def read_header(a, b, c):
+            self.read_header(a, b, c)
+            self.channel = self.protocol.channels[0]
+            check_chunk.orig_func = self.buffer.read
+            self.buffer.read = check_chunk
+
+        rtmp.read_header = read_header
+
+        self.protocol.dataReceived('\x00\x00\x00\x00\x00\x00\x05\x14\x00' + \
+            '\x00\x00\x00\x01\x02\x03\x04')
+
+        self.assertTrue(self.executed)
+
+
+class RTMPHeaderLengthTestCase(BaseRTMPParsingTestCase):
+    def setUp(self):
+        BaseRTMPParsingTestCase.setUp(self)
+
+        self.header_sizes = rtmp.HEADER_SIZES
+        rtmp.HEADER_SIZES = self
+        self.executed = False
+
+    def tearDown(self):
+        rtmp.HEADER_SIZES = self.header_sizes
+        self.assertTrue(self.executed)
+
+    def __getitem__(self, item):
+        self.assertEquals(item, self.expected_value)
+        self.executed = True
+
+        return self.header_sizes[item]
+
+    def test_12bytes(self):
+        self.expected_value = 0
+        self.protocol.dataReceived('\x00')
+
+    def test_8bytes(self):
+        self.expected_value = 1
+        self.protocol.dataReceived('\x40')
+
+    def test_4bytes(self):
+        self.expected_value = 2
+        self.protocol.dataReceived('\x80')
+
+    def test_1byte(self):
+        self.expected_value = 3
+        self.protocol.dataReceived('\xc0')
