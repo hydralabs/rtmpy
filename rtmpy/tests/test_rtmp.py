@@ -618,19 +618,30 @@ class ReadHeaderReplacingParsingTestCase(BaseRTMPParsingTestCase):
         self.assertTrue(self.executed)
 
 
+class HeaderSizeDummy:
+    def __init__(self, tc):
+        self.tc = tc
+
+    def __getitem__(self, item):
+        self.tc.assertEquals(item, self.tc.expected_value)
+        self.tc.executed = True
+
+        return self.tc.header_sizes[item]
+
+
 class RTMPHeaderLengthTestCase(BaseRTMPParsingTestCase):
     def setUp(self):
         BaseRTMPParsingTestCase.setUp(self)
 
         self.header_sizes = rtmp.HEADER_SIZES
-        rtmp.HEADER_SIZES = self
+        rtmp.HEADER_SIZES = HeaderSizeDummy(self)
         self.executed = False
 
     def tearDown(self):
         rtmp.HEADER_SIZES = self.header_sizes
         self.assertTrue(self.executed)
 
-    def __getitem__(self, item):
+    def _getitem(self, item):
         self.assertEquals(item, self.expected_value)
         self.executed = True
 
