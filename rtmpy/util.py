@@ -10,7 +10,6 @@ RTMPy Utilities.
 @since: 0.1
 """
 
-import os, os.path
 import sys, time
 
 # the number of milliseconds since the epoch
@@ -42,33 +41,13 @@ class BufferedByteStream(_BufferedByteStream):
             self.seek(0, 2)
 
 
-def _find_command(command):
-    """
-    Searches the environment path for the specified C{command}.
-    """
-    if not isinstance(command, str):
-        command = str(command)
-
-    assert os.path.sep not in command, "%s found in command" % os.path.sep
-
-    if not os.environ.has_key('PATH'):
-        raise EnvironmentError, 'No PATH found in os.environ'
-
-    for entry in os.environ['PATH'].split(os.pathsep):
-        file_name = os.path.join(entry, command)
-
-        if os.path.isfile(file_name):
-            return file_name
-
-    raise LookupError, "command %s not found" % command
-
 def uptime_win32():
     """
     Returns the number of seconds between the epoch and when the system was
     booted.
 
     @rtype: C{float}
-    """
+    """ 
     import win32api
 
     return float(time.time()) - float(win32api.GetTickCount() / 1000)
@@ -107,17 +86,61 @@ def uptime_darwin():
 
     @rtype: C{float}
     """
-    import re
+    from twisted.internet import protocol, defer
+    from twisted.python import failure, procutils
 
     try:
-        fp = os.popen('%s -nb kern.boottime' % _find_command('sysctl'))
-    except LookupError, EnvironmentError:
+        command = procutils.which('sysctl')[0]
+    except IndexError:
         return 0
 
-    buffer = fp.read()
-    fp.close()
+    buffer = ''
 
-    match = re.compile('^([0-9]+)').match(buffer, 1)
+    class _BackRelay(protocol.ProcessProtocol):
+        def __init__(self, deferred):
+            self.deferred = deferred
+            self.s = StringIO()
+
+        def errReceived(self, text):
+            self.deferred.errback(failure.Failure(IOError()))
+            self.deferred = None
+            self.transport.loseConnection()
+
+        def outReceived(self, text):
+            self.s.write(text)
+
+        def processEnded(self, reason):
+            if self.deferred is not None:
+                result = self.s.getvalue()
+                self.deferred.callback(result)
+
+
+    def getProcessOutput(executable, args=(), env={}, path='.'):
+        from twisted.internet import reactor
+
+        d = defer.Deferred()
+        p = _BackRelay(d)
+
+        reactor.spawnProcess(p, executable, args, env, path)
+
+        return d
+
+    def get_uptime():
+        d = getProcessOutput(command, ('-nb', 'kern.boottime'))
+        d.addErrback(lambda f: '')
+
+        result = defer.waitForDeferred(d)
+        yield result
+
+        buffer = result.getResult()
+
+    get_uptime = defer.deferredGenerator(get_uptime)
+
+    get_uptime()
+
+    import re
+
+    match = re.compile('^([0-9]+)').match(buffer, 0)
 
     if match is None:
         return 0
