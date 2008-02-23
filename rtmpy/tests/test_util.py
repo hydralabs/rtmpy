@@ -72,34 +72,6 @@ class LinuxUptimeTestCase(UptimeTestCase):
 
 
 class Win32UptimeTestCase(UptimeTestCase):
-    def setUp(self):
-        UptimeTestCase.setUp(self)
-
-        self.orig_open = __builtin__.open
-
-    def tearDown(self):
-        __builtin__.open = self.orig_open
-
-    def test_error_open(self):
-        def open_error(path, mode=None):
-            raise IOError
-
-        __builtin__.open = open_error
-        self.assertEquals(util.uptime_win32(), 0)
-
-    def test_bad_content(self):
-        def open_error(path, mode=None):
-            class BadContentFileObject:
-                read = lambda _: '123.bar'
-                close = lambda _: None
-                readlines = lambda _: []
-
-            return BadContentFileObject()
-
-        __builtin__.open = open_error
-
-        self.assertEquals(util.uptime_win32(), 0)
-
     def test_okay(self):
         self.assertNotEquals(util.uptime_win32(), 0)
 

@@ -10,7 +10,7 @@ RTMPy Utilities.
 @since: 0.1
 """
 
-import sys, time
+import os.path, sys, time
 
 # the number of milliseconds since the epoch
 boottime = None

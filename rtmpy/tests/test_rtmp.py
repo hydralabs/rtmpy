@@ -179,7 +179,7 @@ class RTMPChannelTestCase(unittest.TestCase):
         channel.length = 280
         channel.chunk_size = 128
         channel.read = 0
-
+        
         for x in xrange(128, 0, -1):
             self.assertEquals(channel.chunk_remaining, x)
             channel.read += 1
@@ -351,6 +351,37 @@ class BaseProtocolTestCase(unittest.TestCase):
         p._timeout.cancel()
 
         self.assertTrue(self.executed)
+
+    def test_lose_connection(self):
+        self.executed = False
+
+        p = rtmp.RTMPBaseProtocol()
+        transport = util.StringTransport()
+
+        p.makeConnection(transport)
+        to = p._timeout
+
+        def trunc():
+            self.executed = True
+
+        p.buffer.truncate = trunc
+        p.connectionLost(None)
+
+        self.assertFalse(hasattr(p, '_timeout'))
+        self.assertTrue(to.cancelled)
+        self.assertTrue(self.executed)
+
+    def test_onProtocolError(self):
+        p = rtmp.RTMPBaseProtocol()
+
+        transport = util.StringTransportWithDisconnection()
+        transport.protocol = p
+        p.transport = transport
+        p.connectionLost = lambda x: None
+
+        p.onProtocolError()
+
+        self.assertFalse(transport.connected)
 
 
 class ChannelManagementTestCase(unittest.TestCase):
@@ -554,13 +585,17 @@ class ReadHeaderReplacingParsingTestCase(BaseRTMPParsingTestCase):
         self.protocol.getChannel = _getChannel
         self.to = self.protocol._timeout = util.DummyDelayedCall()
 
+        d = defer.Deferred()
+
+        def onProtocolError():
+            d.callback(None)
+
+        self.protocol.addEventListener(rtmp.PROTOCOL_ERROR, onProtocolError)
         self.protocol.dataReceived('\x00' + '\x00' * 12)
 
-        self.assertFalse(self.transport.connected)
-        self.assertFalse(hasattr(self.protocol, '_timeout'))
-        self.assertTrue(self.to.cancelled)
+        return d
 
-    def test_create_channel(self):
+    def test_create_channel(self):        
         self.executed = False
 
         def run_checks(a, b, c):

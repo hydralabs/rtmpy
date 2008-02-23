@@ -29,6 +29,8 @@ HANDSHAKE_SUCCESS = 'rtmp.handshake.success'
 HANDSHAKE_FAILURE = 'rtmp.handshake.failure'
 HANDSHAKE_TIMEOUT = 'rtmp.handshake.timeout'
 
+PROTOCOL_ERROR = 'rtmp.protocol.error'
+
 CHANNEL_BODY_COMPLETE = 'rtmp.channel.body-complete'
 MAX_CHANNELS = 64
 
@@ -81,6 +83,8 @@ def read_header(channel, stream, byte_len):
     @type stream: L{BufferedByteStream}
     @type byte_len: C{int}
     """
+    assert byte_len in HEADER_SIZES, 'Unexpected header size'
+
     if byte_len == 1:
         return
 
@@ -105,8 +109,9 @@ class RTMPChannel:
     @type type: C{int}
     @ivar read: Number of bytes read from the stream so far.
     @type read: C{int}
-    @type chunk_remaining: A calculated field that returns the number of bytes
-        required to complete that chunk.
+    @ivar chunk_remaining: A calculated field that returns the number of bytes
+        required to complete the current chunk.
+    @type chunk_remaining: C{int}
     """
 
     chunk_size = 128
@@ -163,6 +168,7 @@ class RTMPChannel:
 
     chunks_received = property(_chunks_received)
 
+
 class RTMPBaseProtocol(protocol.Protocol, EventDispatcher):
     """
     I provide the basis for the initial handshaking phase and parsing rtmp
@@ -193,9 +199,26 @@ class RTMPBaseProtocol(protocol.Protocol, EventDispatcher):
         # setup event observers
         self.addEventListener(HANDSHAKE_SUCCESS, self.onHandshakeSuccess)
         self.addEventListener(HANDSHAKE_FAILURE, self.onHandshakeFailure)
+        self.addEventListener(PROTOCOL_ERROR, self.onProtocolError)
+
+        self.addEventListener(CHANNEL_BODY_COMPLETE, self.onChannelComplete)
 
         self._timeout = reactor.callLater(self.handshakeTimeout,
             lambda: self.dispatchEvent(HANDSHAKE_TIMEOUT))
+
+    def connectionLost(self, reason):
+        """
+        Called when the connection is lost for some reason.
+
+        Cleans up any timeouts/buffer etc. 
+        """
+        if hasattr(self, '_timeout'):
+            if not self._timeout.cancelled:
+                self._timeout.cancel()
+
+            del self._timeout
+
+        self.buffer.truncate()
 
     def getChannel(self, channel_id):
         """
@@ -275,7 +298,12 @@ class RTMPBaseProtocol(protocol.Protocol, EventDispatcher):
                 num_chunks = self.current_channel.chunks_received
 
                 if chunk_length > 0:
-                    self.current_channel.write(stream.read(chunk_length))
+                    try:
+                        self.current_channel.write(stream.read(chunk_length))
+                    except:
+                        self.dispatchEvent(PROTOCOL_ERROR)
+
+                        return
 
                 if self.current_channel.chunks_received != num_chunks:
                     self.current_channel = None
@@ -284,10 +312,18 @@ class RTMPBaseProtocol(protocol.Protocol, EventDispatcher):
                 break
 
             start_of_header = stream.tell()
-            header_byte = stream.read_uchar()
+
+            try:
+                header_byte = stream.read_uchar()
+            except EOFError:
+                self.dispatchEvent(PROTOCOL_ERROR)
+
+                return
+
             header_len = HEADER_SIZES[header_byte >> 6]
 
             if stream.remaining() < header_len - 1:
+                # not enough stream left to continue decoding, rewind and wait
                 stream.seek(start_of_header)
 
                 break
@@ -296,17 +332,29 @@ class RTMPBaseProtocol(protocol.Protocol, EventDispatcher):
                 self.current_channel = self.getChannel(header_byte & 0x3f)
             except IndexError:
                 # a channel index was specified and it was out of range
-                # disconnect immediately, shouldn't get here but just in case..
-                self.transport.loseConnection()
-                self._timeout.cancel()
-                del self._timeout
+                # shouldn't get here but just in case..
+                self.dispatchEvent(PROTOCOL_ERROR)
 
                 return
             except KeyError:
                 # unknown channel - create one
-                self.current_channel = self.createChannel(header_byte & 0x3f)
+                try:
+                    self.current_channel = self.createChannel(header_byte & 0x3f)
+                except:
+                    self.dispatchEvent(PROTOCOL_ERROR)
 
-            read_header(self.current_channel, stream, header_len)
+                    return
+            except:
+                self.dispatchEvent(PROTOCOL_ERROR)
+
+                return
+
+            try:
+                read_header(self.current_channel, stream, header_len)
+            except:
+                self.dispatchEvent(PROTOCOL_ERROR)
+
+                return
 
         self.buffer.consume()
 
@@ -331,14 +379,27 @@ class RTMPBaseProtocol(protocol.Protocol, EventDispatcher):
         connection immediately.
         """
         self.transport.loseConnection()
-        self._timeout.cancel()
-        del self._timeout
 
     def onHandshakeTimeout(self):
         """
         Called if the handshake was not successful within
         C{self.handshakeTimeout} seconds. Disconnects the peer.
         """
-        self.transport.lostConnection()
-        self._timeout.cancel()
-        del self._timeout
+        self.transport.loseConnection()
+
+    def onProtocolError(self, reason=None):
+        """
+        Called if there is a problem the underlying protocol.
+
+        Immediately disconnects and cancels any timeouts that may be active.
+        """
+        self.transport.loseConnection()
+        # TODO nick: logging here to see what went wrong
+
+    def onChannelComplete(self, channel):
+        """
+        Called when a channel body has been completed.
+        """
+        from pyamf.util import hexdump
+
+        print hexdump(channel.body.getvalue())
