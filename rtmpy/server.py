@@ -51,8 +51,6 @@ class RTMPServerProtocol(rtmp.RTMPBaseProtocol):
     def onHandshakeSuccess(self):
         rtmp.RTMPBaseProtocol.onHandshakeSuccess(self)
 
-        self.buffer.consume()
-
         if len(self.buffer) > 0:
             bytes = self.buffer.getvalue()
             self.buffer.truncate()

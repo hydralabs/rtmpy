@@ -371,18 +371,6 @@ class BaseProtocolTestCase(unittest.TestCase):
         self.assertTrue(to.cancelled)
         self.assertTrue(self.executed)
 
-    def test_onProtocolError(self):
-        p = rtmp.RTMPBaseProtocol()
-
-        transport = util.StringTransportWithDisconnection()
-        transport.protocol = p
-        p.transport = transport
-        p.connectionLost = lambda x: None
-
-        p.onProtocolError()
-
-        self.assertFalse(transport.connected)
-
 
 class ChannelManagementTestCase(unittest.TestCase):
     def setUp(self):
@@ -585,15 +573,8 @@ class ReadHeaderReplacingParsingTestCase(BaseRTMPParsingTestCase):
         self.protocol.getChannel = _getChannel
         self.to = self.protocol._timeout = util.DummyDelayedCall()
 
-        d = defer.Deferred()
-
-        def onProtocolError():
-            d.callback(None)
-
-        self.protocol.addEventListener(rtmp.PROTOCOL_ERROR, onProtocolError)
         self.protocol.dataReceived('\x00' + '\x00' * 12)
-
-        return d
+        self.assertFalse(self.transport.connected)
 
     def test_create_channel(self):        
         self.executed = False

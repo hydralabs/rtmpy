@@ -171,13 +171,18 @@ class RTMPChannel:
 
 class RTMPBaseProtocol(protocol.Protocol, EventDispatcher):
     """
-    I provide the basis for the initial handshaking phase and parsing rtmp
+    I provide the basis for the initial handshaking phase and decoding rtmp
     packets as they arrive.
 
-    @ivar buffer: Contains any remaining unparsed data from the underlying
-        transport.
+    @ivar buffer: Contains any remaining unparsed data from the C{transport}.
     @type buffer: L{util.BufferedByteStream}
-    @ivar state: The state of the protocol, used mainly in handshake negotiation.
+    @ivar state: The state of the protocol.
+    @type state: C{str}
+    @ivar channels: A list of channels that are 'active'.
+    @type channels: C{dict} of L{RTMPChannel}
+    @ivar current_channel: The channel that is currently being written to/read
+        from.
+    @type current_channel: L{RTMPChannel} or None
     """
 
     HANDSHAKE = 'handshake'
@@ -197,9 +202,9 @@ class RTMPBaseProtocol(protocol.Protocol, EventDispatcher):
         self.received_handshake = None
 
         # setup event observers
+        self.addEventListener(PROTOCOL_ERROR, self.onProtocolError)
         self.addEventListener(HANDSHAKE_SUCCESS, self.onHandshakeSuccess)
         self.addEventListener(HANDSHAKE_FAILURE, self.onHandshakeFailure)
-        self.addEventListener(PROTOCOL_ERROR, self.onProtocolError)
 
         self.addEventListener(CHANNEL_BODY_COMPLETE, self.onChannelComplete)
 
@@ -266,29 +271,18 @@ class RTMPBaseProtocol(protocol.Protocol, EventDispatcher):
 
     def decodeHandshake(self):
         """
-        Negotiates the handshake phase of the protocol.
+        Negotiates the handshake phase of the protocol. Needs to be implemented
+        by the subclass.
 
         @see L{http://osflash.org/documentation/rtmp#handshake} for more info.
         """
         raise NotImplementedError
 
-    def dataReceived(self, data):
+    def decodeStream(self):
         """
-        Called when data is received from the underlying transport. Splits the
-        data stream into chunks and delivers them to each channel.
+        Parses the RTMP stream.
         """
-        # the stream's internal pointer is assumed to be at the end of the
-        # buffer each time this function is called.
         stream = self.buffer
-        stream.write(data)
-        stream.seek(0)
-
-        if self.state == RTMPBaseProtocol.HANDSHAKE:
-            self.decodeHandshake()
-
-            return
-        elif self.state != RTMPBaseProtocol.STREAM:
-            return
 
         while stream.remaining() > 0:
             if self.current_channel is not None:
@@ -298,12 +292,7 @@ class RTMPBaseProtocol(protocol.Protocol, EventDispatcher):
                 num_chunks = self.current_channel.chunks_received
 
                 if chunk_length > 0:
-                    try:
-                        self.current_channel.write(stream.read(chunk_length))
-                    except:
-                        self.dispatchEvent(PROTOCOL_ERROR)
-
-                        return
+                    self.current_channel.write(stream.read(chunk_length))
 
                 if self.current_channel.chunks_received != num_chunks:
                     self.current_channel = None
@@ -313,13 +302,7 @@ class RTMPBaseProtocol(protocol.Protocol, EventDispatcher):
 
             start_of_header = stream.tell()
 
-            try:
-                header_byte = stream.read_uchar()
-            except EOFError:
-                self.dispatchEvent(PROTOCOL_ERROR)
-
-                return
-
+            header_byte = stream.read_uchar()
             header_len = HEADER_SIZES[header_byte >> 6]
 
             if stream.remaining() < header_len - 1:
@@ -330,33 +313,32 @@ class RTMPBaseProtocol(protocol.Protocol, EventDispatcher):
 
             try:
                 self.current_channel = self.getChannel(header_byte & 0x3f)
-            except IndexError:
-                # a channel index was specified and it was out of range
-                # shouldn't get here but just in case..
-                self.dispatchEvent(PROTOCOL_ERROR)
-
-                return
             except KeyError:
                 # unknown channel - create one
-                try:
-                    self.current_channel = self.createChannel(header_byte & 0x3f)
-                except:
-                    self.dispatchEvent(PROTOCOL_ERROR)
+                self.current_channel = self.createChannel(header_byte & 0x3f)
 
-                    return
-            except:
-                self.dispatchEvent(PROTOCOL_ERROR)
+            read_header(self.current_channel, stream, header_len)
 
-                return
+    def dataReceived(self, data):
+        """
+        Called when data is received from the underlying transport. Splits the
+        data stream into chunks and delivers them to each channel.
 
-            try:
-                read_header(self.current_channel, stream, header_len)
-            except:
-                self.dispatchEvent(PROTOCOL_ERROR)
+        @note: C{buffer}'s internal pointer is assumed to be at the end of the
+            stream each time this function is called.
+        """
+        self.buffer.write(data)
+        self.buffer.seek(0)
 
-                return
-
-        self.buffer.consume()
+        try:
+            if self.state == RTMPBaseProtocol.HANDSHAKE:
+                self.decodeHandshake()
+            elif self.state == RTMPBaseProtocol.STREAM:
+                self.decodeStream()
+        except:
+            self.transport.loseConnection()
+        else:
+            self.buffer.consume()
 
     def onHandshakeSuccess(self):
         """
@@ -364,8 +346,11 @@ class RTMPBaseProtocol(protocol.Protocol, EventDispatcher):
         packet streaming can commence
         """
         # Remove the handshake timeout
-        self._timeout.cancel()
-        del self._timeout
+        if hasattr(self, '_timeout'):
+            if not self._timeout.cancelled:
+                self._timeout.cancel()
+
+            del self._timeout
 
         self.state = RTMPBaseProtocol.STREAM
         self.removeEventListener(HANDSHAKE_SUCCESS, self.onHandshakeSuccess)
@@ -386,15 +371,6 @@ class RTMPBaseProtocol(protocol.Protocol, EventDispatcher):
         C{self.handshakeTimeout} seconds. Disconnects the peer.
         """
         self.transport.loseConnection()
-
-    def onProtocolError(self, reason=None):
-        """
-        Called if there is a problem the underlying protocol.
-
-        Immediately disconnects and cancels any timeouts that may be active.
-        """
-        self.transport.loseConnection()
-        # TODO nick: logging here to see what went wrong
 
     def onChannelComplete(self, channel):
         """
