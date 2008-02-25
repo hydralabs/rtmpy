@@ -77,14 +77,6 @@ class Win32UptimeTestCase(UptimeTestCase):
 
 
 class DarwinUptimeTestCase(UptimeTestCase):
-    def setUp(self):
-        UptimeTestCase.setUp(self)
-
-        self.orig_func = util._find_command
-
-    def tearDown(self):
-        util._find_command = self.orig_func
-
     def test_okay(self):
         self.assertNotEquals(util.uptime_darwin(), 0)
 
