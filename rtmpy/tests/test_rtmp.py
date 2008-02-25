@@ -20,7 +20,7 @@ class ConstantsTestCase(unittest.TestCase):
         self.assertEquals(rtmp.HANDSHAKE_SUCCESS, 'rtmp.handshake.success')
         self.assertEquals(rtmp.HANDSHAKE_FAILURE, 'rtmp.handshake.failure')
         self.assertEquals(rtmp.HANDSHAKE_TIMEOUT, 'rtmp.handshake.timeout')
-        self.assertEquals(rtmp.CHANNEL_BODY_COMPLETE, 'rtmp.channel.body-complete')
+        self.assertEquals(rtmp.CHANNEL_COMPLETE, 'rtmp.channel.complete')
 
 
 class ReadHeaderTestCase(unittest.TestCase):
@@ -31,7 +31,7 @@ class ReadHeaderTestCase(unittest.TestCase):
         rtmp.read_header(channel, stream, 12)
 
         self.assertEquals(channel.destination, 0)
-        self.assertEquals(channel.unknown, '\x00\x00\x01')
+        self.assertEquals(channel.timer, '\x00\x00\x01')
         self.assertEquals(channel.type, 20)
         self.assertEquals(channel.channel_id, 0)
         self.assertEquals(channel.protocol, None)
@@ -44,7 +44,7 @@ class ReadHeaderTestCase(unittest.TestCase):
         rtmp.read_header(channel, BBS('\x03\x02\x01\x01\x02\x03\x12'), 8)
 
         self.assertEquals(channel.destination, 0)
-        self.assertEquals(channel.unknown, '\x03\x02\x01')
+        self.assertEquals(channel.timer, '\x03\x02\x01')
         self.assertEquals(channel.type, 18)
         self.assertEquals(channel.channel_id, 0)
         self.assertEquals(channel.protocol, None)
@@ -57,7 +57,7 @@ class ReadHeaderTestCase(unittest.TestCase):
         rtmp.read_header(channel, BBS('\x88\x77\x66'), 4)
 
         self.assertEquals(channel.destination, 0)
-        self.assertEquals(channel.unknown, '\x88\x77\x66')
+        self.assertEquals(channel.timer, '\x88\x77\x66')
         self.assertEquals(channel.type, 20)
         self.assertEquals(channel.channel_id, 0)
         self.assertEquals(channel.protocol, None)
@@ -70,7 +70,7 @@ class ReadHeaderTestCase(unittest.TestCase):
         rtmp.read_header(channel, BBS(''), 1)
 
         self.assertEquals(channel.destination, 0)
-        self.assertEquals(channel.unknown, '\x00\x00\x01')
+        self.assertEquals(channel.timer, '\x00\x00\x01')
         self.assertEquals(channel.type, 20)
         self.assertEquals(channel.channel_id, 0)
         self.assertEquals(channel.protocol, None)
@@ -158,7 +158,7 @@ class RTMPChannelTestCase(unittest.TestCase):
 
             d.callback(None)
 
-        protocol.addEventListener(rtmp.CHANNEL_BODY_COMPLETE, complete)
+        protocol.addEventListener(rtmp.CHANNEL_COMPLETE, complete)
         channel.write('12')
 
         return d
@@ -554,6 +554,22 @@ class RTMPParsingTestCase(BaseRTMPParsingTestCase):
         self.assertEquals(self.protocol.current_channel, None)
         self.assertEquals(self.protocol.buffer.remaining(), 0)
 
+    def test_channel_complete(self):
+        channel = rtmp.RTMPChannel(self.protocol, 0)
+        channel.length = 14
+
+        self.protocol.channels[0] = channel
+        self.protocol.current_channel = channel
+        d = defer.Deferred()
+
+        def completeChannel(channel):
+            self.assertFalse(0 in self.protocol.channels)
+            d.callback(None)
+
+        self.protocol.addEventListener(rtmp.CHANNEL_COMPLETE, completeChannel)
+        self.protocol.dataReceived('\x00' * 14)
+
+        return d
 
 class ReadHeaderReplacingParsingTestCase(BaseRTMPParsingTestCase):
     def setUp(self):

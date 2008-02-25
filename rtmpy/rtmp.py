@@ -31,7 +31,7 @@ HANDSHAKE_TIMEOUT = 'rtmp.handshake.timeout'
 
 PROTOCOL_ERROR = 'rtmp.protocol.error'
 
-CHANNEL_BODY_COMPLETE = 'rtmp.channel.body-complete'
+CHANNEL_COMPLETE = 'rtmp.channel.complete'
 MAX_CHANNELS = 64
 
 DEFAULT_HANDSHAKE_TIMEOUT = 30 # seconds
@@ -89,14 +89,14 @@ def read_header(channel, stream, byte_len):
         return
 
     if byte_len >= 4:
-       channel.unknown = stream.read(3)
+       channel.timer = stream.read(3)
 
     if byte_len >= 8:
        channel.length = (stream.read_ushort() << 8) + stream.read_uchar()
        channel.type = stream.read_uchar()
 
     if byte_len >= 12:
-       channel.destination = stream.read_ulong()
+       channel.stream_id = stream.read_ulong()
 
 
 class RTMPChannel:
@@ -116,7 +116,7 @@ class RTMPChannel:
 
     chunk_size = 128
     read = 0
-    unknown = '\x00\x00\x00'
+    timer = 0
     destination = 0
     length = 0
 
@@ -144,7 +144,7 @@ class RTMPChannel:
 
         if self.read == self.length:
             self.body.seek(0)
-            self.protocol.dispatchEvent(CHANNEL_BODY_COMPLETE, self)
+            self.protocol.dispatchEvent(CHANNEL_COMPLETE, self)
 
     def _chunk_remaining(self):
         if self.read >= self.length - (self.length % self.chunk_size):
@@ -202,11 +202,10 @@ class RTMPBaseProtocol(protocol.Protocol, EventDispatcher):
         self.received_handshake = None
 
         # setup event observers
-        self.addEventListener(PROTOCOL_ERROR, self.onProtocolError)
         self.addEventListener(HANDSHAKE_SUCCESS, self.onHandshakeSuccess)
         self.addEventListener(HANDSHAKE_FAILURE, self.onHandshakeFailure)
 
-        self.addEventListener(CHANNEL_BODY_COMPLETE, self.onChannelComplete)
+        self.addEventListener(CHANNEL_COMPLETE, self.onChannelComplete)
 
         self._timeout = reactor.callLater(self.handshakeTimeout,
             lambda: self.dispatchEvent(HANDSHAKE_TIMEOUT))
@@ -327,18 +326,19 @@ class RTMPBaseProtocol(protocol.Protocol, EventDispatcher):
         @note: C{buffer}'s internal pointer is assumed to be at the end of the
             stream each time this function is called.
         """
-        self.buffer.write(data)
-        self.buffer.seek(0)
-
         try:
+            self.buffer.write(data)
+            self.buffer.seek(0)
+
             if self.state == RTMPBaseProtocol.HANDSHAKE:
                 self.decodeHandshake()
             elif self.state == RTMPBaseProtocol.STREAM:
                 self.decodeStream()
+
+            self.buffer.consume()
         except:
             self.transport.loseConnection()
-        else:
-            self.buffer.consume()
+            # TODO nick: logging
 
     def onHandshakeSuccess(self):
         """
@@ -376,6 +376,4 @@ class RTMPBaseProtocol(protocol.Protocol, EventDispatcher):
         """
         Called when a channel body has been completed.
         """
-        from pyamf.util import hexdump
-
-        print hexdump(channel.body.getvalue())
+        del self.channels[channel.channel_id]
