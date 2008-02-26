@@ -77,3 +77,33 @@ class HandshakeTestCase(unittest.TestCase):
         self.protocol.addEventListener(rtmp.HANDSHAKE_SUCCESS, onEvent)
 
         return d
+
+
+class ServerProtocolTestCase(unittest.TestCase):
+    def test_handshake_success(self):
+        d = defer.Deferred()
+
+        def dr(data):
+            try:
+                self.assertEquals(data, '1234567890')
+            except:
+                d.errback()
+            else:
+               d.callback(None)
+
+        protocol = server.RTMPServerProtocol()
+        protocol.makeConnection(util.StringTransport())
+
+        protocol.dataReceived = dr
+
+        protocol.buffer.write('1234567890')
+        protocol.onHandshakeSuccess()
+
+
+class ServerFactoryTestCase(unittest.TestCase):
+    def test_protocol(self):
+        factory = server.RTMPServerFactory()
+
+        protocol = factory.buildProtocol(None)
+
+        self.assertTrue(isinstance(protocol, server.RTMPServerProtocol))

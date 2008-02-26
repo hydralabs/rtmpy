@@ -28,15 +28,14 @@ HANDSHAKE_LENGTH = 1536
 HANDSHAKE_SUCCESS = 'rtmp.handshake.success'
 HANDSHAKE_FAILURE = 'rtmp.handshake.failure'
 HANDSHAKE_TIMEOUT = 'rtmp.handshake.timeout'
+DEFAULT_HANDSHAKE_TIMEOUT = 5 # in seconds, can be a float
 
 PROTOCOL_ERROR = 'rtmp.protocol.error'
 
 CHANNEL_COMPLETE = 'rtmp.channel.complete'
 MAX_CHANNELS = 64
 
-DEFAULT_HANDSHAKE_TIMEOUT = 30 # seconds
-
-def generate_handshake(uptime=None):
+def generate_handshake(uptime=None, ping=0):
     """
     Generates a handshake packet. If an uptime is not supplied, it is figured
     out automatically.
@@ -46,7 +45,7 @@ def generate_handshake(uptime=None):
     if uptime is None:
         uptime = util.uptime()
 
-    handshake = struct.pack("!I", uptime) + struct.pack("!I", 0)
+    handshake = struct.pack("!I", uptime) + struct.pack("!I", ping)
 
     x = uptime
 
@@ -58,21 +57,27 @@ def generate_handshake(uptime=None):
 
 def decode_handshake(data):
     """
-    Decodes a handshake packet into a tuple (uptime, data)
+    Decodes a handshake packet into a tuple (uptime, ping, data)
 
     @param data: C{str} or L{util.StringIO} instance
     """
-    if not (hasattr(data, 'seek') and hasattr(data, 'read') and hasattr(data, 'close')):
-        data = util.StringIO(data)
+    created = False
+
+    if not isinstance(data, util.BufferedByteStream):
+        data = util.BufferedByteStream(data)
+
+        created = True
 
     data.seek(0)
 
-    uptime = struct.unpack("!I", data.read(4))[0]
+    uptime = data.read_ulong()
+    ping = data.read_ulong()
     body = data.read()
 
-    data.close()
+    if created:
+        data.close()
 
-    return uptime, body
+    return uptime, ping, body
 
 def read_header(channel, stream, byte_len):
     """
@@ -146,15 +151,15 @@ class RTMPChannel:
             self.body.seek(0)
             self.protocol.dispatchEvent(CHANNEL_COMPLETE, self)
 
-    def _chunk_remaining(self):
+    def chunk_remaining(self):
         if self.read >= self.length - (self.length % self.chunk_size):
             return self.length - self.read
 
         return self.chunk_size - (self.read % self.chunk_size)
 
-    chunk_remaining = property(_chunk_remaining)
+    chunk_remaining = property(chunk_remaining)
 
-    def _chunks_received(self):
+    def chunks_received(self):
         if self.length < self.chunk_size:
             if self.read == self.length:
                 return 1
@@ -166,7 +171,7 @@ class RTMPChannel:
 
         return self.read / self.chunk_size
 
-    chunks_received = property(_chunks_received)
+    chunks_received = property(chunks_received)
 
 
 class RTMPBaseProtocol(protocol.Protocol, EventDispatcher):
@@ -206,9 +211,23 @@ class RTMPBaseProtocol(protocol.Protocol, EventDispatcher):
         self.addEventListener(HANDSHAKE_FAILURE, self.onHandshakeFailure)
 
         self.addEventListener(CHANNEL_COMPLETE, self.onChannelComplete)
+        self.setTimeout(self.handshakeTimeout, lambda: self.dispatchEvent(HANDSHAKE_TIMEOUT))
 
-        self._timeout = reactor.callLater(self.handshakeTimeout,
-            lambda: self.dispatchEvent(HANDSHAKE_TIMEOUT))
+    def setTimeout(self, timeout, func):
+        if hasattr(self, '_timeout'):
+            if not self._timeout.cancelled:
+                self._timeout.cancel()
+
+        self._timeout = reactor.callLater(timeout, func)
+
+    def clearTimeout(self):
+        if not hasattr(self, '_timeout'):
+            return
+
+        if not self._timeout.cancelled:
+            self._timeout.cancel()
+
+        del self._timeout
 
     def connectionLost(self, reason):
         """
@@ -216,13 +235,9 @@ class RTMPBaseProtocol(protocol.Protocol, EventDispatcher):
 
         Cleans up any timeouts/buffer etc. 
         """
-        if hasattr(self, '_timeout'):
-            if not self._timeout.cancelled:
-                self._timeout.cancel()
-
-            del self._timeout
-
+        self.clearTimeout()
         self.buffer.truncate()
+        self.channels = {}
 
     def getChannel(self, channel_id):
         """
@@ -268,6 +283,15 @@ class RTMPBaseProtocol(protocol.Protocol, EventDispatcher):
 
         return channel
 
+    def closeChannel(self, channel_id):
+        """
+        Closes a RTMP channel.
+
+        @param: the index of the to channel be closed.
+        @type: C{int}
+        """
+        del self.channels[channel_id]
+
     def decodeHandshake(self):
         """
         Negotiates the handshake phase of the protocol. Needs to be implemented
@@ -279,7 +303,8 @@ class RTMPBaseProtocol(protocol.Protocol, EventDispatcher):
 
     def decodeStream(self):
         """
-        Parses the RTMP stream.
+        Attempts to unweave the RTMP stream. Splits and unweave the frames and
+        dispatch them to the relevant channel.
         """
         stream = self.buffer
 
@@ -310,11 +335,11 @@ class RTMPBaseProtocol(protocol.Protocol, EventDispatcher):
 
                 break
 
+            channel_id = header_byte & 0x3f
             try:
-                self.current_channel = self.getChannel(header_byte & 0x3f)
+                self.current_channel = self.getChannel(channel_id)
             except KeyError:
-                # unknown channel - create one
-                self.current_channel = self.createChannel(header_byte & 0x3f)
+                self.current_channel = self.createChannel(channel_id)
 
             read_header(self.current_channel, stream, header_len)
 
@@ -345,18 +370,12 @@ class RTMPBaseProtocol(protocol.Protocol, EventDispatcher):
         Called when the RTMP handshake was successful. Once this is called,
         packet streaming can commence
         """
-        # Remove the handshake timeout
-        if hasattr(self, '_timeout'):
-            if not self._timeout.cancelled:
-                self._timeout.cancel()
-
-            del self._timeout
-
         self.state = RTMPBaseProtocol.STREAM
         self.removeEventListener(HANDSHAKE_SUCCESS, self.onHandshakeSuccess)
         self.removeEventListener(HANDSHAKE_FAILURE, self.onHandshakeFailure)
         self.my_handshake = None
         self.received_handshake = None
+        self.clearTimeout()
 
     def onHandshakeFailure(self, reason):
         """
@@ -376,4 +395,4 @@ class RTMPBaseProtocol(protocol.Protocol, EventDispatcher):
         """
         Called when a channel body has been completed.
         """
-        del self.channels[channel.channel_id]
+        self.closeChannel(channel.channel_id)

@@ -79,28 +79,30 @@ class ReadHeaderTestCase(unittest.TestCase):
 class HandshakeHelperTestCase(unittest.TestCase):
     def test_generate(self):
         # specify the uptime in ms
-        hs = rtmp.generate_handshake(0)
+        hs = rtmp.generate_handshake(0, 0)
 
         self.assertEquals(hs[0:8], '\x00' * 8)
         self.assertEquals(len(hs), rtmp.HANDSHAKE_LENGTH)
 
         ms = 100000
-        hs = rtmp.generate_handshake(ms)
-        self.assertEquals(hs[0:8], '\x00\x01\x86\xa0\x00\x00\x00\x00')
+        hs = rtmp.generate_handshake(ms, 50)
+        self.assertEquals(hs[0:8], '\x00\x01\x86\xa0\x00\x00\x00\x32')
         self.assertEquals(len(hs), rtmp.HANDSHAKE_LENGTH)
 
     def test_decode(self):
         hs = rtmp.generate_handshake(0)
-        uptime, body = rtmp.decode_handshake(hs)
+        uptime, ping, body = rtmp.decode_handshake(hs)
 
         self.assertEquals(uptime, 0)
-        self.assertEquals(body, hs[4:])
+        self.assertEquals(ping, 0)
+        self.assertEquals(body, hs[8:])
 
-        hs = rtmp.generate_handshake(100000)
-        uptime, body = rtmp.decode_handshake(hs)
+        hs = rtmp.generate_handshake(100000, 345)
+        uptime, ping, body = rtmp.decode_handshake(hs)
 
         self.assertEquals(uptime, 100000)
-        self.assertEquals(body, hs[4:])
+        self.assertEquals(ping, 345)
+        self.assertEquals(body, hs[8:])
 
 
 class RTMPChannelTestCase(unittest.TestCase):
