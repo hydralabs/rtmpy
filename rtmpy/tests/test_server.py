@@ -99,6 +99,8 @@ class ServerProtocolTestCase(unittest.TestCase):
         protocol.buffer.write('1234567890')
         protocol.onHandshakeSuccess()
 
+        return d
+
 
 class ServerFactoryTestCase(unittest.TestCase):
     def test_protocol(self):

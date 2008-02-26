@@ -233,7 +233,7 @@ class RTMPBaseProtocol(protocol.Protocol, EventDispatcher):
         """
         Called when the connection is lost for some reason.
 
-        Cleans up any timeouts/buffer etc. 
+        Cleans up any timeouts/buffer etc.
         """
         self.clearTimeout()
         self.buffer.truncate()

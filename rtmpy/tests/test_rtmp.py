@@ -6,7 +6,7 @@ Tests for L{rtmpy.rtmp}
 """
 
 from twisted.trial import unittest
-from twisted.internet import defer
+from twisted.internet import defer, reactor
 
 from rtmpy.tests import util
 from rtmpy import rtmp, dispatcher
@@ -181,7 +181,7 @@ class RTMPChannelTestCase(unittest.TestCase):
         channel.length = 280
         channel.chunk_size = 128
         channel.read = 0
-        
+
         for x in xrange(128, 0, -1):
             self.assertEquals(channel.chunk_remaining, x)
             channel.read += 1
@@ -373,6 +373,25 @@ class BaseProtocolTestCase(unittest.TestCase):
         self.assertTrue(to.cancelled)
         self.assertTrue(self.executed)
 
+    def test_set_timeout(self):
+        p = rtmp.RTMPBaseProtocol()
+        d = defer.Deferred()
+        p.setTimeout(0, lambda: d.callback(None))
+
+        return d
+
+    def test_clear_timeout(self):
+        p = rtmp.RTMPBaseProtocol()
+        p.clearTimeout()
+
+        self.assertFalse(hasattr(p, '_timeout'))
+
+        p = rtmp.RTMPBaseProtocol()
+        p._timeout = reactor.callLater(0, lambda: None)
+        p.clearTimeout()
+
+        self.assertFalse(hasattr(p, '_timeout'))
+
 
 class ChannelManagementTestCase(unittest.TestCase):
     def setUp(self):
@@ -407,6 +426,13 @@ class ChannelManagementTestCase(unittest.TestCase):
         self.assertEquals(channel.channel_id, 63)
         self.assertIdentical(channel.protocol, self.protocol)
 
+    def test_close(self):
+        self.assertTrue(1 not in self.protocol.channels)
+        self.assertRaises(KeyError, self.protocol.closeChannel, 1)
+        self.protocol.channels[1] = 'foo'
+        self.protocol.closeChannel(1)
+        self.assertRaises(KeyError, self.protocol.closeChannel, 1)
+        self.assertTrue(1 not in self.protocol.channels)
 
 class BaseRTMPParsingTestCase(unittest.TestCase):
     def setUp(self):
@@ -594,7 +620,7 @@ class ReadHeaderReplacingParsingTestCase(BaseRTMPParsingTestCase):
         self.protocol.dataReceived('\x00' + '\x00' * 12)
         self.assertFalse(self.transport.connected)
 
-    def test_create_channel(self):        
+    def test_create_channel(self):
         self.executed = False
 
         def run_checks(a, b, c):

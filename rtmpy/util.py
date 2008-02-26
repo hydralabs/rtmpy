@@ -47,7 +47,7 @@ def uptime_win32():
     booted.
 
     @rtype: C{float}
-    """ 
+    """
     import win32api
 
     return float(time.time()) - float(win32api.GetTickCount() / 1000)
