@@ -13,7 +13,7 @@ class RTMPServerProtocol(rtmp.RTMPBaseProtocol):
     Server RTMP Protocol.
     """
 
-    def decodeHandshake(self):
+    def _decodeHandshake(self):
         """
         Negotiates the handshake phase of the protocol.
 
@@ -24,10 +24,12 @@ class RTMPServerProtocol(rtmp.RTMPBaseProtocol):
         if self.my_handshake is not None:
             # we have received the correct header, the peer's handshake,
             # sent our own handshake, time to validate.
-            if len(buffer) < rtmp.HANDSHAKE_LENGTH:
+            if buffer.remaining() < rtmp.HANDSHAKE_LENGTH:
                 return
 
-            if buffer.read(rtmp.HANDSHAKE_LENGTH) != self.my_handshake:
+            hs = buffer.read(rtmp.HANDSHAKE_LENGTH)
+
+            if hs[8:] != self.my_handshake[8:]:
                 self.dispatchEvent(rtmp.HANDSHAKE_FAILURE, 'Handshake mismatch')
 
                 return
@@ -61,6 +63,10 @@ class RTMPServerProtocol(rtmp.RTMPBaseProtocol):
 
         self.transport.write(
             rtmp.HEADER_BYTE + self.my_handshake + self.received_handshake)
+
+    def decodeHandshake(self):
+        self._decodeHandshake()
+        self.buffer.consume()
 
     def onHandshakeSuccess(self):
         rtmp.RTMPBaseProtocol.onHandshakeSuccess(self)

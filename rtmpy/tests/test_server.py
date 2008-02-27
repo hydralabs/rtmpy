@@ -61,20 +61,24 @@ class HandshakeTestCase(unittest.TestCase):
         d = defer.Deferred()
         self.protocol.makeConnection(self.transport)
 
+        def onEvent():
+            d.callback(None)
+
+        def eb(reason):
+            d.errback()
+
+        self.protocol.addEventListener(rtmp.HANDSHAKE_SUCCESS, onEvent)
+        self.protocol.addEventListener(rtmp.HANDSHAKE_FAILURE, eb)
+
         client_hs = rtmp.generate_handshake()
         self.protocol.dataReceived(rtmp.HEADER_BYTE + client_hs)
         handshake = self.transport.value()
 
         self.assertEquals(handshake[0], rtmp.HEADER_BYTE)
-        self.assertEquals(handshake[1:rtmp.HANDSHAKE_LENGTH + 1], self.protocol.my_handshake)
-        self.assertEquals(handshake[1 + rtmp.HANDSHAKE_LENGTH:], client_hs)
+        self.assertEquals(handshake[9:rtmp.HANDSHAKE_LENGTH + 1], self.protocol.my_handshake[8:])
+        self.assertEquals(handshake[9 + rtmp.HANDSHAKE_LENGTH:], client_hs[8:])
 
         self.protocol.dataReceived(self.protocol.my_handshake)
-
-        def onEvent():
-            d.callback(None)
-
-        self.protocol.addEventListener(rtmp.HANDSHAKE_SUCCESS, onEvent)
 
         return d
 

@@ -445,6 +445,7 @@ class BaseRTMPParsingTestCase(unittest.TestCase):
 
         self.protocol._timeout.cancel()
         self.protocol.state = rtmp.RTMPBaseProtocol.STREAM
+        self.protocol.onHandshakeSuccess()
 
 
 class RTMPParsingTestCase(BaseRTMPParsingTestCase):
@@ -467,6 +468,7 @@ class RTMPParsingTestCase(BaseRTMPParsingTestCase):
         for byte in '\x01' * 128:
             self.protocol.dataReceived(byte)
 
+        self.protocol.decodeStream()
         self.assertIdentical(self.protocol.current_channel, None)
         self.assertEquals(channel.chunks_received, 1)
         self.assertEquals(channel.chunk_remaining, channel.chunk_size)
@@ -476,12 +478,14 @@ class RTMPParsingTestCase(BaseRTMPParsingTestCase):
         for byte in '\xc0':
             self.protocol.dataReceived(byte)
 
+        self.protocol.decodeStream()
         self.assertIdentical(self.protocol.current_channel, channel)
 
         # second 128 byte body
         for byte in '\x02' * 128:
             self.protocol.dataReceived(byte)
 
+        self.protocol.decodeStream()
         self.assertIdentical(self.protocol.current_channel, None)
         self.assertEquals(channel.chunks_received, 2)
         self.assertEquals(channel.chunk_remaining, 34)
@@ -497,6 +501,7 @@ class RTMPParsingTestCase(BaseRTMPParsingTestCase):
         for byte in '\x03' * 34:
             self.protocol.dataReceived(byte)
 
+        self.protocol.decodeStream()
         self.assertIdentical(self.protocol.current_channel, None)
         self.assertEquals(channel.chunks_received, 3)
         self.assertEquals(channel.chunk_remaining, 0)
@@ -515,6 +520,7 @@ class RTMPParsingTestCase(BaseRTMPParsingTestCase):
         for byte in '\x05' * 128:
             self.protocol.dataReceived(byte)
 
+        self.protocol.decodeStream()
         self.assertEqual(channel0.body.getvalue(), '\x05' * 128)
         self.assertEqual(channel0.chunks_received, 1)
         self.assertEqual(channel0.chunk_remaining, 10)
@@ -531,6 +537,7 @@ class RTMPParsingTestCase(BaseRTMPParsingTestCase):
         for byte in '\x04' * 34:
             self.protocol.dataReceived(byte)
 
+        self.protocol.decodeStream()
         self.assertEqual(channel12.body.getvalue(), '\x04' * 34)
         self.assertEqual(channel12.chunks_received, 1)
         self.assertEqual(channel12.chunk_remaining, 0)
@@ -540,12 +547,14 @@ class RTMPParsingTestCase(BaseRTMPParsingTestCase):
         for byte in '\xc0':
             self.protocol.dataReceived(byte)
 
+        self.protocol.decodeStream()
         self.assertIdentical(self.protocol.current_channel, channel0)
 
         # second 10 byte body
         for byte in '\x05' * 10:
             self.protocol.dataReceived(byte)
 
+        self.protocol.decodeStream()
         self.assertEquals(channel0.body.getvalue(), '\x05' * 138)
         self.assertEqual(channel0.chunks_received, 2)
         self.assertEqual(channel0.chunk_remaining, 0)
@@ -588,16 +597,23 @@ class RTMPParsingTestCase(BaseRTMPParsingTestCase):
 
         self.protocol.channels[0] = channel
         self.protocol.current_channel = channel
+        
         d = defer.Deferred()
 
         def completeChannel(channel):
-            self.assertFalse(0 in self.protocol.channels)
-            d.callback(None)
+            try:
+                self.assertFalse(0 in self.protocol.channels)
+                self.assertEquals(self.protocol.current_channel, None)
+            except:
+                d.errback()
+            else:
+                d.callback(None)
 
         self.protocol.addEventListener(rtmp.CHANNEL_COMPLETE, completeChannel)
         self.protocol.dataReceived('\x00' * 14)
 
         return d
+
 
 class ReadHeaderReplacingParsingTestCase(BaseRTMPParsingTestCase):
     def setUp(self):

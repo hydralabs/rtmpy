@@ -72,8 +72,23 @@ class HandshakeTestCase(unittest.TestCase):
         server_token = ('\x01' * rtmp.HANDSHAKE_LENGTH)
         self.transport.clear()
 
-        self.protocol.dataReceived(rtmp.HEADER_BYTE + server_token + client_token)
-        self.assertTrue(self.transport.connected)
+        d = defer.Deferred()
 
-        self.assertEquals(server_token, self.transport.value())
-        self.assertTrue(self.transport.connected)
+        def cb():
+            try:
+                self.assertEquals(server_token, self.transport.value())
+                self.assertTrue(self.transport.connected)
+            except:
+                d.errback()
+            else:
+                d.callback(None)
+
+        def eb(reason):
+            d.errback()
+
+        self.protocol.addEventListener(rtmp.HANDSHAKE_SUCCESS, cb)
+        self.protocol.addEventListener(rtmp.HANDSHAKE_FAILURE, eb)
+
+        self.protocol.dataReceived(rtmp.HEADER_BYTE + server_token + client_token)
+
+        return d

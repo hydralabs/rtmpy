@@ -22,42 +22,52 @@ class RTMPClientProtocol(rtmp.RTMPBaseProtocol):
         # generate and send initial handshake
         self.my_handshake = rtmp.generate_handshake()
 
-        self.transport.write(rtmp.HEADER_BYTE)
-        self.transport.write(self.my_handshake)
+        self.transport.write(rtmp.HEADER_BYTE + self.my_handshake)
 
-    def decodeHandshake(self):
+    def _decodeHandshake(self):
         """
         Negotiates the handshake phase of the protocol.
 
         @see L{http://osflash.org/documentation/rtmp#handshake} for more info.
         """
+        if self.debug:
+            rtmp._debug(self, "Begin decode handshake")
         buffer = self.buffer
 
         if len(buffer) < 1:
             # no data has been received yet
+            if self.debug:
+                rtmp._debug(self, "Header not received")
             return
 
-        if buffer.read(1) != rtmp.HEADER_BYTE:
+        if self.received_handshake is None and buffer.read(1) != rtmp.HEADER_BYTE:
             self.dispatchEvent(rtmp.HANDSHAKE_FAILURE, 'Invalid header byte received')
 
             return
 
-        if len(buffer) < rtmp.HANDSHAKE_LENGTH * 2 + 1:
+        self.received_handshake = ''
+
+        if buffer.remaining() < rtmp.HANDSHAKE_LENGTH * 2:
             # buffer is too small, wait for more data
             return
 
         self.received_handshake = buffer.read(rtmp.HANDSHAKE_LENGTH)
+        hs = buffer.read(rtmp.HANDSHAKE_LENGTH)
 
-        if buffer.read(rtmp.HANDSHAKE_LENGTH) != self.my_handshake:
+        if hs[8:] != self.my_handshake[8:]:
             self.dispatchEvent(rtmp.HANDSHAKE_FAILURE, 'Handshake mismatch')
+        else:
+            self.transport.write(self.received_handshake)
+            self.dispatchEvent(rtmp.HANDSHAKE_SUCCESS)
 
-            return
-
+    def decodeHandshake(self):
+        self._decodeHandshake()
         self.buffer.consume()
-        self.transport.write(self.received_handshake)
-        self.dispatchEvent(rtmp.HANDSHAKE_SUCCESS)
 
     def onHandshakeSuccess(self):
+        if self.debug:
+            rtmp._debug(self, "handshake success")
+
         rtmp.RTMPBaseProtocol.onHandshakeSuccess(self)
 
         # send invoke->connect here

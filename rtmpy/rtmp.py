@@ -14,7 +14,8 @@ RTMP protocol for Twisted.
 """
 
 import time, struct
-from twisted.internet import reactor, protocol, defer
+from twisted.internet import reactor, protocol, defer, task
+from twisted.python import log
 
 from rtmpy.dispatcher import EventDispatcher
 from rtmpy import util
@@ -28,12 +29,15 @@ HANDSHAKE_LENGTH = 1536
 HANDSHAKE_SUCCESS = 'rtmp.handshake.success'
 HANDSHAKE_FAILURE = 'rtmp.handshake.failure'
 HANDSHAKE_TIMEOUT = 'rtmp.handshake.timeout'
-DEFAULT_HANDSHAKE_TIMEOUT = 5 # in seconds, can be a float
+DEFAULT_HANDSHAKE_TIMEOUT = 5.0 # in seconds
 
 PROTOCOL_ERROR = 'rtmp.protocol.error'
 
 CHANNEL_COMPLETE = 'rtmp.channel.complete'
 MAX_CHANNELS = 64
+
+def _debug(obj, msg):
+    print "%s<0x%x> - %s" %(obj.__class__.__name__, id(obj), msg)
 
 def generate_handshake(uptime=None, ping=0):
     """
@@ -173,6 +177,9 @@ class RTMPChannel:
 
     chunks_received = property(chunks_received)
 
+    def __repr__(self):
+        return '<%s.%s channel_id=%d length=%d read=%d @ 0x%x>' % (self.__module__,
+            self.__class__.__name__, self.channel_id, self.length, self.read, id(self))
 
 class RTMPBaseProtocol(protocol.Protocol, EventDispatcher):
     """
@@ -195,13 +202,19 @@ class RTMPBaseProtocol(protocol.Protocol, EventDispatcher):
 
     handshakeTimeout = DEFAULT_HANDSHAKE_TIMEOUT
 
+    debug = False
+
     def connectionMade(self):
+        if self.debug:
+            _debug(self, "Connection made")
+
         protocol.Protocol.connectionMade(self)
 
         self.buffer = util.BufferedByteStream()
         self.channels = {}
         self.state = RTMPBaseProtocol.HANDSHAKE
         self.current_channel = None
+        self.decoding = False
 
         self.my_handshake = None
         self.received_handshake = None
@@ -214,6 +227,9 @@ class RTMPBaseProtocol(protocol.Protocol, EventDispatcher):
         self.setTimeout(self.handshakeTimeout, lambda: self.dispatchEvent(HANDSHAKE_TIMEOUT))
 
     def setTimeout(self, timeout, func):
+        if self.debug:
+            _debug(self, "Setting timeout")
+
         if hasattr(self, '_timeout'):
             if not self._timeout.cancelled:
                 self._timeout.cancel()
@@ -228,6 +244,8 @@ class RTMPBaseProtocol(protocol.Protocol, EventDispatcher):
             self._timeout.cancel()
 
         del self._timeout
+        if self.debug:
+            _debug(self, "Clearing timeout")
 
     def connectionLost(self, reason):
         """
@@ -235,9 +253,13 @@ class RTMPBaseProtocol(protocol.Protocol, EventDispatcher):
 
         Cleans up any timeouts/buffer etc.
         """
+        if self.debug:
+            _debug(self, "Lost connection (reason:%s)" % reason)
+
         self.clearTimeout()
         self.buffer.truncate()
         self.channels = {}
+        self.stopDecoding()
 
     def getChannel(self, channel_id):
         """
@@ -281,6 +303,9 @@ class RTMPBaseProtocol(protocol.Protocol, EventDispatcher):
 
         channel = self.channels[channel_id] = RTMPChannel(self, channel_id)
 
+        if self.debug:
+            _debug(self, "Creating channel %r" % channel)
+
         return channel
 
     def closeChannel(self, channel_id):
@@ -290,6 +315,9 @@ class RTMPBaseProtocol(protocol.Protocol, EventDispatcher):
         @param: the index of the to channel be closed.
         @type: C{int}
         """
+        if self.debug:
+            _debug(self, "Closing channel %r" % self.channels[channel_id])
+
         del self.channels[channel_id]
 
     def decodeHandshake(self):
@@ -301,69 +329,103 @@ class RTMPBaseProtocol(protocol.Protocol, EventDispatcher):
         """
         raise NotImplementedError
 
-    def decodeStream(self):
+    def _decodeStream(self):
         """
         Attempts to unweave the RTMP stream. Splits and unweave the frames and
         dispatch them to the relevant channel.
         """
+        self.buffer.seek(0)
+
         stream = self.buffer
 
-        while stream.remaining() > 0:
-            if self.current_channel is not None:
-                chunk_length = min(stream.remaining(),
-                    self.current_channel.chunk_remaining)
+        if self.current_channel is not None:
+            chunk_length = min(stream.remaining(),
+                self.current_channel.chunk_remaining)
 
-                num_chunks = self.current_channel.chunks_received
+            num_chunks = self.current_channel.chunks_received
 
-                if chunk_length > 0:
-                    self.current_channel.write(stream.read(chunk_length))
+            if chunk_length > 0:
+                self.current_channel.write(stream.read(chunk_length))
 
-                if self.current_channel.chunks_received != num_chunks:
-                    self.current_channel = None
+            if self.current_channel.chunks_received != num_chunks:
+                self.current_channel = None
 
-            if self.current_channel is not None or stream.remaining() == 0:
-                break
+        if self.current_channel is not None or stream.remaining() == 0:
+            self.stopDecoding()
 
-            start_of_header = stream.tell()
+            return
 
-            header_byte = stream.read_uchar()
-            header_len = HEADER_SIZES[header_byte >> 6]
+        start_of_header = stream.tell()
 
-            if stream.remaining() < header_len - 1:
-                # not enough stream left to continue decoding, rewind and wait
-                stream.seek(start_of_header)
+        header_byte = stream.read_uchar()
+        header_len = HEADER_SIZES[header_byte >> 6]
 
-                break
+        if stream.remaining() < header_len - 1:
+            # not enough stream left to continue decoding, rewind and wait
+            stream.seek(start_of_header)
+            self.stopDecoding()
 
-            channel_id = header_byte & 0x3f
-            try:
-                self.current_channel = self.getChannel(channel_id)
-            except KeyError:
-                self.current_channel = self.createChannel(channel_id)
+            return
 
-            read_header(self.current_channel, stream, header_len)
+        channel_id = header_byte & 0x3f
+        try:
+            self.current_channel = self.getChannel(channel_id)
+        except KeyError:
+            self.current_channel = self.createChannel(channel_id)
+
+        read_header(self.current_channel, stream, header_len)
+
+    def decodeStream(self):
+        if self.debug:
+            _debug(self, "Begin decoding stream buffer length: %d, pos: %d, channel: %r" % (len(self.buffer), self.buffer.tell(), self.current_channel))
+
+        self._decodeStream()
+        if self.debug:
+            _debug(self, "End decoding stream pos: %d" % self.buffer.tell())
+
+        self.buffer.consume()
+
+    def logAndDisconnect(self, failure=None):
+        if self.debug:
+            log.err()
+            _debug(self, "error")
+            raise
+
+        self.transport.loseConnection()
+
+    def stopDecoding(self):
+        if self.debug:
+            _debug(self, "Stopping decoding")
+
+        if hasattr(self, '_decoding_loop') and self._decoding_loop.running:
+            self._decoding_loop.stop()
+
+    def startDecoding(self):
+        if not self._decoding_loop.running:
+            d = self._decoding_loop.start(0)
+
+            d.addErrback(lambda f: self.logAndDisconnect(f))
 
     def dataReceived(self, data):
         """
         Called when data is received from the underlying transport. Splits the
         data stream into chunks and delivers them to each channel.
-
-        @note: C{buffer}'s internal pointer is assumed to be at the end of the
-            stream each time this function is called.
         """
+        if self.debug:
+            _debug(self, "Receive data: state=%s, len=%d, stream.len=%d, stream.pos=%d" % (
+                self.state, len(data), len(self.buffer), self.buffer.tell()))
+
         try:
+            self.buffer.seek(0, 2)
             self.buffer.write(data)
             self.buffer.seek(0)
 
             if self.state == RTMPBaseProtocol.HANDSHAKE:
                 self.decodeHandshake()
             elif self.state == RTMPBaseProtocol.STREAM:
-                self.decodeStream()
-
-            self.buffer.consume()
+                self.startDecoding()
         except:
-            self.transport.loseConnection()
-            # TODO nick: logging
+            self.logAndDisconnect()
 
     def onHandshakeSuccess(self):
         """
@@ -376,12 +438,15 @@ class RTMPBaseProtocol(protocol.Protocol, EventDispatcher):
         self.my_handshake = None
         self.received_handshake = None
         self.clearTimeout()
+        self._decoding_loop = task.LoopingCall(self.decodeStream)
 
     def onHandshakeFailure(self, reason):
         """
         Called when the RTMP handshake failed for some reason. Drops the
         connection immediately.
         """
+        if self.debug:
+            _debug(self, "Failed handshake (reason:%s)" % reason)
         self.transport.loseConnection()
 
     def onHandshakeTimeout(self):
@@ -395,4 +460,7 @@ class RTMPBaseProtocol(protocol.Protocol, EventDispatcher):
         """
         Called when a channel body has been completed.
         """
+        if self.current_channel == channel:
+            self.current_channel = None
+
         self.closeChannel(channel.channel_id)
