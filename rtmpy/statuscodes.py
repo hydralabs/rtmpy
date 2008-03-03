@@ -105,6 +105,13 @@ class StatusCodes:
     #: Playlist playback switched from one stream to another.
     NS_PLAY_SWITCH = "NetStream.Play.Switch"
 
+    #: Flash Player detected an invalid file structure and will not try to play this type of file.
+    NS_PLAY_FILESTRUCTUREINVALID = "NetStream.Play.FileStructureInvalid"
+
+    #: Flash Player did not detect any supported tracks (video, audio or data) and will not try to
+    #: play the file.
+    NS_PLAY_NOSUPPORTEDTRACKFOUND = "NetStream.Play.NoSupportedTrackFound"
+    
     #: Playlist playback is complete.
     NS_PLAY_COMPLETE = "NetStream.Play.Complete"
 
