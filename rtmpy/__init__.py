@@ -2,8 +2,8 @@
 # See LICENSE for details.
 
 """
-U{RTMPy<http://rtmpy.org>} is a U{Twisted<http://twistedmatrix.com>}
-protocol implementing U{RTMP<http://osflash.org/documentation/rtmp>}.
+RTMPy is a U{Twisted<http://twistedmatrix.com>} protocol
+implementing U{RTMP<http://osflash.org/documentation/rtmp>}.
 
 @author: U{Arnar Birgisson<mailto:arnarbi@gmail.com>}
 @author: U{Thijs Triemstra<mailto:info@collab.nl>}
