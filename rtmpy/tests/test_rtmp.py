@@ -24,56 +24,52 @@ class ConstantsTestCase(unittest.TestCase):
 
 
 class ReadHeaderTestCase(unittest.TestCase):
+    def setUp(self):
+        self.header = rtmp.RTMPHeader(None)
+        self.stream = BBS()
+
+    def _write(self, bytes):
+        self.stream.truncate()
+        self.stream.write(bytes)
+        self.stream.seek(0)
+
+        rtmp.read_header(self.header, self.stream, len(bytes) + 1)
+
     def test_12byte_header(self):
-        channel = rtmp.RTMPChannel(None, 0)
-        stream = BBS('\x00\x00\x01\x00\x01\x05\x14\x00\x00\x00\x00')
+        self._write('\x00\x00\x01\x00\x01\x05\x14\x00\x00\x00\x00')
 
-        rtmp.read_header(channel, stream, 12)
-
-        self.assertEquals(channel.destination, 0)
-        self.assertEquals(channel.timer, '\x00\x00\x01')
-        self.assertEquals(channel.type, 20)
-        self.assertEquals(channel.channel_id, 0)
-        self.assertEquals(channel.protocol, None)
+        self.assertEquals(self.header.stream_id, 0)
+        self.assertEquals(self.header.length, 261)
+        self.assertEquals(self.header.timer, 1)
+        self.assertEquals(self.header.type, 20)
+        self.assertEquals(self.header.relative, False)
 
     def test_8byte_header(self):
-        channel = rtmp.RTMPChannel(None, 0)
-        stream = BBS('\x00\x00\x01\x00\x01\x05\x14\x00\x00\x00\x00')
+        self._write('\x03\x02\x01\x01\x02\x03\x12')
 
-        rtmp.read_header(channel, stream, 12)
-        rtmp.read_header(channel, BBS('\x03\x02\x01\x01\x02\x03\x12'), 8)
-
-        self.assertEquals(channel.destination, 0)
-        self.assertEquals(channel.timer, '\x03\x02\x01')
-        self.assertEquals(channel.type, 18)
-        self.assertEquals(channel.channel_id, 0)
-        self.assertEquals(channel.protocol, None)
+        self.assertEquals(self.header.stream_id, None)
+        self.assertEquals(self.header.length, 66051)
+        self.assertEquals(self.header.timer, 197121)
+        self.assertEquals(self.header.relative, True)
+        self.assertEquals(self.header.type, 18)
 
     def test_4byte_header(self):
-        channel = rtmp.RTMPChannel(None, 0)
-        stream = BBS('\x00\x00\x01\x00\x01\x05\x14\x00\x00\x00\x00')
+        self._write('\x88\x77\x66')
 
-        rtmp.read_header(channel, stream, 12)
-        rtmp.read_header(channel, BBS('\x88\x77\x66'), 4)
-
-        self.assertEquals(channel.destination, 0)
-        self.assertEquals(channel.timer, '\x88\x77\x66')
-        self.assertEquals(channel.type, 20)
-        self.assertEquals(channel.channel_id, 0)
-        self.assertEquals(channel.protocol, None)
+        self.assertEquals(self.header.stream_id, None)
+        self.assertEquals(self.header.length, None)
+        self.assertEquals(self.header.timer, 8943462)
+        self.assertEquals(self.header.relative, True)
+        self.assertEquals(self.header.type, None)
 
     def test_1byte_header(self):
-        channel = rtmp.RTMPChannel(None, 0)
-        stream = BBS('\x00\x00\x01\x00\x01\x05\x14\x00\x00\x00\x00')
+        self._write('')
 
-        rtmp.read_header(channel, stream, 12)
-        rtmp.read_header(channel, BBS(''), 1)
-
-        self.assertEquals(channel.destination, 0)
-        self.assertEquals(channel.timer, '\x00\x00\x01')
-        self.assertEquals(channel.type, 20)
-        self.assertEquals(channel.channel_id, 0)
-        self.assertEquals(channel.protocol, None)
+        self.assertEquals(self.header.stream_id, None)
+        self.assertEquals(self.header.length, None)
+        self.assertEquals(self.header.timer, None)
+        self.assertEquals(self.header.relative, True)
+        self.assertEquals(self.header.type, None)
 
 
 class HandshakeHelperTestCase(unittest.TestCase):
@@ -117,7 +113,7 @@ class RTMPChannelTestCase(unittest.TestCase):
         self.assertEquals(channel.channel_id, 324)
         self.assertEquals(channel.chunk_size, 128)
         self.assertEquals(channel.read, 0)
-        self.assertEquals(channel.length, 0)
+        self.assertEquals(channel.length, None)
         self.assertTrue(isinstance(channel.body, BBS))
 
     def test_remaining(self):

@@ -83,29 +83,62 @@ def decode_handshake(data):
 
     return uptime, ping, body
 
-def read_header(channel, stream, byte_len):
+def read_header(header, stream, byte_len):
     """
     Reads a header from the incoming stream.
 
-    @type channel: L{RTMPChannel}
+    @type header: L{RTMPHeader}
     @param stream: The input buffer to read from
     @type stream: L{BufferedByteStream}
     @type byte_len: C{int}
     """
     assert byte_len in HEADER_SIZES, 'Unexpected header size'
 
+    header.relative = byte_len != 12
+
     if byte_len == 1:
         return
 
     if byte_len >= 4:
-       channel.timer = stream.read(3)
+       header.timer = stream.read_3byte_uint()
 
     if byte_len >= 8:
-       channel.length = stream.read_3byte_uint()
-       channel.type = stream.read_uchar()
+       header.length = stream.read_3byte_uint()
+       header.type = stream.read_uchar()
 
     if byte_len >= 12:
-       channel.stream_id = stream.read_ulong()
+       header.stream_id = stream.read_ulong()
+       header.relative = False
+
+
+class RTMPHeader:
+    """
+    @ivar length: Length of the channel body.
+    @type length: C{int}
+    @ivar timer: A timer value.
+    @type timer: C{int}
+    @ivar relative: If the timer value is relative
+    @type relative: C{bool}
+    @ivar type: The data type of channel.
+    @type type: C{int}
+    """
+
+    def __init__(self, channel, **kwargs):
+        self.channel = channel
+
+        self.relative = kwargs.get('relative', False)
+        self.length = kwargs.get('length', None)
+        self.timer = kwargs.get('timer', None)
+        self.type = kwargs.get('type', None)
+        self.stream_id = kwargs.get('stream_id', None)
+
+    def channel_id(self):
+        if not self.channel:
+            return None
+
+        return self.channel.channel_id
+
+    channel_id = property(channel_id)
 
 
 class RTMPChannel:
@@ -119,14 +152,12 @@ class RTMPChannel:
 
     chunk_size = 128
     read = 0
-    timer = 0
-    destination = 0
-    length = 0
-    type = None
 
     def __init__(self, protocol, channel_id):
         self.protocol = protocol
         self.channel_id = channel_id
+
+        self.header = RTMPHeader(self)
         self.body = util.BufferedByteStream()
 
     def _remaining(self):
@@ -136,6 +167,7 @@ class RTMPChannel:
         return self.length - self.read
 
     remaining = property(_remaining)
+    length = property(lambda self: self.header.length)
 
     def write(self, data):
         data_len = len(data)
@@ -173,8 +205,8 @@ class RTMPChannel:
     chunks_received = property(chunks_received)
 
     def __repr__(self):
-        return '<%s.%s channel_id=%d length=%d read=%d type=%s @ 0x%x>' % (self.__module__,
-            self.__class__.__name__, self.channel_id, self.length, self.read, self.type, id(self))
+        return '<%s.%s channel_id=%d header=%r @ 0x%x>' % (self.__module__,
+            self.__class__.__name__, self.channel_id, self.header, id(self))
 
 class RTMPBaseProtocol(protocol.Protocol, EventDispatcher):
     """
@@ -374,7 +406,7 @@ class RTMPBaseProtocol(protocol.Protocol, EventDispatcher):
         except KeyError:
             self.current_channel = self.createChannel(channel_id)
 
-        read_header(self.current_channel, stream, header_len)
+        read_header(self.current_channel.header, stream, header_len)
 
     def decodeStream(self):
         if self.debug:
