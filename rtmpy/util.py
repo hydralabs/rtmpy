@@ -40,6 +40,16 @@ class BufferedByteStream(_BufferedByteStream):
             self.write(bytes)
             self.seek(0, 2)
 
+    def read_3byte_uint(self):
+        return (self.read_ushort() << 8) + self.read_uchar()
+
+    def write_3byte_uint(self, n):
+        if n < 0 or n > 0xffffff:
+            raise ValueError, "n is out of range"
+
+        self.write_uchar((n >> 16) & 0xff)
+        self.write_uchar((n >> 8) & 0xff)
+        self.write_uchar(n & 0xff)
 
 def uptime_win32():
     """

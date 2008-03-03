@@ -29,7 +29,7 @@ HANDSHAKE_LENGTH = 1536
 HANDSHAKE_SUCCESS = 'rtmp.handshake.success'
 HANDSHAKE_FAILURE = 'rtmp.handshake.failure'
 HANDSHAKE_TIMEOUT = 'rtmp.handshake.timeout'
-DEFAULT_HANDSHAKE_TIMEOUT = 5.0 # in seconds
+DEFAULT_HANDSHAKE_TIMEOUT = 5.0 # seconds
 
 PROTOCOL_ERROR = 'rtmp.protocol.error'
 
@@ -101,7 +101,7 @@ def read_header(channel, stream, byte_len):
        channel.timer = stream.read(3)
 
     if byte_len >= 8:
-       channel.length = (stream.read_ushort() << 8) + stream.read_uchar()
+       channel.length = stream.read_3byte_uint()
        channel.type = stream.read_uchar()
 
     if byte_len >= 12:
@@ -110,12 +110,6 @@ def read_header(channel, stream, byte_len):
 
 class RTMPChannel:
     """
-    @ivar length: Length of the body.
-    @type length: C{int}
-    @ivar unknown: 3 bytes of unknown data.
-    @type unknown: C{str}
-    @ivar type: The type of channel.
-    @type type: C{int}
     @ivar read: Number of bytes read from the stream so far.
     @type read: C{int}
     @ivar chunk_remaining: A calculated field that returns the number of bytes
@@ -128,6 +122,7 @@ class RTMPChannel:
     timer = 0
     destination = 0
     length = 0
+    type = None
 
     def __init__(self, protocol, channel_id):
         self.protocol = protocol
@@ -178,8 +173,8 @@ class RTMPChannel:
     chunks_received = property(chunks_received)
 
     def __repr__(self):
-        return '<%s.%s channel_id=%d length=%d read=%d @ 0x%x>' % (self.__module__,
-            self.__class__.__name__, self.channel_id, self.length, self.read, id(self))
+        return '<%s.%s channel_id=%d length=%d read=%d type=%s @ 0x%x>' % (self.__module__,
+            self.__class__.__name__, self.channel_id, self.length, self.read, self.type, id(self))
 
 class RTMPBaseProtocol(protocol.Protocol, EventDispatcher):
     """
@@ -228,7 +223,7 @@ class RTMPBaseProtocol(protocol.Protocol, EventDispatcher):
 
     def setTimeout(self, timeout, func):
         if self.debug:
-            _debug(self, "Setting timeout")
+            _debug(self, "Setting timeout: %s seconds" % timeout)
 
         if hasattr(self, '_timeout'):
             if not self._timeout.cancelled:
@@ -237,15 +232,18 @@ class RTMPBaseProtocol(protocol.Protocol, EventDispatcher):
         self._timeout = reactor.callLater(timeout, func)
 
     def clearTimeout(self):
+        if self.debug:
+            _debug(self, "Clearing timeout")
+
         if not hasattr(self, '_timeout'):
             return
 
-        if not self._timeout.cancelled:
+        if not self._timeout.cancelled and not self._timeout.called:
+            if self.debug:
+                _debug(self, "Cancelling timeout")
             self._timeout.cancel()
 
         del self._timeout
-        if self.debug:
-            _debug(self, "Clearing timeout")
 
     def connectionLost(self, reason):
         """
@@ -362,6 +360,9 @@ class RTMPBaseProtocol(protocol.Protocol, EventDispatcher):
 
         if stream.remaining() < header_len - 1:
             # not enough stream left to continue decoding, rewind and wait
+            if self.debug:
+                _debug(self, "Insufficient data, rewinding (header_len:%d, stream_len:%d)" %(header_len, stream.remaining()))
+
             stream.seek(start_of_header)
             self.stopDecoding()
 
@@ -377,13 +378,17 @@ class RTMPBaseProtocol(protocol.Protocol, EventDispatcher):
 
     def decodeStream(self):
         if self.debug:
-            _debug(self, "Begin decoding stream buffer length: %d, pos: %d, channel: %r" % (len(self.buffer), self.buffer.tell(), self.current_channel))
+            _debug(self, "Begin decoding stream buffer length: %d, channel: %r" % (len(self.buffer), self.current_channel))
 
-        self._decodeStream()
-        if self.debug:
-            _debug(self, "End decoding stream pos: %d" % self.buffer.tell())
+        try:
+            self._decodeStream()
+        except:
+            self.logAndDisconnect()
+        else:
+            if self.debug:
+                _debug(self, "End decoding stream pos: %d" % self.buffer.tell())
 
-        self.buffer.consume()
+            self.buffer.consume()
 
     def logAndDisconnect(self, failure=None):
         if self.debug:
@@ -395,7 +400,7 @@ class RTMPBaseProtocol(protocol.Protocol, EventDispatcher):
 
     def stopDecoding(self):
         if self.debug:
-            _debug(self, "Stopping decoding")
+            _debug(self, "Stopping decoding channel=%r" % self.current_channel)
 
         if hasattr(self, '_decoding_loop') and self._decoding_loop.running:
             self._decoding_loop.stop()
@@ -454,6 +459,8 @@ class RTMPBaseProtocol(protocol.Protocol, EventDispatcher):
         Called if the handshake was not successful within
         C{self.handshakeTimeout} seconds. Disconnects the peer.
         """
+        if self.debug:
+            _debug(self, "Handshake timedout")
         self.transport.loseConnection()
 
     def onChannelComplete(self, channel):
