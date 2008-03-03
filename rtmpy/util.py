@@ -7,12 +7,13 @@
 RTMPy Utilities.
 
 @author: U{Nick Joyce<mailto:nick@boxdesign.co.uk>}
-@since: 0.1
+
+@since: 0.1.0
 """
 
 import os.path, sys, time
 
-# the number of milliseconds since the epoch
+#: The number of milliseconds since the epoch.
 boottime = None
 
 try:
@@ -54,8 +55,8 @@ class BufferedByteStream(_BufferedByteStream):
 
 def uptime_win32():
     """
-    Returns the number of seconds between the epoch and when the system was
-    booted.
+    Returns the number of seconds between the epoch and when the Windows system
+    was booted.
 
     @rtype: C{float}
     """
@@ -65,8 +66,8 @@ def uptime_win32():
 
 def uptime_linux():
     """
-    Returns the number of seconds between the epoch and when the system was
-    booted.
+    Returns the number of seconds between the epoch and when the Linux system
+    was booted.
 
     @rtype: C{float}
     """
@@ -92,8 +93,8 @@ def uptime_linux():
 
 def uptime_darwin():
     """
-    Returns the number of seconds between the epoch and when the system was
-    booted.
+    Returns the number of seconds between the epoch and when the Darwin system
+    (Mac OSX) was booted.
 
     @rtype: C{float}
     """

@@ -4,7 +4,20 @@
 # See LICENSE for details.
 
 """
-RTMP protocol for Twisted.
+RTMP implementation.
+
+The Real Time Messaging Protocol (RTMP) is a protocol that is
+primarily used to stream audio and video over the internet to
+the U{Flash Player<http://en.wikipedia.org/wiki/Flash_Player>}.
+
+The protocol is a container for data packets which may be
+U{AMF<http://osflash.org/documentation/amf>} or raw audio/video
+data like found in U{FLV<http://osflash.org/flv>}. A single
+connection is capable of multiplexing many NetStreams using
+different channels. Within these channels packets are split up
+into fixed size body chunks.
+
+@see: U{RTMP (external)<http://rtmpy.org/wiki/RTMP>}
 
 @author: U{Arnar Birgisson<mailto:arnarbi@gmail.com>}
 @author: U{Thijs Triemstra<mailto:info@collab.nl>}
@@ -20,9 +33,14 @@ from twisted.python import log
 from rtmpy.dispatcher import EventDispatcher
 from rtmpy import util
 
+#: Default port 1935 is a registered U{IANA<http://iana.org>} port.
 RTMP_PORT = 1935
 
+#: First single byte in the handshake request.
 HEADER_BYTE = '\x03'
+
+#: The header can come in one of four sizes: 12, 8, 4, or 1
+#: byte(s).
 HEADER_SIZES = [12, 8, 4, 1]
 
 HANDSHAKE_LENGTH = 1536
@@ -41,10 +59,11 @@ def _debug(obj, msg):
 
 def generate_handshake(uptime=None, ping=0):
     """
-    Generates a handshake packet. If an uptime is not supplied, it is figured
+    Generates a handshake packet. If an C{uptime} is not supplied, it is figured
     out automatically.
 
-    @see: U{http://www.mail-archive.com/red5@osflash.org/msg04906.html}
+    @see: U{Red5 mailinglist (external)
+    <http://www.mail-archive.com/red5@osflash.org/msg04906.html>}
     """
     if uptime is None:
         uptime = util.uptime()
@@ -61,7 +80,7 @@ def generate_handshake(uptime=None, ping=0):
 
 def decode_handshake(data):
     """
-    Decodes a handshake packet into a tuple (uptime, ping, data)
+    Decodes a handshake packet into a C{tuple} (C{uptime}, C{ping}, C{data})
 
     @param data: C{str} or L{util.StringIO} instance
     """
@@ -87,7 +106,7 @@ def read_header(header, stream, byte_len):
     """
     Reads a header from the incoming stream.
 
-    @param stream: The input buffer to read from
+    @param stream: The input buffer to read from.
     @type stream: L{BufferedByteStream}
     @type byte_len: C{int}
     """
@@ -145,6 +164,7 @@ class RTMPChannel:
     @ivar chunk_remaining: A calculated field that returns the number of bytes
         required to complete the current chunk.
     @type chunk_remaining: C{int}
+    @raise OverflowError: Attempted to write too much data to the body.
     """
 
     chunk_size = 128
@@ -207,7 +227,7 @@ class RTMPChannel:
 
 class RTMPBaseProtocol(protocol.Protocol, EventDispatcher):
     """
-    I provide the basis for the initial handshaking phase and decoding rtmp
+    I provide the basis for the initial handshaking phase and decoding RTMP
     packets as they arrive.
 
     @ivar buffer: Contains any remaining unparsed data from the C{transport}.
@@ -218,7 +238,7 @@ class RTMPBaseProtocol(protocol.Protocol, EventDispatcher):
     @type channels: C{dict} of L{RTMPChannel}
     @ivar current_channel: The channel that is currently being written to/read
         from.
-    @type current_channel: L{RTMPChannel} or None
+    @type current_channel: L{RTMPChannel} or C{None}
     """
 
     HANDSHAKE = 'handshake'
@@ -290,8 +310,8 @@ class RTMPBaseProtocol(protocol.Protocol, EventDispatcher):
         @param channel_id: Index for the channel to retrieve.
         @type channel_id: C{int}
 
-        @raises IndexError: channel_id is out of range.
-        @raises KeyError: No channel at specified index.
+        @raise IndexError: C{channel_id} is out of range.
+        @raise KeyError: No channel at specified index.
 
         @return: The existing channel.
         @rtype: L{RTMPChannel}
@@ -334,7 +354,7 @@ class RTMPBaseProtocol(protocol.Protocol, EventDispatcher):
         """
         Closes a RTMP channel.
 
-        @param channel_id: the index of the to channel be closed.
+        @param channel_id: The index of the to channel be closed.
         @type channel_id: C{int}
         """
         if self.debug:
@@ -347,7 +367,8 @@ class RTMPBaseProtocol(protocol.Protocol, EventDispatcher):
         Negotiates the handshake phase of the protocol. Needs to be implemented
         by the subclass.
 
-        @see: U{http://osflash.org/documentation/rtmp#handshake} for more info.
+        @see: U{RTMP handshake on OSFlash (external)
+        <http://osflash.org/documentation/rtmp#handshake>} for more info.
         """
         raise NotImplementedError
 
@@ -470,7 +491,7 @@ class RTMPBaseProtocol(protocol.Protocol, EventDispatcher):
     def onHandshakeSuccess(self):
         """
         Called when the RTMP handshake was successful. Once this is called,
-        packet streaming can commence
+        packet streaming can commence.
         """
         self.state = RTMPBaseProtocol.STREAM
         self.removeEventListener(HANDSHAKE_SUCCESS, self.onHandshakeSuccess)

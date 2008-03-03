@@ -3,6 +3,16 @@
 # Copyright (c) 2007-2008 The RTMPy Project.
 # See LICENSE for details.
 
+"""
+Server implementation.
+
+@author: U{Arnar Birgisson<mailto:arnarbi@gmail.com>}
+@author: U{Thijs Triemstra<mailto:info@collab.nl>}
+@author: U{Nick Joyce<mailto:nick@boxdesign.co.uk>}
+
+@since: 0.1.0
+"""
+
 from twisted.internet import reactor, protocol
 from twisted.python import log
 
@@ -17,7 +27,8 @@ class RTMPServerProtocol(rtmp.RTMPBaseProtocol):
         """
         Negotiates the handshake phase of the protocol.
 
-        @see: U{http://osflash.org/documentation/rtmp#handshake} for more info.
+        @see: U{RTMP handshake on OSFlash (external)
+        <http://osflash.org/documentation/rtmp#handshake>} for more info.
         """
         buffer = self.buffer
 
@@ -69,6 +80,9 @@ class RTMPServerProtocol(rtmp.RTMPBaseProtocol):
         self.buffer.consume()
 
     def onHandshakeSuccess(self):
+        """
+        Successful handshake between server and client.
+        """
         rtmp.RTMPBaseProtocol.onHandshakeSuccess(self)
 
         if len(self.buffer) > 0:
@@ -80,7 +94,7 @@ class RTMPServerProtocol(rtmp.RTMPBaseProtocol):
 
 class RTMPServerFactory(protocol.ServerFactory):
     """
-    RTMP server protocol factory
+    RTMP server protocol factory.
     """
 
     protocol = RTMPServerProtocol

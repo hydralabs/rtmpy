@@ -3,6 +3,16 @@
 # Copyright (c) 2007-2008 The RTMPy Project.
 # See LICENSE for details.
 
+"""
+Client implementation.
+
+@author: U{Arnar Birgisson<mailto:arnarbi@gmail.com>}
+@author: U{Thijs Triemstra<mailto:info@collab.nl>}
+@author: U{Nick Joyce<mailto:nick@boxdesign.co.uk>}
+
+@since: 0.1.0
+"""
+
 from twisted.internet import reactor, protocol
 
 from rtmpy import rtmp, util
@@ -15,7 +25,7 @@ class RTMPClientProtocol(rtmp.RTMPBaseProtocol):
     def connectionMade(self):
         """
         Called when a connection has been made to this protocol instance. Used
-        to do general setup and protocol initialisation
+        to do general setup and protocol initialisation.
         """
         rtmp.RTMPBaseProtocol.connectionMade(self)
 
@@ -28,7 +38,8 @@ class RTMPClientProtocol(rtmp.RTMPBaseProtocol):
         """
         Negotiates the handshake phase of the protocol.
 
-        @see: U{http://osflash.org/documentation/rtmp#handshake} for more info.
+        @see: U{RTMP handshake on OSFlash (external)
+        <http://osflash.org/documentation/rtmp#handshake>} for more info.
         """
         if self.debug:
             rtmp._debug(self, "Begin decode handshake")
@@ -65,6 +76,9 @@ class RTMPClientProtocol(rtmp.RTMPBaseProtocol):
         self.buffer.consume()
 
     def onHandshakeSuccess(self):
+        """
+        Successful handshake between client and server.
+        """
         if self.debug:
             rtmp._debug(self, "handshake success")
 
@@ -74,7 +88,7 @@ class RTMPClientProtocol(rtmp.RTMPBaseProtocol):
 
 class RTMPClientFactory(protocol.ClientFactory):
     """
-    RTMP client protocol factory
+    RTMP client protocol factory.
     """
 
     protocol = RTMPClientProtocol
