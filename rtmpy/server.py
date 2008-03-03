@@ -17,7 +17,7 @@ class RTMPServerProtocol(rtmp.RTMPBaseProtocol):
         """
         Negotiates the handshake phase of the protocol.
 
-        @see L{http://osflash.org/documentation/rtmp#handshake} for more info.
+        @see: U{http://osflash.org/documentation/rtmp#handshake} for more info.
         """
         buffer = self.buffer
 

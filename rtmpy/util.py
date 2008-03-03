@@ -24,7 +24,8 @@ from pyamf.util import BufferedByteStream as _BufferedByteStream
 
 class BufferedByteStream(_BufferedByteStream):
     """
-    Contains specific functionality not available in L{PyAMF}
+    Contains specific functionality not available in
+    U{PyAMF<http://pyamf.org>}
     """
 
     def consume(self):

@@ -125,17 +125,16 @@ class StatusCodes:
 
     #: The Python interpreter has encountered a runtime error. In addition to the standard infoObject
     #: properties, the following properties are set:
-    #:  filename - name of the offending ASC file.
-    #:  lineno - line number where the error occurred.
-    #:  linebuf - source code of the offending line.
+    #:  - filename - name of the offending ASC file.
+    #:  - lineno - line number where the error occurred.
+    #:  - linebuf - source code of the offending line.
     APP_SCRIPT_ERROR = "Application.Script.Error"
 
     #: The Python interpreter has encountered a runtime warning. In addition to the standard infoObject
     #: properties, the following properties are set:
-    #:
-    #:  filename - name of the offending ASC file.
-    #:  lineno - line number where the error occurred.
-    #:  linebuf - source code of the offending line.
+    #:  - filename - name of the offending ASC file.
+    #:  - lineno - line number where the error occurred.
+    #:  - linebuf - source code of the offending line.
     APP_SCRIPT_WARNING = "Application.Script.Warning"
 
     #: The Python interpreter is low on runtime memory. This provides an opportunity for the

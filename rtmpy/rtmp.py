@@ -44,7 +44,7 @@ def generate_handshake(uptime=None, ping=0):
     Generates a handshake packet. If an uptime is not supplied, it is figured
     out automatically.
 
-    @reference L{http://www.mail-archive.com/red5@osflash.org/msg04906.html}
+    @see: U{http://www.mail-archive.com/red5@osflash.org/msg04906.html}
     """
     if uptime is None:
         uptime = util.uptime()
@@ -334,8 +334,8 @@ class RTMPBaseProtocol(protocol.Protocol, EventDispatcher):
         """
         Closes a RTMP channel.
 
-        @param: the index of the to channel be closed.
-        @type: C{int}
+        @param channel_id: the index of the to channel be closed.
+        @type channel_id: C{int}
         """
         if self.debug:
             _debug(self, "Closing channel %r" % self.channels[channel_id])
@@ -347,7 +347,7 @@ class RTMPBaseProtocol(protocol.Protocol, EventDispatcher):
         Negotiates the handshake phase of the protocol. Needs to be implemented
         by the subclass.
 
-        @see L{http://osflash.org/documentation/rtmp#handshake} for more info.
+        @see: U{http://osflash.org/documentation/rtmp#handshake} for more info.
         """
         raise NotImplementedError
 
