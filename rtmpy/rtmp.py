@@ -87,17 +87,16 @@ def read_header(header, stream, byte_len):
     """
     Reads a header from the incoming stream.
 
-    @type header: L{RTMPHeader}
     @param stream: The input buffer to read from
     @type stream: L{BufferedByteStream}
     @type byte_len: C{int}
     """
     assert byte_len in HEADER_SIZES, 'Unexpected header size'
 
-    header.relative = byte_len != 12
-
     if byte_len == 1:
-        return
+        return header
+
+    header.relative = byte_len != 12
 
     if byte_len >= 4:
        header.timer = stream.read_3byte_uint()
@@ -108,8 +107,6 @@ def read_header(header, stream, byte_len):
 
     if byte_len >= 12:
        header.stream_id = stream.read_ulong()
-       header.relative = False
-
 
 class RTMPHeader:
     """
@@ -178,7 +175,7 @@ class RTMPChannel:
         self.read += data_len
         self.body.write(data)
 
-        if self.read == self.length:
+        if self.read >= self.length:
             self.body.seek(0)
             self.protocol.dispatchEvent(CHANNEL_COMPLETE, self)
 
@@ -375,10 +372,18 @@ class RTMPBaseProtocol(protocol.Protocol, EventDispatcher):
             num_chunks = self.current_channel.chunks_received
 
             if chunk_length > 0:
+                if self.debug:
+                    _debug(self, "Writing %d bytes to channel %r" % (
+                        chunk_length, self.current_channel))
+
                 self.current_channel.write(stream.read(chunk_length))
 
             if self.current_channel.chunks_received != num_chunks:
+                if self.debug:
+                    _debug(self, "Received full chunk")
                 self.current_channel = None
+
+                return
 
         if self.current_channel is not None or stream.remaining() == 0:
             self.stopDecoding()
@@ -408,6 +413,8 @@ class RTMPBaseProtocol(protocol.Protocol, EventDispatcher):
 
         read_header(self.current_channel.header, stream, header_len)
 
+        # compare headers here
+
     def decodeStream(self):
         if self.debug:
             _debug(self, "Begin decoding stream buffer length: %d, channel: %r" % (len(self.buffer), self.current_channel))
@@ -418,7 +425,8 @@ class RTMPBaseProtocol(protocol.Protocol, EventDispatcher):
             self.logAndDisconnect()
         else:
             if self.debug:
-                _debug(self, "End decoding stream pos: %d" % self.buffer.tell())
+                _debug(self, "End decoding stream pos: %d, remaining: %d, current_channel: %r" % (
+                    self.buffer.tell(), self.buffer.remaining(), self.current_channel))
 
             self.buffer.consume()
 
