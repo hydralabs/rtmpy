@@ -235,11 +235,7 @@ class RTMPBaseProtocol(protocol.Protocol, EventDispatcher):
         protocol.Protocol.connectionMade(self)
 
         self.buffer = util.BufferedByteStream()
-        self.channels = {}
         self.state = RTMPBaseProtocol.HANDSHAKE
-        self.current_channel = None
-        self.decoding = False
-
         self.my_handshake = None
         self.received_handshake = None
 
@@ -247,7 +243,6 @@ class RTMPBaseProtocol(protocol.Protocol, EventDispatcher):
         self.addEventListener(HANDSHAKE_SUCCESS, self.onHandshakeSuccess)
         self.addEventListener(HANDSHAKE_FAILURE, self.onHandshakeFailure)
 
-        self.addEventListener(CHANNEL_COMPLETE, self.onChannelComplete)
         self.setTimeout(self.handshakeTimeout, lambda: self.dispatchEvent(HANDSHAKE_TIMEOUT))
 
     def setTimeout(self, timeout, func):
@@ -483,6 +478,12 @@ class RTMPBaseProtocol(protocol.Protocol, EventDispatcher):
         self.my_handshake = None
         self.received_handshake = None
         self.clearTimeout()
+        
+        self.channels = {}
+        self.current_channel = None
+        self.addEventListener(CHANNEL_COMPLETE, self.onChannelComplete)
+
+        self.streams = {}
         self._decoding_loop = task.LoopingCall(self.decodeStream)
 
     def onHandshakeFailure(self, reason):

@@ -272,6 +272,8 @@ class HandshakeProtocolTestCase(unittest.TestCase):
             self.assertEquals(p.state, rtmp.RTMPBaseProtocol.STREAM)
             self.assertTrue(self.removed_event)
             self.assertEquals(p.buffer.getvalue(), '')
+            self.assertEquals(p.channels, {})
+            self.assertEquals(p.current_channel, None)
 
             d.callback(None)
 
@@ -321,7 +323,6 @@ class BaseProtocolTestCase(unittest.TestCase):
         p.makeConnection(transport)
         p._timeout.cancel()
 
-        self.assertEquals(p.channels, {})
         self.assertEquals(p.buffer.getvalue(), '')
         self.assertEquals(p.buffer.tell(), 0)
         self.assertEquals(p.state, rtmp.RTMPBaseProtocol.HANDSHAKE)
@@ -329,7 +330,6 @@ class BaseProtocolTestCase(unittest.TestCase):
         self.assertEquals(p.received_handshake, None)
         self.assertTrue(self.registered_success)
         self.assertTrue(self.registered_failure)
-        self.assertEquals(p.current_channel, None)
 
     def test_decode_handshake(self):
         p = rtmp.RTMPBaseProtocol()
@@ -395,7 +395,7 @@ class ChannelManagementTestCase(unittest.TestCase):
         self.protocol.connectionMade()
         self.protocol._timeout.cancel()
 
-        self.channels = self.protocol.channels
+        self.channels = self.protocol.channels = {}
 
     def test_retrieve(self):
         self.assertRaises(IndexError, self.protocol.getChannel, -1)
