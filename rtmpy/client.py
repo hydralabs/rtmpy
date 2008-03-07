@@ -86,6 +86,12 @@ class RTMPClientProtocol(rtmp.RTMPBaseProtocol):
 
         # send invoke->connect here
 
+    def invoke(self, stream, *args, **kwargs):
+        if stream is None:
+            stream = self.streams[0]
+
+        print args, kwargs
+
 class RTMPClientFactory(protocol.ClientFactory):
     """
     RTMP client protocol factory.

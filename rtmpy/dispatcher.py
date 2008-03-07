@@ -188,7 +188,7 @@ class EventDispatcher:
         """
         if self._dispatchDepth > 0:
             self._updateQueue.append(
-                lambda:self.addEventListener(event, listener, priority, *args, **kwargs))
+                lambda: self.addEventListener(event, listener, priority, *args, **kwargs))
 
             return
 
