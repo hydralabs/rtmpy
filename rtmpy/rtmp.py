@@ -272,8 +272,8 @@ class ChannelTypes:
     PING = 0x04
     SERVER_BANDWIDTH = 0x05
     CLIENT_BANDWIDTH = 0x06
-    AUDIO_DATA = 0x07
-    VIDEO_DATA = 0x08
+    AUDIO_DATA = 0x08
+    VIDEO_DATA = 0x09
     # 0x0a - 0x0e is unknown
     # FLEX_SHARED_OBJECT = 0x10
     NOTIFY = 0x12
