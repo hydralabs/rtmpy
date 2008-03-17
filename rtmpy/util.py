@@ -42,10 +42,10 @@ class BufferedByteStream(_BufferedByteStream):
             self.write(bytes)
             self.seek(0, 2)
 
-    def read_3byte_uint(self):
+    def read_24bit_uint(self):
         return (self.read_ushort() << 8) + self.read_uchar()
 
-    def write_3byte_uint(self, n):
+    def write_24bit_uint(self, n):
         if n < 0 or n > 0xffffff:
             raise ValueError, "n is out of range"
 

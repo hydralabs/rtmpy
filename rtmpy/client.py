@@ -16,8 +16,9 @@ Client implementation.
 from twisted.internet import reactor, protocol
 
 from rtmpy import rtmp, util
+import pyamf
 
-class RTMPClientProtocol(rtmp.RTMPBaseProtocol):
+class RTMPClientProtocol(rtmp.BaseProtocol):
     """
     Client RTMP Protocol.
     """
@@ -27,7 +28,7 @@ class RTMPClientProtocol(rtmp.RTMPBaseProtocol):
         Called when a connection has been made to this protocol instance. Used
         to do general setup and protocol initialisation.
         """
-        rtmp.RTMPBaseProtocol.connectionMade(self)
+        rtmp.BaseProtocol.connectionMade(self)
 
         # generate and send initial handshake
         self.my_handshake = rtmp.generate_handshake()
@@ -71,7 +72,10 @@ class RTMPClientProtocol(rtmp.RTMPBaseProtocol):
             self.transport.write(self.received_handshake)
             self.dispatchEvent(rtmp.HANDSHAKE_SUCCESS)
 
-    def decodeHandshake(self):
+    def decodeHandshake(self, data):
+        self.buffer.seek(0, 2)
+        self.buffer.write(data)
+        self.buffer.seek(0)
         self._decodeHandshake()
         self.buffer.consume()
 
@@ -82,15 +86,24 @@ class RTMPClientProtocol(rtmp.RTMPBaseProtocol):
         if self.debug:
             rtmp._debug(self, "handshake success")
 
-        rtmp.RTMPBaseProtocol.onHandshakeSuccess(self)
+        rtmp.BaseProtocol.onHandshakeSuccess(self)
 
         # send invoke->connect here
 
     def invoke(self, stream, *args, **kwargs):
         if stream is None:
-            stream = self.streams[0]
+            stream = self.stream_manager.getStream(0)
 
-        print args, kwargs
+        data = pyamf.encode(args[0], 1, kwargs).getvalue()
+        channel = self.channel_manager.createChannel()
+        channel.body.write(data)
+        channel.body.seek(0)
+        channel.type = rtmp.ChannelTypes.INVOKE
+        channel.stream_id = self.stream_manager.getStreamId(stream)
+        channel.timer = 0
+        channel.length = len(data)
+
+        self.registerProducingChannel(channel)
 
 class RTMPClientFactory(protocol.ClientFactory):
     """
