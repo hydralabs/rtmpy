@@ -4,8 +4,6 @@
 """
 Collection of commonly used constants with status codes.
 
-@author: U{Thijs Triemstra<mailto:info@collab.nl>}
-
 @since: 0.1.0
 """
 

@@ -118,6 +118,7 @@ class ServerProtocol(rtmp.BaseProtocol):
         """
         Called when the peer sends a C{connect} request.
         """
+        print command
         def return_response(result, c, a):
             if c.application is a:
                 command.setResult(None, {
@@ -244,7 +245,7 @@ class ServerFactory(protocol.ServerFactory):
 
     def buildProtocol(self, addr):
         p = protocol.ServerFactory.buildProtocol(self, addr)
-        #p.debug = True
+        p.debug = True
 
         return p
 

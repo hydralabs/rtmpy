@@ -16,9 +16,9 @@ from twisted.python import log
 
 class IEventDispatcher(Interface):
     """
-    The IEventDispatcher interface defines methods for adding or removing event
-    listeners, checks whether specific types of event listeners are registered,
-    and dispatches events.
+    The IEventDispatcher interface defines methods for adding or removing
+    event listeners, checks whether specific types of event listeners are
+    registered, and dispatches events.
     """
 
     def addEventListener(event, listener, priority=0, *args, **kwargs):
@@ -62,7 +62,7 @@ class _MethodWrapper(object):
         self.method(*nargs, **nkwargs)
 
 
-class CallbackList:
+class CallbackList(object):
     """
     Container for callbacks.
 
@@ -76,9 +76,10 @@ class CallbackList:
     positional arguments of the first set. Keyword arguments in the second set
     override those in the first set.
 
-    @ivar callbacks: The registered callbacks as mapping from the callable to a
-        tuple of a wrapper for that callable that keeps the callback specific
-        arguments and a boolean that signifies if it is to be called only once.
+    @ivar callbacks: The registered callbacks as mapping from the callable to
+        a tuple of a wrapper for that callable that keeps the callback
+        specific arguments and a boolean that signifies if it is to be called
+        only once.
     @type callbacks: C{dict}
     """
 
@@ -119,9 +120,9 @@ class CallbackList:
         The passed arguments are event specific and augment and override
         the callback specific arguments as described above.
 
-        @note: Exceptions raised by callbacks are trapped and logged. They will
-            not propagate up to make sure other callbacks will still be called,
-            and the event dispatching always succeeds.
+        @note: Exceptions raised by callbacks are trapped and logged. They
+            will not propagate up to make sure other callbacks will still be
+            called, and the event dispatching always succeeds.
 
         @param args: Positional arguments to the callable.
         @type args: C{list}
@@ -145,16 +146,16 @@ class CallbackList:
         return len(self.callbacks) == 0
 
 
-class EventDispatcher:
+class EventDispatcher(object):
     """
     Event dispatching service.
 
-    The C{EventDispatcher} allows observers to be registered for certain events
-    that are dispatched.
+    The C{EventDispatcher} allows observers to be registered for certain
+    events that are dispatched.
 
     Every dispatch is triggered by calling L{dispatchEvent} with the name of
-    the event. A named event will simply call each registered observer for that
-    particular event name, with any supplied arguments.
+    the event. A named event will simply call each registered observer for
+    that particular event name, with any supplied arguments.
 
     When registering observers, the event that is to be observed is specified
     using a string.
@@ -182,13 +183,14 @@ class EventDispatcher:
 
     def addEventListener(self, event, listener, priority=0, *args, **kwargs):
         """
-        Adds a listener to this event dispatcher. If L{dispatchEvent} is called
-        with the corresponding C{event} then listener will be called with the
-        supplied C{*args} and C{**kwargs}
+        Adds a listener to this event dispatcher. If L{dispatchEvent} is
+        called with the corresponding C{event} then listener will be called
+        with the supplied C{*args} and C{**kwargs}
         """
         if self._dispatchDepth > 0:
             self._updateQueue.append(
-                lambda: self.addEventListener(event, listener, priority, *args, **kwargs))
+                lambda: self.addEventListener(
+                    event, listener, priority, *args, **kwargs))
 
             return
 

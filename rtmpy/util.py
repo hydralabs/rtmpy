@@ -6,52 +6,20 @@
 """
 RTMPy Utilities.
 
-@author: U{Nick Joyce<mailto:nick@boxdesign.co.uk>}
-
-@since: 0.1.0
+@since: 0.1
 """
 
 import os.path, sys, time
 
+from pyamf.util import BufferedByteStream as BBS
+
+class BufferedByteStream(BBS):
+    def append(self, data):
+        self.seek(0, 2)
+        self.write(data)
+
 #: The number of milliseconds since the epoch.
 boottime = None
-
-try:
-    from cStringIO import StringIO
-except ImportError:
-    from StringIO import StringIO
-
-from pyamf.util import BufferedByteStream as _BufferedByteStream
-
-class BufferedByteStream(_BufferedByteStream):
-    """
-    Contains specific functionality not available in
-    U{PyAMF<http://pyamf.org>}
-    """
-
-    def consume(self):
-        """
-        Chops off the data that has already been read from the stream.
-
-        @note: Leaves the internal pointer at the end of the stream.
-        """
-        bytes = self.read()
-        self.truncate()
-
-        if len(bytes) > 0:
-            self.write(bytes)
-            self.seek(0, 2)
-
-    def read_24bit_uint(self):
-        return (self.read_ushort() << 8) + self.read_uchar()
-
-    def write_24bit_uint(self, n):
-        if n < 0 or n > 0xffffff:
-            raise ValueError, "n is out of range"
-
-        self.write_uchar((n >> 16) & 0xff)
-        self.write_uchar((n >> 8) & 0xff)
-        self.write_uchar(n & 0xff)
 
 def uptime_win32():
     """
@@ -111,7 +79,7 @@ def uptime_darwin():
     class _BackRelay(protocol.ProcessProtocol):
         def __init__(self, deferred):
             self.deferred = deferred
-            self.s = StringIO()
+            self.s = BufferedByteStream()
 
         def errReceived(self, text):
             self.deferred.errback(failure.Failure(IOError()))
@@ -125,7 +93,6 @@ def uptime_darwin():
             if self.deferred is not None:
                 result = self.s.getvalue()
                 self.deferred.callback(result)
-
 
     def getProcessOutput(executable, args=(), env={}, path='.'):
         from twisted.internet import reactor

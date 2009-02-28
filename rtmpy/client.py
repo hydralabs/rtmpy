@@ -18,7 +18,7 @@ from twisted.internet import reactor, protocol
 from rtmpy import rtmp, util
 import pyamf
 
-class RTMPClientProtocol(rtmp.BaseProtocol):
+class ClientProtocol(rtmp.BaseProtocol):
     """
     Client RTMP Protocol.
     """
@@ -28,10 +28,17 @@ class RTMPClientProtocol(rtmp.BaseProtocol):
         Called when a connection has been made to this protocol instance. Used
         to do general setup and protocol initialisation.
         """
+        self.debug = True
         rtmp.BaseProtocol.connectionMade(self)
 
         # generate and send initial handshake
         self.my_handshake = rtmp.generate_handshake()
+
+        if self.debug:
+            rtmp._debug(self, "My handshake:")
+
+            from pyamf.util import hexdump
+            rtmp._debug(self, hexdump(self.my_handshake))
 
         self.transport.write(rtmp.HEADER_BYTE + self.my_handshake)
 
@@ -50,6 +57,7 @@ class RTMPClientProtocol(rtmp.BaseProtocol):
             # no data has been received yet
             if self.debug:
                 rtmp._debug(self, "Header not received")
+
             return
 
         if self.received_handshake is None and buffer.read(1) != rtmp.HEADER_BYTE:
@@ -64,8 +72,16 @@ class RTMPClientProtocol(rtmp.BaseProtocol):
             return
 
         self.received_handshake = buffer.read(rtmp.HANDSHAKE_LENGTH)
+
+        if self.debug:
+            from pyamf.util import hexdump
+
+            rtmp._debug(self, 'received handshake :')
+            rtmp._debug(self, hexdump(self.received_handshake))
+
         hs = buffer.read(rtmp.HANDSHAKE_LENGTH)
 
+        print hexdump(hs[:7])
         if hs[8:] != self.my_handshake[8:]:
             self.dispatchEvent(rtmp.HANDSHAKE_FAILURE, 'Handshake mismatch')
         else:
@@ -105,9 +121,9 @@ class RTMPClientProtocol(rtmp.BaseProtocol):
 
         self.registerProducingChannel(channel)
 
-class RTMPClientFactory(protocol.ClientFactory):
+class ClientFactory(protocol.ClientFactory):
     """
     RTMP client protocol factory.
     """
 
-    protocol = RTMPClientProtocol
+    protocol = ClientProtocol

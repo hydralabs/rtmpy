@@ -8,7 +8,7 @@ use_setuptools()
 import sys
 from setuptools import setup, find_packages
 
-install_requires = ['Twisted>=2.5.0', 'PyAMF>=0.1.1']
+install_requires = ['Twisted>=2.5.0', 'PyAMF>=0.4.1']
 
 if sys.platform.startswith('win'):
     install_requires.append('PyWin32')
