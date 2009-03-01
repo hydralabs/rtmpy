@@ -1,4 +1,4 @@
-# Copyright (c) 2007-2008 The RTMPy Project.
+# Copyright (c) 2007-2009 The RTMPy Project.
 # See LICENSE for details.
 
 from ez_setup import use_setuptools
@@ -7,17 +7,68 @@ use_setuptools()
 
 import sys
 from setuptools import setup, find_packages
+from setuptools.command import test
 
-install_requires = ['Twisted>=2.5.0', 'PyAMF>=0.4.1']
+class TestCommand(test.test):
+    def run_twisted(self):
+        from twisted.trial import runner
+        from twisted.trial import reporter
 
-if sys.platform.startswith('win'):
-    install_requires.append('PyWin32')
+        from pyamf.tests import suite
 
-long_desc = """\
-RTMPy is a Twisted protocol implementing Adobe's Real
-Time Messaging Protocol (RTMP), used for full-duplex
-real-time communication with applications running inside
-the Flash Player."""
+        r = runner.TrialRunner(reporter.VerboseTextReporter)
+        return r.run(suite())
+
+    def run_tests(self):
+        import logging
+        logging.basicConfig()
+        logging.getLogger().setLevel(logging.CRITICAL)
+
+        try:
+            import twisted
+
+            return self.run_twisted()
+        except ImportError:
+            return test.test.run_tests(self)
+
+def get_version():
+    """
+    Gets the version number. Pulls it from the source files rather than
+    duplicating it.
+    """
+    import os.path
+    # we read the file instead of importing it as root sometimes does not
+    # have the cwd as part of the PYTHONPATH
+
+    fn = os.path.join(os.path.dirname(__file__), 'rtmpy', '__init__.py')
+    lines = open(fn, 'rt').readlines()
+
+    version = None
+
+    for l in lines:
+        # include the ' =' as __version__ is a part of __all__
+        if l.startswith('__version__ =', ):
+            x = compile(l, fn, 'single')
+            eval(x)
+            version = locals()['__version__']
+            break
+
+    if version is None:
+        raise RuntimeError('Couldn\'t determine version number')
+
+    return '.'.join([str(x) for x in version])
+
+def get_install_requirements():
+    """
+    Returns a list of dependencies for RTMPy to function correctly on the
+    target platform.
+    """
+    install_requires = ['Twisted>=2.5.0', 'PyAMF>=0.4.1']
+
+    if sys.platform.startswith('win'):
+        install_requires.append('PyWin32')
+
+    return install_requires
 
 keyw = """\
 rtmp flv rtmps rtmpe amf amf0 amf3 flex flash http https
@@ -25,22 +76,34 @@ streaming video audio sharedobject webcam record playback
 flashplayer air actionscript decoder encoder gateway"""
 
 setup(name = "RTMPy",
-    version = "0.1",
+    version = get_version(),
     description = "Twisted protocol for RTMP",
-    long_description = long_desc,
+    long_description = open('README.txt', 'rt').read(),
     url = "http://rtmpy.org",
     author = "The RTMPy Project",
     author_email = "rtmpy-dev@rtmpy.org",
     keywords = keyw,
-    packages = ["rtmpy"],
+    packages = find_packages(exclude=["*.tests"]),
+    install_requires = get_install_requirements(),
     test_suite = "rtmpy.tests.suite",
-    install_requires = install_requires,
+    zip_safe = True,
     license = "MIT License",
+    platforms = ["any"],
+    cmdclass = {
+        'test': TestCommand,
+    },
     classifiers = [
         "Development Status :: 2 - Pre-Alpha",
+        "Framework :: Twisted",
         "Natural Language :: English",
         "Intended Audience :: Developers",
+        "Intended Audience :: Information Technology",
         "License :: OSI Approved :: MIT License",
         "Operating System :: OS Independent",
         "Programming Language :: Python",
+        "Programming Language :: Python :: 2.3",
+        "Programming Language :: Python :: 2.4",
+        "Programming Language :: Python :: 2.5",
+        "Programming Language :: Python :: 2.6",
+        "Topic :: Software Development :: Libraries :: Python Modules",
     ])
