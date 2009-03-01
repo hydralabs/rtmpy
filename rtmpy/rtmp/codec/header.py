@@ -6,7 +6,7 @@
 """
 Utility/helper functions for encoding and decoding RTMP headers.
 
-@see: L{RTMP Packet Structure on OSFlash (external)<http://osflash.org/documentation/rtmp#rtmp_packet_structure>}
+@see: U{RTMP Packet Structure on OSFlash (external)<http://osflash.org/documentation/rtmp#rtmp_packet_structure>}
 """
 
 from rtmpy.rtmp.interfaces import IHeader
@@ -163,8 +163,10 @@ def diffHeaders(old, new):
     Both C{old} and C{new} must implement L{IHeader}, be from the same channel
     and be absolute.
 
-    @param old & new: The two headers to compare.
-    @type old & new: L{IHeader}
+    @param old: The first header to compare.
+    @type old: L{IHeader}
+    @param new: The second header to compare.
+    @type new: L{IHeader}
     @return: A header with the computed differences between old & new.
     @rtype: L{rtmp.Header}
     """

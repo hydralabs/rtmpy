@@ -155,7 +155,7 @@ class Channel(object):
         not necessarily be the same.
 
         @param data: A string of bytes.
-        @type: data: C{str}
+        @type data: C{str}
         """
         if self.header is None:
             raise RuntimeError("Cannot write to a channel with no header")
@@ -207,8 +207,8 @@ class ChannelManager(object):
     linked to a connected RTMP Protocol. Also handles any events that channels
     may fire.
 
-    @ivar channels: A list of channels 
-    @ivar channels: C{dict} of L{Channel}
+    @ivar channels: A list of channels.
+    @type channels: C{dict} of L{Channel}
     """
 
     implements(interfaces.IChannelManager)

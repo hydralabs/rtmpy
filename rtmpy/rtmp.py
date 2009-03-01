@@ -282,8 +282,8 @@ class StreamManager:
         """
         Closes a RTMP stream and removes it from t.
 
-        @param: the stream to be closed.
-        @type: L{RTMPStream}
+        @param stream: the stream to be closed.
+        @type stream: L{RTMPStream}
         """
         try:
             idx = self._rev_streams[stream]
