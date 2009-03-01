@@ -21,12 +21,10 @@ packets are split up into fixed size body chunks.
 @since: 0.1
 """
 
-import time, struct
 from twisted.internet import reactor, protocol, defer, task
 from twisted.internet import interfaces as tw_interfaces
 from twisted.python import log
 from zope.interface import implements, providedBy
-import pyamf
 from pyamf.util import hexdump, IndexedCollection, BufferedByteStream
 
 from rtmpy.rtmp import interfaces
@@ -196,7 +194,7 @@ class Channel(object):
 
     def channelId(self):
         if self.header is None:
-            raise RuntimeError("No channelId without a header")
+            raise AttributeError("No channelId without a header")
 
         return self.header.channelId
 

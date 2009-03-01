@@ -31,8 +31,6 @@ class MethodWrapperTestCase(unittest.TestCase):
         self._called = False
 
         def foo(*args, **kwargs):
-            global called
-
             self._called = True
             self.assertEquals(args, expected_args)
             self.assertEquals(kwargs, expected_kwargs)

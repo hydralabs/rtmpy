@@ -40,9 +40,6 @@ class IChannel(Interface):
     as well as providing context information for protocol en/decoding.
     """
 
-    header = Attribute(
-        "An object that contains the header context information for this "
-        "channel. Must provide IHeader")
     bytes = Attribute(
         "The total number of bytes that have been routed through this "
         "channel.")
@@ -55,6 +52,11 @@ class IChannel(Interface):
     def registerProducer(producer):
         """
         Registers a producer for this channel.
+        """
+
+    def registerConsumer(consumer):
+        """
+        Registers a consumer for this channel.
         """
 
     def getHeader():
@@ -81,8 +83,6 @@ class IStream(Interface):
     """
     """
 
-# Now the supporting classes
-
 class IChannelManager(Interface):
     """
     Defines the interface for managing channels. The channel manager handles
@@ -100,18 +100,6 @@ class IChannelManager(Interface):
     def createChannel():
         """
         Creates a channel using an unused channel id.
-        """
-
-    def registerChannel(channel, id):
-        """
-        Registers a C{channel} to the C{id}. 
-
-        @param channel: An implementation of L{IChannel}.
-        @type id: C{int}.
-        @param producing: Whether this channel is producing.
-        @type producing: C{bool}
-        @raise IndexError: The C{id} is already in use or out of range.
-        @raise OverflowError: There are no free channels.
         """
 
     def removeChannel(channel):

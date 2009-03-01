@@ -10,38 +10,50 @@ RTMP codecs. Encoders and decoders for rtmp streams.
 @since: 0.1
 """
 
-from twisted.internet import task, interfaces as tw_interfaces
-from zope.interface import implements
+from twisted.internet import task
 
 from rtmpy import util
+from rtmpy.rtmp import interfaces
 from rtmpy.rtmp.codec import header
+
 
 class BaseCodec(object):
     """
     @ivar deferred: The deferred from the result of L{getJob}.
     @type deferred: L{twisted.internet.defer.Deferred}
+    @ivar job: A L{task.LoopingCall} instance that is used to iteratively
+        call the method supplied by L{getJob}.
     """
 
-    implements(tw_interfaces.IPullProducer)
-
     def __init__(self, manager):
-        self.job = self.getJob()
-        self.deferred = None
+        if not interfaces.IChannelManager.providedBy(manager):
+            raise TypeError('IChannelManager expected (got %s)' % (type(manager),))
 
         self.manager = manager
+        self.deferred = None
         self.buffer = util.BufferedByteStream()
+
+        self.job = task.LoopingCall(self.getJob())
+
+    def __del__(self):
+        if not hasattr(self, 'job'):
+            return
+
+        if self.job.running:
+            self.job.stop()
 
     def getJob(self):
         """
-        Returns a L{task.LoopingCall} instance.
+        Returns the method to be iteratively called to process the codec.
+
+        This method is intended to be implemented by sub-classes.
         """
-        # implemented by subclasses
         raise NotImplementedError()
 
-    def resumeProducing(self):
+    def start(self, when=0):
         """
-        Starts or restarts the job. If the job is already running (i.e. not
-        stopped) then this is a noop. Called when the buffer is written to.
+        Starts or resumes the job. If the job is already running (i.e. not
+        stopped) then this is a noop.
 
         @return: The deferred from starting the job.
         @rtype: L{twisted.internet.defer.Deferred}
@@ -53,7 +65,7 @@ class BaseCodec(object):
 
         return self.deferred
 
-    def pauseProducing(self):
+    def pause(self):
         """
         Pauses the codec. Called when the buffer is exhausted. If the job is
         already stopped then this is a noop.
@@ -62,14 +74,6 @@ class BaseCodec(object):
             self.job.stop()
             self.deferred = None
 
-    stopProducing = pauseProducing
-
-    def write(self, data):
-        """
-        Adds data to the end of the stream.
-        """
-        self.buffer.seek(0, 2)
-        self.buffer.write(data)
 
 class Decoder(BaseCodec):
     """
@@ -77,16 +81,16 @@ class Decoder(BaseCodec):
     to the individual buffers.
 
     @ivar currentChannel: The channel currently being decoded.
-    @type currentChannel: L{rtmp.Channel}
+    @type currentChannel: L{interfaces.IChannel}
     """
 
-    def __init__(self):
-        BaseCodec.__init__(self)
+    def __init__(self, manager):
+        BaseCodec.__init__(self, manager)
 
         self.currentChannel = None
 
     def getJob(self):
-        return task.LoopingCall(self.decode)
+        return self.decode
 
     def readHeader(self):
         headerPosition = self.buffer.tell()
@@ -106,9 +110,6 @@ class Decoder(BaseCodec):
 
         After this function is finished, the next part of the buffer will
         either be empty or a header section.
-
-        @return: Whether a full frame was read from the buffer.
-        @rtype: C{bool}
         """
         available = min(
             self.buffer.remaining(),
@@ -117,8 +118,10 @@ class Decoder(BaseCodec):
 
         frames = self.currentChannel.frames
 
-        if available > 0:
-            self.currentChannel.write(self.buffer.read(available))
+        if available == 0:
+            return
+
+        self.currentChannel.write(self.buffer.read(available))
 
         if self.currentChannel.frames != frames:
             # a complete frame was read from the stream which means a new
@@ -126,12 +129,6 @@ class Decoder(BaseCodec):
             self.currentChannel = None
 
         return self.currentChannel is None
-
-    def _getChannel(self, channelId):
-        try:
-            self.currentChannel = self.manager.getChannel(channelId)
-        except KeyError:
-            self.currentChannel = self.manager.createChannel(channelId, False)
 
     def canContinue(self, minBytes=1):
         """
@@ -145,10 +142,10 @@ class Decoder(BaseCodec):
         """
         remaining = self.buffer.remaining()
 
-        if remaining < min_bytes or remaining == 0:
-            self.stop()
+        if remaining < minBytes or remaining == 0:
+            self.pause()
 
-        return (remaining >= min_bytes)
+        return (remaining >= minBytes)
 
     def _decode(self):
         if self.current_channel is not None:
@@ -165,7 +162,7 @@ class Decoder(BaseCodec):
             # require a complete header to decode
             return
 
-        channel = self.getChannel(header.channelId)
+        self.currentChannel = self.manager.getChannel(channelId)
 
         if header is not None:
             channel.setHeader(header)
@@ -190,6 +187,13 @@ class Decoder(BaseCodec):
             # delete the bytes that have already been decoded
             self.buffer.consume()
 
+    def dataReceived(self, data):
+        """
+        Adds data to the end of the stream.
+        """
+        self.buffer.seek(0, 2)
+        self.buffer.write(data)
+
 
 class ChannelConsumer(object):
     def __init__(self, channel):
@@ -207,6 +211,7 @@ class ChannelConsumer(object):
         self.buffer.consume()
 
         return data
+
 
 class ProtocolEncoder(BaseCodec):
     """
