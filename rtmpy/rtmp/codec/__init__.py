@@ -1,6 +1,6 @@
 # -*- test-case-name: rtmpy.tests.test_codec -*-
 #
-# Copyright (c) 2007-2008 The RTMPy Project.
+# Copyright (c) 2007-2009 The RTMPy Project.
 # See LICENSE for details.
 
 """

@@ -1,14 +1,10 @@
 # -*- test-case-name: rtmpy.tests.test_server -*-
 #
-# Copyright (c) 2007-2008 The RTMPy Project.
+# Copyright (c) 2007-2009 The RTMPy Project.
 # See LICENSE for details.
 
 """
 Server implementation.
-
-@author: U{Arnar Birgisson<mailto:arnarbi@gmail.com>}
-@author: U{Thijs Triemstra<mailto:info@collab.nl>}
-@author: U{Nick Joyce<mailto:nick@boxdesign.co.uk>}
 
 @since: 0.1.0
 """
@@ -139,6 +135,7 @@ class ServerProtocol(rtmp.BaseProtocol):
 
 
 class IApplication(Interface):
+
     clients = Attribute("A list of all clients currently connected to the application.")
     name = Attribute("The name of the application instance.")
 
@@ -154,7 +151,7 @@ class IApplication(Interface):
         Called when the application is unloaded. Can return a deferred that
         signals that the application has completely shutdown. Use this to close
         database connections etc. When this function is called, the
-        L{onAppShutdown} must be be called
+        L{onAppShutdown} must be be called.
         """
 
     def rejectConnection(client, reason):
@@ -194,7 +191,7 @@ class Application:
 
     def rejectConnection(self, client):
         """
-        Called when a client connection request has been rejected
+        Called when a client connection request has been rejected.
         """
         # reject the connection and close
         # client.onStatus(...)
@@ -211,7 +208,7 @@ class Application:
 
     def disconnect(self, client):
         """
-        Removes the C{client} from this application
+        Removes the C{client} from this application.
         """
         self.clients.remove(client)
         # close the connection with the client
@@ -239,7 +236,7 @@ class ServerFactory(protocol.ServerFactory):
 
     def getApplication(self, name):
         """
-        Returns the application mounted at C{name}, if any
+        Returns the application mounted at C{name}, if any.
         """
         return self.applications.get(name, None)
 
@@ -253,6 +250,7 @@ class RTMPServer(internet.TCPServer):
     """
     Twisted RTMP server.
     """
+    
     factoryClass = ServerFactory
 
     def __init__(self, port, applications=None):

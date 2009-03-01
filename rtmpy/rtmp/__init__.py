@@ -1,6 +1,6 @@
 # -*- test-case-name: rtmpy.tests.test_rtmp -*-
 #
-# Copyright (c) 2007-2008 The RTMPy Project.
+# Copyright (c) 2007-2009 The RTMPy Project.
 # See LICENSE for details.
 
 """
@@ -35,7 +35,6 @@ from rtmpy import util
 
 #: Default port 1935 is a registered U{IANA<http://iana.org>} port.
 RTMP_PORT = 1935
-
 
 PROTOCOL_ERROR = 'rtmp.protocol.error'
 
@@ -236,7 +235,7 @@ class ChannelManager(object):
     def createChannel(self):
         """
         Creates and returns a newly created channel. The channel is registered
-        to the first available channelId (see L{getNextAvailableChannelId})
+        to the first available channelId (see L{getNextAvailableChannelId}).
 
         @return: The newly created channel.
         @rtype: L{RTMPChannel}
@@ -254,8 +253,8 @@ class ChannelManager(object):
         """
         Removes a RTMP channel.
 
-        @param: the index of the to channel be closed.
-        @type: C{int}
+        @param channel_id: The index of the to channel be closed.
+        @type channel_id: C{int}
         """
         if channel_id >= self.max_channels or channel_id < 0:
             raise IndexError, "channel index %d is out of range" % channel_id

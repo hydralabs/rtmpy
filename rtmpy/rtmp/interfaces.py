@@ -3,6 +3,8 @@
 
 """
 Interface documentation.
+
+@since: 0.1
 """
 
 from twisted.internet import interfaces
@@ -34,8 +36,7 @@ class IHeader(Interface):
 class IChannel(Interface):
     """
     An RTMP channel. A channel acts as an intermediary between two endpoints, 
-    as well as providing context information for protocol en/decoding. This
-    means a 
+    as well as providing context information for protocol en/decoding.
     """
 
     header = Attribute(

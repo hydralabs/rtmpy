@@ -1,5 +1,11 @@
-# Copyright (c) 2007-2008 The RTMPy Project.
+# Copyright (c) 2007-2009 The RTMPy Project.
 # See LICENSE for details.
+
+"""
+RTMP handshake.
+
+@since: 0.1
+"""
 
 SECRET_KEY = '\x47\x65\x6e\x75\x69\x6e\x65\x20\x41\x64\x6f\x62\x65\x20' + \
     '\x46\x6c\x61\x73\x68\x20\x4d\x65\x64\x69\x61\x20\x53\x65\x72\x76' + \
@@ -38,7 +44,7 @@ def generate_handshake(uptime=None, ping=0):
 
 def decode_handshake(data):
     """
-    Decodes a handshake packet into a C{tuple} (C{uptime}, C{ping}, C{data})
+    Decodes a handshake packet into a C{tuple} (C{uptime}, C{ping}, C{data}).
 
     @param data: C{str} or L{util.StringIO} instance
     """

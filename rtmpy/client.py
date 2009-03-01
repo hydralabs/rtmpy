@@ -1,14 +1,10 @@
 # -*- test-case-name: rtmpy.tests.test_client -*-
 #
-# Copyright (c) 2007-2008 The RTMPy Project.
+# Copyright (c) 2007-2009 The RTMPy Project.
 # See LICENSE for details.
 
 """
-Client implementation.
-
-@author: U{Arnar Birgisson<mailto:arnarbi@gmail.com>}
-@author: U{Thijs Triemstra<mailto:info@collab.nl>}
-@author: U{Nick Joyce<mailto:nick@boxdesign.co.uk>}
+RTMP client implementation.
 
 @since: 0.1.0
 """

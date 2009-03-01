@@ -1,6 +1,6 @@
 # -*- test-case-name: rtmpy.tests.test_rtmp -*-
 #
-# Copyright (c) 2007-2008 The RTMPy Project.
+# Copyright (c) 2007-2009 The RTMPy Project.
 # See LICENSE for details.
 
 """
@@ -18,10 +18,6 @@ different channels. Within these channels packets are split up
 into fixed size body chunks.
 
 @see: U{RTMP (external)<http://rtmpy.org/wiki/RTMP>}
-
-@author: U{Arnar Birgisson<mailto:arnarbi@gmail.com>}
-@author: U{Thijs Triemstra<mailto:info@collab.nl>}
-@author: U{Nick Joyce<mailto:nick@boxdesign.co.uk>}
 
 @since: 0.1.0
 """
@@ -162,7 +158,7 @@ def write_header(channel, stream, byte_len):
 
 class ChannelTypes:
     """
-    RTMP Channel data types
+    RTMP Channel data types.
     """
 
     CHUNK_SIZE = 0x01
@@ -267,13 +263,13 @@ class StreamManager:
 
     def getStreamId(self, stream):
         """
-        Gets the id of registered stream
+        Gets the id of registered stream.
         """
         return self._rev_streams[stream]
 
     def getStream(self, stream_id):
         """
-        Gets a stream based on the id
+        Gets a stream based on the id.
         """
         self._checkRange(stream_id)
 
@@ -319,8 +315,8 @@ class StreamManager:
         """
         Removes a RTMP stream.
 
-        @param: the index of the to stream be closed.
-        @type: C{int}
+        @param stream_id: the index of the to stream be closed.
+        @type stream_id: C{int}
         """
         self._checkRange(stream_id)
 
@@ -355,7 +351,7 @@ class StreamManager:
 class ChannelDecoder:
     """
     Decodes the channel body and dispatches the relevant event to the attached
-    stream
+    stream.
     """
 
     type_map = {
@@ -606,7 +602,7 @@ class ChannelManager(EventDispatcher):
         Called when a channel has received all of its data.
         
         @note: This may change to C{onData} at some point as we start to look
-            at streaming larger chunks of data, e.g. video/audio
+            at streaming larger chunks of data, e.g. video/audio.
         """
         self.removeChannel(channel.channel_id)
 
@@ -658,7 +654,7 @@ class BaseCodec:
     def _onChannelComplete(self, channel):
         """
         Called when a channel body has been completed. Attempt to decode the
-        channel and dispatch to the relevant data type handler
+        channel and dispatch to the relevant data type handler.
         """
         if channel in self.channels:
             self.channelComplete(channel)
@@ -988,7 +984,7 @@ class BaseProtocol(protocol.Protocol, EventDispatcher):
     def onHandshakeTimeout(self):
         """
         Called if the handshake was not successful within
-        C{self.handshakeTimeout} seconds. Disconnects the peer.
+        L{self.handshakeTimeout} seconds. Disconnects the peer.
         """
         if self.debug:
             _debug(self, "Handshake timedout")

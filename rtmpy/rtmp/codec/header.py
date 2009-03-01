@@ -6,7 +6,7 @@
 """
 Utility/helper functions for encoding and decoding RTMP headers.
 
-@see: L{http://osflash.org/documentation/rtmp#rtmp_packet_structure}
+@see: L{RTMP Packet Structure on OSFlash (external)<http://osflash.org/documentation/rtmp#rtmp_packet_structure>}
 """
 
 from rtmpy.rtmp.interfaces import IHeader

@@ -3,11 +3,13 @@
 # A lot of this code is copied from the Twisted codebase but adapted to remove
 # the XML stuff from it.
 #
-# Copyright (c) 2007-2008 The RTMPy Project.
+# Copyright (c) 2007-2009 The RTMPy Project.
 # See LICENSE for details.
 
 """
 Event Dispatching and Callback utilities.
+
+@since: 0.1
 """
 
 from zope.interface import Interface, implements
