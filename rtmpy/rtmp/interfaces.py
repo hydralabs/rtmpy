@@ -21,7 +21,8 @@ class IHeader(Interface):
     relative = Attribute(
         "A C{bool} which is C{True} if this header is relative to the "
         "previous. If C{False} then the header completely replaces the "
-        "previous.")
+        "previous. If this value is C{False} then all other attributes on "
+        "the header are guaranteed to be populated.")
     timestamp = Attribute(
         "An C{int} time value - not sure what this represents atm.")
     datatype = Attribute(
@@ -75,16 +76,6 @@ class IChannel(Interface):
     def write(data):
         """
         """
-
-class IProducingChannel(IChannel):
-    """
-    A channel that produces data for RTMP encoding.
-    """
-
-class IConsumingChannel(IChannel):
-    """
-    A channel that consumes data from an RTMP bytestream.
-    """
 
 class IStream(Interface):
     """

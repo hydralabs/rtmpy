@@ -41,6 +41,8 @@ PROTOCOL_ERROR = 'rtmp.protocol.error'
 MAX_CHANNELS = 64
 MAX_STREAMS = 0xffff
 
+DEBUG = True
+
 class ChannelTypes:
     """
     RTMP Channel data types.
@@ -295,7 +297,10 @@ class ChannelManager(object):
         """
         self.removeChannel(channel.channel_id)
 
-class BaseProtocol(protocol.Protocol, ChannelManager, EventDispatcher):
+class Context(ChannelManager):
+    pass
+
+class BaseProtocol(protocol.Protocol, EventDispatcher):
     """
     Provides the basis for the initial handshaking phase and decoding RTMP
     packets as they arrive.

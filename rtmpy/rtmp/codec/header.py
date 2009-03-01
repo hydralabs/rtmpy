@@ -10,7 +10,7 @@ Utility/helper functions for encoding and decoding RTMP headers.
 """
 
 from rtmpy.rtmp.interfaces import IHeader
-from rtmpy import rtmp
+from rtmpy import rtmp, util
 
 #: The header can come in one of four sizes: 12, 8, 4, or 1 byte(s).
 HEADER_SIZES = [12, 8, 4, 1]
@@ -18,16 +18,20 @@ HEADER_SIZES = [12, 8, 4, 1]
 
 def decodeHeaderByte(byte):
     """
-    Returns the header length (in bytes) and the channel id from the header
-    byte.
+    Returns a tuple containing the decoded header length (in bytes) and the
+    channel id from the header byte.
 
     @param byte: The header byte read from the stream.
     @type byte: C{int}
     @return: The header length and the channel id.
     @rtype: C{tuple}
     """
-    if not isinstance(type(byte), int):
+    if not isinstance(byte, int):
         raise TypeError('Expected an int (got %s)' % (type(byte),))
+
+    if byte > 255 or byte < 0:
+        raise OverflowError('Byte must be between 0 and 255 (got %d)' % (
+            byte,))
 
     index = byte >> 6
 
@@ -47,29 +51,58 @@ def encodeHeaderByte(headerLength, channelId):
     @param channelId: The channel id for the header.
     @type channelId: C{int}
     """
-    return (headerLength << 6) | channelId
+    if not isinstance(headerLength, int):
+        raise TypeError('Expected an int for headerLength (got %s)' % (
+            type(headerLength),))
+
+    if not isinstance(channelId, int):
+        raise TypeError('Expected an int for channelId (got %s)' % (
+            type(channelId),))
+
+    try:
+        index = HEADER_SIZES.index(headerLength)
+    except ValueError:
+        raise ValueError('Unexpected headerLength value (got %d)' % (
+            headerLength,))
+
+    if channelId > 0x3f or channelId < 0:
+        raise ValueError('Expected channelId between 0x00 and 0x3f')
+
+    return (index << 6) | channelId
 
 
 def getHeaderSizeIndex(header):
     """
     Calculates the RTMP header size for C{header}. At a minimum, the
-    C{channelId} on C{header} needs to exist otherwise and L{AttributeError}
+    C{channelId} on C{header} needs to exist otherwise and L{ValueError}
     will be raised.
 
     @param header: An L{IHeader} object.
     @return: An index relating to L{HEADER_SIZES}.
     @rtype: C{int}
     """
+    if not IHeader.providedBy(header):
+        raise TypeError('IHeader interface expected')
+
     if header.channelId is None:
-        raise AttributeError("Header channelId cannot be None.")
+        raise ValueError('Header channelId cannot be None')
 
     if header.streamId is not None:
+        if None in [header.bodyLength, header.datatype, header.timestamp]:
+            raise ValueError('Dependant values unmet (got:%r)' % (header,))
+
         return 0
 
     if [header.bodyLength, header.datatype] != [None, None]:
+        if header.timestamp is None:
+            raise ValueError('Dependant values unmet (got:%r)' % (header,))
+
         return 1
 
     if header.timestamp is not None:
+        # XXX : What should happen if header.streamId or header.datatype is
+        # set? Whilst not strictly an error, it could be the result of some
+        # corruption elsewhere.
         return 2
 
     return 3
@@ -89,7 +122,8 @@ def getHeaderSize(header):
     try:
         return HEADER_SIZES[index]
     except IndexError:
-        raise ValueError("Unable to determine header size (got %r)" % (header,))
+        raise ValueError("Unable to determine header size (got %r)" % (
+            header,))
 
 
 def encodeHeader(stream, header):
@@ -102,23 +136,34 @@ def encodeHeader(stream, header):
     @raise TypeError: If L{IHeader} is not provided by C{header}.
     """
     if not IHeader.providedBy(header):
-        raise TypeError('Expected an IHeader (got %s)' % (type(header),))
+        raise TypeError('IHeader interface expected (got %s)' % (
+            type(header),))
 
-    size = getHeaderSize(header)
-    stream.write_uchar(encodeHeaderByte(size, header.channelId))
+    if not isinstance(stream, util.BufferedByteStream):
+        raise TypeError('BufferedByteStream expected (got %s)' % (
+            type(stream),))
 
-    if size == 1:
-        return
+    def _encode():
+        size = getHeaderSize(header)
+        stream.write_uchar(encodeHeaderByte(size, header.channelId))
 
-    if size >= 4:
-        stream.write_24bit_uint(header.timestamp)
+        if size == 1:
+            return
 
-    if size >= 8:
-        stream.write_24bit_uint(header.bodyLength)
-        stream.write_uchar(header.datatype)
+        if size >= 4:
+            stream.write_24bit_uint(header.timestamp)
 
-    if size >= 12:
-        stream.write_ulong(header.streamId)
+        if size >= 8:
+            stream.write_24bit_uint(header.bodyLength)
+            stream.write_uchar(header.datatype)
+
+        if size >= 12:
+            stream.write_ulong(header.streamId)
+
+    oldEndian = stream.endian
+    stream.endian = util.BufferedByteStream.ENDIAN_NETWORK
+    _encode()
+    stream.endian = oldEndian
 
 
 def decodeHeader(stream):
@@ -187,7 +232,7 @@ def diffHeaders(old, new):
     if old.channelId != new.channelId:
         raise ValueError("The two headers are not for the same channel")
 
-    header = rtmp.Header(channelId=old.channelId)
+    header = rtmp.Header(channelId=old.channelId, relative=True)
 
     header.timestamp = new.timestamp - old.timestamp
 
