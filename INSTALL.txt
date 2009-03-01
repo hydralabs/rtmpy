@@ -14,7 +14,7 @@ The following software packages are pre-requisites:
 
 - **Python 2.3 or newer**
 - **Twisted 2.5 or newer**
-- **PyAMF 0.1 or newer**
+- **PyAMF 0.4.1 or newer**
 - **PyWin32 b210 or newer** (for Windows only)
 
 Installing
