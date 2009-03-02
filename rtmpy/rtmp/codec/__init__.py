@@ -17,6 +17,18 @@ from rtmpy.rtmp import interfaces
 from rtmpy.rtmp.codec import header
 
 
+class DecodeError(Exception):
+    """
+    Raised if there is an error decoding an RTMP bytestream.
+    """
+
+
+class EncodeError(Exception):
+    """
+    Raised if there is an error encoding an RTMP bytestream.
+    """
+
+
 class BaseCodec(object):
     """
     @ivar deferred: The deferred from the result of L{getJob}.
@@ -102,6 +114,16 @@ class Decoder(BaseCodec):
 
             return None
 
+    def getBytesAvailableForChannel(self, channel):
+        """
+        Returns the number of bytes available in the buffer to be read as an
+        RTMP stream.
+        """
+        return min(
+            self.buffer.remaining(),
+            channel.frameRemaining
+        )
+
     def readFrame(self):
         """
         This function attempts to read a frame from the stream. A frame is a
@@ -111,11 +133,10 @@ class Decoder(BaseCodec):
         After this function is finished, the next part of the buffer will
         either be empty or a header section.
         """
-        available = min(
-            self.buffer.remaining(),
-            self.currentChannel.frameRemaining
-        )
+        if self.currentChannel is None:
+            raise DecodeError('Channel is required to read frame')
 
+        available = self.getBytesAvailableForChannel(self.currentChannel)
         frames = self.currentChannel.frames
 
         if available == 0:
@@ -127,8 +148,6 @@ class Decoder(BaseCodec):
             # a complete frame was read from the stream which means a new
             # header and frame body will be next in the stream
             self.currentChannel = None
-
-        return self.currentChannel is None
 
     def canContinue(self, minBytes=1):
         """

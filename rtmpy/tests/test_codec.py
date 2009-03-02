@@ -20,6 +20,43 @@ class DummyChannelManager(object):
     implements(interfaces.IChannelManager)
 
 
+class DummyChannel(object):
+    """
+    """
+
+    implements(interfaces.IChannel)
+
+    frameSize = 128
+
+    def __init__(self):
+        self.frameRemaining = self.frameSize
+        self.frames = 0
+        self.buffer = ''
+
+    def write(self, data):
+        self.buffer += str(data)
+
+        l = len(data)
+
+        if l < self.frameSize:
+            self.frameRemaining -= l
+
+            return
+
+        while l >= self.frameSize:
+            self.frames += 1
+            l -= self.frameSize
+
+        if self.frameRemaining != self.frameSize and l + self.frameRemaining >= self.frameSize:
+            self.frames += 1
+            l -= self.frameSize
+
+        if l > 0:
+            self.frameRemaining = l
+        else:
+            self.frameRemaining = self.frameSize
+
+
 class BaseCodecTestCase(unittest.TestCase):
     """
     Tests for L{codec.BaseCodec}
@@ -120,15 +157,20 @@ class BaseCodecTestCase(unittest.TestCase):
         self.assertEquals(c.deferred, None)
 
 
-class DecoderTestCase(unittest.TestCase):
+class BaseDecoderTestCase(unittest.TestCase):
     """
-    Tests for L{codec.Decoder}
     """
 
     def setUp(self):
         self.manager = DummyChannelManager()
         self.decoder = codec.Decoder(self.manager)
         self.buffer = self.decoder.buffer
+
+
+class DecoderTestCase(BaseDecoderTestCase):
+    """
+    Tests for L{codec.Decoder}
+    """
 
     def test_job(self):
         self.assertEquals(self.decoder.getJob(), self.decoder.decode)
@@ -152,6 +194,7 @@ class DecoderTestCase(unittest.TestCase):
         self.assertEquals(self.buffer.getvalue(), '')
         self.assertEquals(self.decoder.readHeader(), None)
 
+        # this is a valid 8 byte header
         full_header = 'U\x03\x92\xfa\x00z\n\x03'
 
         self.buffer.write(full_header[:5])
@@ -199,3 +242,138 @@ class DecoderTestCase(unittest.TestCase):
         self.assertTrue(self.executed)
         self.assertTrue(self.decoder.canContinue(4))
         self.assertFalse(self.decoder.canContinue(5))
+
+    def test_getBytesAvailableForChannel(self):
+        c = DummyChannel()
+
+        self.assertEquals(self.buffer.remaining(), 0)
+        self.assertEquals(c.frameRemaining, 128)
+        self.assertEquals(self.decoder.getBytesAvailableForChannel(c), 0)
+
+        self.buffer.write(' ' * 10)
+        self.buffer.seek(0)
+        c.write(' ' * 10)
+
+        self.assertEquals(self.buffer.remaining(), 10)
+        self.assertEquals(c.frameRemaining, 118)
+
+        self.assertEquals(self.decoder.getBytesAvailableForChannel(c), 10)
+
+        self.buffer.write(' ' * (c.frameSize - 1))
+        self.buffer.seek(0)
+        c.write(' ' * (c.frameSize - 11))
+
+        self.assertEquals(self.buffer.remaining(), 127)
+        self.assertEquals(c.frameRemaining, 1)
+
+        self.assertEquals(self.decoder.getBytesAvailableForChannel(c), 1)
+
+        self.buffer.write(' ' * c.frameSize)
+        self.buffer.seek(0)
+        c.write(' ')
+
+        self.assertEquals(self.buffer.remaining(), 128)
+        self.assertEquals(c.frameRemaining, 0)
+
+        self.assertEquals(self.decoder.getBytesAvailableForChannel(c), 0)
+
+    def test_noop(self):
+        """
+        If the decoder can't continue then the buffer should be left untouched
+        """
+        self.buffer.write('foo')
+        self.buffer.seek(3)
+        self.assertEquals(self.buffer.tell(), 3)
+        self.assertFalse(self.decoder.canContinue())
+
+        self.decoder.decode()
+
+        self.assertEquals(self.buffer.tell(), 3)
+
+
+class FrameReadingTestCase(BaseDecoderTestCase):
+    """
+    Tests for L{codec.Decoder.readFrame}
+    """
+
+    def test_nochannel(self):
+        self.assertEquals(self.decoder.currentChannel, None)
+
+        e = self.assertRaises(codec.DecodeError, self.decoder.readFrame)
+        self.assertEquals(str(e), 'Channel is required to read frame')
+
+    def test_notavailable(self):
+        channel = self.decoder.currentChannel = DummyChannel()
+        self.assertEquals(self.buffer.getvalue(), '')
+        self.assertEquals(channel.buffer, '')
+        self.assertEquals(channel.frames, 0)
+
+        self.decoder.readFrame()
+
+        self.assertEquals(self.buffer.getvalue(), '')
+        self.assertEquals(channel.buffer, '')
+        self.assertEquals(channel.frames, 0)
+
+    def test_partial(self):
+        channel = self.decoder.currentChannel = DummyChannel()
+
+        self.buffer.write('foo.bar.baz')
+        self.buffer.seek(0)
+
+        self.assertEquals(self.buffer.tell(), 0)
+        self.assertEquals(channel.buffer, '')
+        self.assertEquals(channel.frames, 0)
+
+        self.decoder.readFrame()
+
+        self.assertEquals(self.buffer.tell(), 11)
+        self.assertEquals(channel.buffer, 'foo.bar.baz')
+        self.assertEquals(channel.frames, 0)
+
+    def test_full(self):
+        channel = self.decoder.currentChannel = DummyChannel()
+
+        self.assertEquals(channel.frameRemaining, channel.frameSize)
+
+        self.buffer.write(' ' * channel.frameSize)
+        self.buffer.seek(0)
+
+        self.assertEquals(self.buffer.tell(), 0)
+        self.assertEquals(channel.buffer, '')
+        self.assertEquals(channel.frames, 0)
+
+        self.decoder.readFrame()
+
+        self.assertEquals(self.buffer.tell(), channel.frameSize)
+        self.assertEquals(channel.buffer, ' ' * channel.frameSize)
+        self.assertEquals(channel.frames, 1)
+        self.assertEquals(self.decoder.currentChannel, None)
+
+    def test_moreThanOne(self):
+        channel = self.decoder.currentChannel = DummyChannel()
+
+        self.assertEquals(channel.frameRemaining, channel.frameSize)
+
+        self.buffer.write(' ' * (channel.frameSize + 50))
+        self.buffer.seek(0)
+
+        self.assertEquals(self.buffer.tell(), 0)
+        self.assertEquals(channel.buffer, '')
+        self.assertEquals(channel.frames, 0)
+
+        self.decoder.readFrame()
+
+        self.assertEquals(self.buffer.tell(), channel.frameSize)
+        self.assertEquals(channel.buffer, ' ' * channel.frameSize)
+        self.assertEquals(channel.frames, 1)
+        self.assertEquals(channel.frameRemaining, 128)
+        self.assertEquals(self.decoder.currentChannel, None)
+
+        self.decoder.currentChannel = channel
+        self.decoder.readFrame()
+
+        self.assertEquals(self.buffer.tell(), channel.frameSize + 50)
+        self.assertEquals(channel.buffer, ' ' * (channel.frameSize + 50))
+        self.assertEquals(channel.frames, 1)
+        self.assertEquals(channel.frameRemaining, 78)
+        self.assertEquals(self.decoder.currentChannel, channel)
