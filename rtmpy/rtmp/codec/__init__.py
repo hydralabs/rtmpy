@@ -39,7 +39,8 @@ class BaseCodec(object):
 
     def __init__(self, manager):
         if not interfaces.IChannelManager.providedBy(manager):
-            raise TypeError('IChannelManager expected (got %s)' % (type(manager),))
+            raise TypeError('IChannelManager expected (got %s)' % (
+                type(manager),))
 
         self.manager = manager
         self.deferred = None
@@ -106,6 +107,12 @@ class Decoder(BaseCodec):
         return self.decode
 
     def readHeader(self):
+        """
+        Reads an RTMP Header from the stream. If there is not enough data in
+        the buffer then C{None} is returned.
+
+        @rtype: L{interfaces.IHeader} or C{None}
+        """
         headerPosition = self.buffer.tell()
 
         try:
@@ -122,8 +129,8 @@ class Decoder(BaseCodec):
         """
         return min(
             self.buffer.remaining(),
-            channel.frameRemaining,
             channel.bodyRemaining,
+            self.manager.frameSize
         )
 
     def readFrame(self):
@@ -196,7 +203,8 @@ class Decoder(BaseCodec):
 
     def decode(self):
         """
-        Attempt to decode the buffer.
+        Attempt to decode the buffer. If a successful frame was decoded from
+        the stream then the decoded bytes are removed.
         """
         if not self.canContinue():
             self.pause()
@@ -206,94 +214,164 @@ class Decoder(BaseCodec):
         # start from the beginning of the buffer
         self.buffer.seek(0)
 
-        try:
-            self._decode()
-        except:
-            self.deferred.errback()
-        else:
-            # delete the bytes that have already been decoded
-            self.buffer.consume()
+        self._decode()
+        # delete the bytes that have already been decoded
+        self.buffer.consume()
 
     def dataReceived(self, data):
         """
-        Adds data to the end of the stream.
+        Adds data to the end of the stream. 
         """
         self.buffer.seek(0, 2)
         self.buffer.write(data)
 
 
-class ChannelConsumer(object):
-    def __init__(self, channel):
-        self.buffer = util.BufferedByteStream()
+class ChannelContext(object):
+    """
+    Provides contextual meta data for each channel attached to L{Encoder}.
+
+    @ivar buffer: Any data from the channel waiting to be encoded.
+    @type buffer: L{util.BufferedByteStream}
+    @ivar header: The last header that was written to the stream.
+    @type header: L{interfaces.IHeader}
+    @ivar channel: The underlying RTMP channel.
+    @type channel: L{interfaces.IChannel}
+    @ivar encoder: The RTMP encoder object.
+    @type encoder: L{Encoder}
+    @ivar active: Whether this channel is actively producing data.
+    @type active: C{bool}
+    """
+
+    def __init__(self, channel, encoder):
         self.channel = channel
+        self.encoder = encoder
+
+        self.buffer = util.BufferedByteStream()
+        self.active = False
         self.header = None
 
         self.channel.registerConsumer(self)
 
     def write(self, data):
+        """
+        Called by the channel when data becomes available.
+        """
         self.buffer.append(data)
 
-    def getData(self, length=0):
-        data = self.buffer.read(length)
-        self.buffer.consume()
+        if not self.active:
+            self.encoder.activateChannel(self.channel)
+            self.active = True
+
+    def getData(self, length):
+        """
+        Called by the encoder to return any data that may be available in the
+        buffer. If C{length} bytes cannot be retrieved then C{None} is
+        returned. Once the data has been read from the stream, it is consumed.
+
+        @param length: The length of data requested.
+        @type length: C{int}
+        """
+        pos = self.buffer.tell()
+
+        try:
+            data = self.buffer.read(length)
+        except EOFError:
+            self.buffer.seek(pos)
+            data = None
+
+        if len(self.buffer) == 0 or data is None:
+            self.encoder.deactivateChannel(self.channel)
+            self.active = False
+        else:
+            self.buffer.consume()
 
         return data
+
+    def getRelativeHeader(self):
+        """
+        Returns a header based on the last absolute header written to the
+        stream and the channel's header. If there was no header written to the
+        stream then the channel's header is returned.
+
+        @rtype: L{interfaces.IHeader}
+        """
+        if self.header is None:
+            return self.channel.getHeader()
+
+        return header.diffHeaders(self.header, self.channel.getHeader())
 
 
 class Encoder(BaseCodec):
     """
     Interlaces all active channels to form one stream. At this point no
     attempt has been made to prioritise other channels over others.
+
+    @ivar channelContext: A C{dict} of {channel: L{ChannelContext}} objects.
+    @type channelContext: C{dict}
+    @ivar activeChannels: A C{set} of channels that are actively producing
+        data.
+    @type activeChannels: C{set}
+    @ivar currentContext: A reference to the current context being encoded.
+    @type currentContext: L{ChannelContext}
     """
+
+    channelContext = {}
+    activeChannels = set()
+    currentContext = None
+    consumer = None
 
     def getJob(self):
         return self.encode
 
-    def getRelativeHeader(self, old, new):
-        if old is None or new.relative is False:
-            return new
+    def registerConsumer(self, consumer):
+        self.consumer = consumer
 
-        return header.diffHeaders(old, new)
+    def activateChannel(self, channel):
+        """
+        """
+        self.activeChannels.update([channel])
+
+    def deactivateChannel(self, channel):
+        """
+        """
+        self.activeChannels.remove(channel)
 
     def getNextChannel(self):
         """
         """
 
-    def writeFrame(self, channel):
+    def writeFrame(self):
         """
         """
-        meta = self.getChannelMeta(channel)
+        context = self.currentContext
+        channel = context.channel
+
         available = min(
-            meta.remaining(),
-            channel.frameRemaining,
-            # include protocol frame size here
+            channel.bodyRemaining,
+            self.manager.frameSize
         )
 
-        if not meta.hasEnoughData(available):
-            return False
+        data = context.getData(available)
 
-        relativeHeader = self.getRelativeHeader(meta.header, channel.header)
-        meta.header = channel.header
+        if data is None:
+            return
+
+        relativeHeader = context.getRelativeHeader()
+        context.header = context.channel.getHeader()
 
         header.encodeHeader(self.buffer, relativeHeader)
-        self.buffer.write(meta.getData(available))
-
-        return True
+        self.buffer.write(data)
 
     def encode(self):
-        def _encode():
-            channel = self.getNextChannel()
+        channel = self.getNextChannel()
 
-            if channel is None:
-                self.pauseProducing()
+        if channel is None:
+            self.pause()
 
-                return
+            return
 
-            if self.writeFrame(channel):
-                self.consumer.write(self.buffer.getvalue())
-                self.buffer.truncate()
+        self.currentContext = self.channelContext[channel]
 
-        try:
-            _encode()
-        except:
-            self.deferred.errback()
+        self.writeFrame()
+        self.consumer.write(self.buffer.getvalue())
+        self.buffer.truncate()

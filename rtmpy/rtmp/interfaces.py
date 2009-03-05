@@ -46,8 +46,6 @@ class IChannel(Interface):
     frames = Attribute(
         "The total number of frames that have been routed through this "
         "channel.")
-    frameRemaining = Attribute(
-        "The number of bytes that remain until another frame is completed.")
     bodyRemaining = Attribute(
         "The number of bytes that remain until this channel's body is "
         "considered complete.")

@@ -104,6 +104,7 @@ class DummyChannel(object):
         self.frameRemaining = DummyChannelManager.frameSize
         self.frames = 0
         self.buffer = ''
+        self.consumer = None
 
     def write(self, data):
         self.buffer += str(data)
@@ -141,10 +142,16 @@ class DummyChannel(object):
 
         self.header = mergeHeaders(self.header, header)
 
+    def getHeader(self):
+        return self.header
+
     def bodyRemaining(self):
         return self.header.bodyLength - len(self.buffer)
 
     bodyRemaining = property(bodyRemaining)
+
+    def registerConsumer(self, consumer):
+        self.consumer = consumer
 
 
 class DummyHeader(object):
