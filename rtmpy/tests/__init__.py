@@ -3,9 +3,4 @@
 
 """
 Tests for RTMPy.
-
-@author: U{Arnar Birgisson<mailto:arnarbi@gmail.com>}
-@author: U{Thijs Triemstra<mailto:info@collab.nl>}
-
-@since: 0.1.0
 """

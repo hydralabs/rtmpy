@@ -256,3 +256,59 @@ def diffHeaders(old, new):
         header.streamId = None
 
     return header
+
+
+def mergeHeaders(old, new):
+    """
+    Returns an absolute header that is the result of merging the values of
+    C{old} and C{new}. Both C{old} and C{new} must implement L{IHeader} and be
+    from the same channel. Also, C{old} must be absolute and C{new} must be
+    relative.
+
+    @param old: The first header to compare.
+    @type old: L{IHeader}
+    @param new: The second header to compare.
+    @type new: L{IHeader}
+    @return: A header with the merged values of old & new.
+    @rtype: L{rtmp.Header}
+    """
+    if not IHeader.providedBy(old):
+        raise TypeError("Expected IHeader for old (got %r)" % (old,))
+
+    if not IHeader.providedBy(new):
+        raise TypeError("Expected IHeader for new (got %r)" % (new,))
+
+    if old.relative is not False:
+        raise ValueError("Received a non-absolute header for old " \
+            "(relative = %r)" % (old.relative))
+
+    if new.relative is not True:
+        raise ValueError("Received a non-relative header for new " \
+            "(relative = %r)" % (new.relative))
+
+    if old.channelId != new.channelId:
+        raise ValueError("The two headers are not for the same channel")
+
+    header = rtmp.Header(channelId=old.channelId, relative=False)
+
+    if new.timestamp is not None:
+        header.timestamp = old.timestamp + new.timestamp
+    else:
+        header.timestamp = old.timestamp
+
+    if new.datatype is not None:
+        header.datatype = new.datatype
+    else:
+        header.datatype = old.datatype
+
+    if new.bodyLength is not None:
+        header.bodyLength = old.bodyLength + new.bodyLength
+    else:
+        header.bodyLength = old.bodyLength
+
+    if new.streamId is not None:
+        header.streamId = new.streamId
+    else:
+        header.streamId = old.streamId
+
+    return header

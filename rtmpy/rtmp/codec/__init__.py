@@ -73,7 +73,7 @@ class BaseCodec(object):
         if self.job.running:
             return self.deferred
 
-        self.deferred = self.job.start(when)
+        self.deferred = self.job.start(when, now=False)
 
         return self.deferred
 
@@ -90,7 +90,8 @@ class BaseCodec(object):
 class Decoder(BaseCodec):
     """
     Decodes an RTMP stream. De-interlaces the channels and writes the frames
-    to the individual buffers.
+    to the individual buffers. The decoder has the power to pause itself, but
+    not to start.
 
     @ivar currentChannel: The channel currently being decoded.
     @type currentChannel: L{interfaces.IChannel}
@@ -121,7 +122,8 @@ class Decoder(BaseCodec):
         """
         return min(
             self.buffer.remaining(),
-            channel.frameRemaining
+            channel.frameRemaining,
+            channel.bodyRemaining,
         )
 
     def readFrame(self):
@@ -148,6 +150,8 @@ class Decoder(BaseCodec):
             # a complete frame was read from the stream which means a new
             # header and frame body will be next in the stream
             self.currentChannel = None
+        elif self.currentChannel.bodyRemaining == 0:
+            self.currentChannel = None
 
     def canContinue(self, minBytes=1):
         """
@@ -167,24 +171,26 @@ class Decoder(BaseCodec):
         return (remaining >= minBytes)
 
     def _decode(self):
-        if self.current_channel is not None:
+        if self.currentChannel is not None:
             self.readFrame()
 
         if not self.canContinue():
             # the buffer is empty
+            self.pause()
+
             return
 
-        header = self.readHeader()
+        h = self.readHeader()
 
-        if header is None:
+        if h is None:
             # not enough bytes left in the stream to continue decoding, we
             # require a complete header to decode
+            self.pause()
+
             return
 
-        self.currentChannel = self.manager.getChannel(channelId)
-
-        if header is not None:
-            channel.setHeader(header)
+        self.currentChannel = self.manager.getChannel(h.channelId)
+        self.currentChannel.setHeader(h)
 
         self.readFrame()
 
@@ -193,6 +199,8 @@ class Decoder(BaseCodec):
         Attempt to decode the buffer.
         """
         if not self.canContinue():
+            self.pause()
+
             return
 
         # start from the beginning of the buffer

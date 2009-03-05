@@ -200,6 +200,11 @@ class Channel(object):
 
     channelId = property(channelId)
 
+    def bodyRemaining(self):
+        return self.header.bodyLength - len(self.buffer)
+
+    bodyRemaining = property(bodyRemaining)
+
 
 class ChannelManager(object):
     """

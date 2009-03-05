@@ -5,28 +5,11 @@
 Tests for L{rtmpy.rtmp.codec.header}.
 """
 
-from zope.interface import implements
-from twisted.internet import reactor, defer
 from twisted.trial import unittest
 
 from rtmpy.rtmp.codec import header
 from rtmpy import util
-
-
-class DummyHeader(object):
-    """
-    A dumb object that implements L{header.IHeader}
-    """
-
-    implements(header.IHeader)
-
-    def __init__(self, *args, **kwargs):
-        self.channelId = kwargs.get('channelId', None)
-        self.relative = kwargs.get('relative', None)
-        self.timestamp = kwargs.get('timestamp', None)
-        self.datatype = kwargs.get('datatype', None)
-        self.bodyLength = kwargs.get('bodyLength', None)
-        self.streamId = kwargs.get('streamId', None)
+from rtmpy.tests.util import DummyHeader
 
 
 class DecodeHeaderByteTestCase(unittest.TestCase):
@@ -450,7 +433,6 @@ class DiffHeadersTestCase(unittest.TestCase):
         new.timestamp = 234234
         new.datatype = 0
         new.bodyLength = 2001
-        new.streamId = 12
 
         h = header.diffHeaders(old, new)
 
@@ -461,3 +443,148 @@ class DiffHeadersTestCase(unittest.TestCase):
         self.assertEquals(h.datatype, 0)
         self.assertEquals(h.streamId, 12)
         self.assertEquals(h.channelId, 3)
+
+
+class MergeHeadersTestCase(unittest.TestCase):
+    """
+    Tests for L{header.mergeHeaders}
+    """
+
+    def setUp(self):
+        self.absolute = DummyHeader(relative=False, channelId=3,
+            timestamp=1000, bodyLength=2000, datatype=3, streamId=243)
+
+    def _generate(self):
+        """
+        Generates a relative header and with the same channelId on each call.
+        """
+        return DummyHeader(relative=True, channelId=3)
+
+    def test_types(self):
+        h = DummyHeader()
+
+        self.assertTrue(header.IHeader.providedBy(h))
+        self.assertRaises(TypeError, header.mergeHeaders, h, object())
+        self.assertRaises(TypeError, header.mergeHeaders, object(), h)
+
+        try:
+            header.mergeHeaders(h, h)
+        except TypeError:
+            self.fail('Unexpected TypeError raised')
+        except:
+            pass
+
+    def test_absolute(self):
+        h1 = DummyHeader(relative=None)
+        h2 = DummyHeader(relative=True)
+        h3 = DummyHeader(relative=False)
+
+        e = self.assertRaises(ValueError, header.mergeHeaders, h1, h1)
+        self.assertEquals(str(e),
+            'Received a non-absolute header for old (relative = None)')
+
+        e = self.assertRaises(ValueError, header.mergeHeaders, h2, h2)
+        self.assertEquals(str(e),
+            'Received a non-absolute header for old (relative = True)')
+
+        e = self.assertRaises(ValueError, header.mergeHeaders, h3, h1)
+        self.assertEquals(str(e),
+            'Received a non-relative header for new (relative = None)')
+
+        e = self.assertRaises(ValueError, header.mergeHeaders, h2, h3)
+        self.assertEquals(str(e),
+            'Received a non-absolute header for old (relative = True)')
+
+    def test_sameChannel(self):
+        h1 = DummyHeader(relative=False, channelId=3)
+        h2 = DummyHeader(relative=True, channelId=42)
+
+        e = self.assertRaises(ValueError, header.mergeHeaders, h1, h2)
+        self.assertEquals(str(e), 'The two headers are not for the same channel')
+
+    def test_nodiff(self):
+        new = self._generate()
+
+        h = header.mergeHeaders(self.absolute, new)
+
+        self.assertTrue(header.IHeader.providedBy(h))
+        self.assertFalse(h.relative)
+        self.assertEquals(h.timestamp, self.absolute.timestamp)
+        self.assertEquals(h.bodyLength, self.absolute.bodyLength)
+        self.assertEquals(h.datatype, self.absolute.datatype)
+        self.assertEquals(h.streamId, self.absolute.streamId)
+        self.assertEquals(h.channelId, self.absolute.channelId)
+
+    def test_timestamp(self):
+        new = self._generate()
+        new.timestamp = 3
+
+        h = header.mergeHeaders(self.absolute, new)
+
+        self.assertTrue(header.IHeader.providedBy(h))
+        self.assertFalse(h.relative)
+        self.assertEquals(h.timestamp, self.absolute.timestamp + 3)
+        self.assertEquals(h.bodyLength, self.absolute.bodyLength)
+        self.assertEquals(h.datatype, self.absolute.datatype)
+        self.assertEquals(h.streamId, self.absolute.streamId)
+        self.assertEquals(h.channelId, self.absolute.channelId)
+
+    def test_datatype(self):
+        new = self._generate()
+        new.datatype = 7
+
+        h = header.mergeHeaders(self.absolute, new)
+
+        self.assertTrue(header.IHeader.providedBy(h))
+        self.assertFalse(h.relative)
+        self.assertEquals(h.timestamp, self.absolute.timestamp)
+        self.assertEquals(h.bodyLength, self.absolute.bodyLength)
+        self.assertEquals(h.datatype, 7)
+        self.assertEquals(h.streamId, self.absolute.streamId)
+        self.assertEquals(h.channelId, self.absolute.channelId)
+
+    def test_bodyLength(self):
+        new = self._generate()
+        new.bodyLength = 42
+
+        h = header.mergeHeaders(self.absolute, new)
+
+        self.assertTrue(header.IHeader.providedBy(h))
+        self.assertFalse(h.relative)
+        self.assertEquals(h.timestamp, self.absolute.timestamp)
+        self.assertEquals(h.bodyLength, self.absolute.bodyLength + 42)
+        self.assertEquals(h.datatype, self.absolute.datatype)
+        self.assertEquals(h.streamId, self.absolute.streamId)
+        self.assertEquals(h.channelId, self.absolute.channelId)
+
+    def test_streamId(self):
+        new = self._generate()
+        new.streamId = 31
+
+        h = header.mergeHeaders(self.absolute, new)
+
+        self.assertTrue(header.IHeader.providedBy(h))
+        self.assertFalse(h.relative)
+        self.assertEquals(h.timestamp, self.absolute.timestamp)
+        self.assertEquals(h.bodyLength, self.absolute.bodyLength)
+        self.assertEquals(h.datatype, self.absolute.datatype)
+        self.assertEquals(h.streamId, 31)
+        self.assertEquals(h.channelId, self.absolute.channelId)
+
+    def test_complex(self):
+        new = self._generate()
+
+        new.streamId = 12
+        new.timestamp = 234234
+        new.datatype = 0
+        new.bodyLength = 2001
+
+        h = header.mergeHeaders(self.absolute, new)
+
+        self.assertTrue(header.IHeader.providedBy(h))
+        self.assertFalse(h.relative)
+        self.assertEquals(h.timestamp, 235234)
+        self.assertEquals(h.bodyLength, 4001)
+        self.assertEquals(h.datatype, 0)
+        self.assertEquals(h.streamId, 12)
+        self.assertEquals(h.channelId, self.absolute.channelId)
