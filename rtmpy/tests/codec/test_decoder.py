@@ -106,9 +106,9 @@ class DecoderClassTestCase(BaseDecoderTestCase):
 
         self.assertEquals(self.decoder.getBytesAvailableForChannel(c), 10)
 
-        self.buffer.write(' ' * (c.frameSize - 1))
+        self.buffer.write(' ' * (DummyChannelManager.frameSize - 1))
         self.buffer.seek(0)
-        c.write(' ' * (c.frameSize - 11))
+        c.write(' ' * (DummyChannelManager.frameSize - 11))
 
         self.assertEquals(self.buffer.remaining(), 127)
         self.assertEquals(c.frameRemaining, 1)
@@ -116,7 +116,7 @@ class DecoderClassTestCase(BaseDecoderTestCase):
 
         self.assertEquals(self.decoder.getBytesAvailableForChannel(c), 1)
 
-        self.buffer.write(' ' * c.frameSize)
+        self.buffer.write(' ' * DummyChannelManager.frameSize)
         self.buffer.seek(0)
         c.write(' ')
 
@@ -218,7 +218,7 @@ class DecodingTestCase(BaseDecoderTestCase):
 
             c = self.decoder.currentChannel
             self.assertTrue(isinstance(c, DummyChannel))
-            self.assertEquals(c.frameRemaining, DummyChannel.frameSize)
+            self.assertEquals(c.frameRemaining, DummyChannelManager.frameSize)
             self.assertEquals(c.frames, 0)
             self.assertEquals(c.buffer, '')
             self.assertFalse(self.job.running)
@@ -240,7 +240,7 @@ class DecodingTestCase(BaseDecoderTestCase):
             self.assertEquals(self.buffer.getvalue(), '')
             self.assertFalse(self.job.running)
 
-            self.assertEquals(c.frameRemaining, DummyChannel.frameSize - 5)
+            self.assertEquals(c.frameRemaining, DummyChannelManager.frameSize - 5)
             self.assertEquals(c.frames, 0)
             self.assertEquals(c.buffer, 'hello')
 
@@ -252,7 +252,7 @@ class DecodingTestCase(BaseDecoderTestCase):
 
         self.decoder.currentChannel = c
 
-        self.buffer.write(' ' * DummyChannel.frameSize)
+        self.buffer.write(' ' * DummyChannelManager.frameSize)
         self.buffer.seek(0)
 
         def cb(lc):
@@ -260,9 +260,9 @@ class DecodingTestCase(BaseDecoderTestCase):
             self.assertEquals(self.buffer.getvalue(), '')
             self.assertFalse(self.job.running)
 
-            self.assertEquals(c.frameRemaining, DummyChannel.frameSize)
+            self.assertEquals(c.frameRemaining, DummyChannelManager.frameSize)
             self.assertEquals(c.frames, 1)
-            self.assertEquals(c.buffer, ' ' * DummyChannel.frameSize)
+            self.assertEquals(c.buffer, ' ' * DummyChannelManager.frameSize)
 
         return self.deferred.addCallback(cb)
 
@@ -298,15 +298,15 @@ class DecodingTestCase(BaseDecoderTestCase):
         # a full header channelId 3, datatype 2, bodyLength 500, streamId 1, timestamp 10
         self.buffer.write('\x03\x00\x00\n\x00\x01\xf4\x02\x00\x00\x00\x01')
         # complete the frame
-        self.buffer.write('a' * DummyChannel.frameSize)
+        self.buffer.write('a' * DummyChannelManager.frameSize)
         # a full header channelId 5, datatype 5, bodyLength 500, streamId 1, timestamp 50
         self.buffer.write('\x05\x00\x002\x00\x01\xf4\x05\x00\x00\x00\x01')
         # complete the frame
-        self.buffer.write('b' * DummyChannel.frameSize)
+        self.buffer.write('b' * DummyChannelManager.frameSize)
         # a relative header for channelId 3
         self.buffer.write('\xc3')
         # complete the frame
-        self.buffer.write('c' * DummyChannel.frameSize)
+        self.buffer.write('c' * DummyChannelManager.frameSize)
 
         self.buffer.seek(0)
 
@@ -325,7 +325,7 @@ class DecodingTestCase(BaseDecoderTestCase):
             self.assertEquals(h.streamId, 1)
             self.assertEquals(h.timestamp, 10)
 
-            self.assertEquals(c.buffer, 'a' * DummyChannel.frameSize + 'c' * DummyChannel.frameSize)
+            self.assertEquals(c.buffer, 'a' * DummyChannelManager.frameSize + 'c' * DummyChannelManager.frameSize)
 
             c = self.manager.channels[5]
             h = c.header
@@ -336,7 +336,7 @@ class DecodingTestCase(BaseDecoderTestCase):
             self.assertEquals(h.streamId, 1)
             self.assertEquals(h.timestamp, 50)
 
-            self.assertEquals(c.buffer, 'b' * DummyChannel.frameSize)
+            self.assertEquals(c.buffer, 'b' * DummyChannelManager.frameSize)
 
             self.assertEquals(self.decoder.currentChannel, None)
 
@@ -388,9 +388,9 @@ class FrameReadingTestCase(BaseDecoderTestCase):
         channel = self.decoder.currentChannel = DummyChannel()
         channel.setHeader(DummyHeader(bodyLength=1000, relative=False))
 
-        self.assertEquals(channel.frameRemaining, channel.frameSize)
+        self.assertEquals(channel.frameRemaining, DummyChannelManager.frameSize)
 
-        self.buffer.write(' ' * channel.frameSize)
+        self.buffer.write(' ' * DummyChannelManager.frameSize)
         self.buffer.seek(0)
 
         self.assertEquals(self.buffer.tell(), 0)
@@ -399,8 +399,8 @@ class FrameReadingTestCase(BaseDecoderTestCase):
 
         self.decoder.readFrame()
 
-        self.assertEquals(self.buffer.tell(), channel.frameSize)
-        self.assertEquals(channel.buffer, ' ' * channel.frameSize)
+        self.assertEquals(self.buffer.tell(), DummyChannelManager.frameSize)
+        self.assertEquals(channel.buffer, ' ' * DummyChannelManager.frameSize)
         self.assertEquals(channel.frames, 1)
         self.assertEquals(self.decoder.currentChannel, None)
 
@@ -408,9 +408,9 @@ class FrameReadingTestCase(BaseDecoderTestCase):
         channel = self.decoder.currentChannel = DummyChannel()
         channel.setHeader(DummyHeader(bodyLength=1000, relative=False))
 
-        self.assertEquals(channel.frameRemaining, channel.frameSize)
+        self.assertEquals(channel.frameRemaining, DummyChannelManager.frameSize)
 
-        self.buffer.write(' ' * (channel.frameSize + 50))
+        self.buffer.write(' ' * (DummyChannelManager.frameSize + 50))
         self.buffer.seek(0)
 
         self.assertEquals(self.buffer.tell(), 0)
@@ -419,8 +419,8 @@ class FrameReadingTestCase(BaseDecoderTestCase):
 
         self.decoder.readFrame()
 
-        self.assertEquals(self.buffer.tell(), channel.frameSize)
-        self.assertEquals(channel.buffer, ' ' * channel.frameSize)
+        self.assertEquals(self.buffer.tell(), DummyChannelManager.frameSize)
+        self.assertEquals(channel.buffer, ' ' * DummyChannelManager.frameSize)
         self.assertEquals(channel.frames, 1)
         self.assertEquals(channel.frameRemaining, 128)
         self.assertEquals(self.decoder.currentChannel, None)
@@ -428,8 +428,8 @@ class FrameReadingTestCase(BaseDecoderTestCase):
         self.decoder.currentChannel = channel
         self.decoder.readFrame()
 
-        self.assertEquals(self.buffer.tell(), channel.frameSize + 50)
-        self.assertEquals(channel.buffer, ' ' * (channel.frameSize + 50))
+        self.assertEquals(self.buffer.tell(), DummyChannelManager.frameSize + 50)
+        self.assertEquals(channel.buffer, ' ' * (DummyChannelManager.frameSize + 50))
         self.assertEquals(channel.frames, 1)
         self.assertEquals(channel.frameRemaining, 78)
         self.assertEquals(self.decoder.currentChannel, channel)

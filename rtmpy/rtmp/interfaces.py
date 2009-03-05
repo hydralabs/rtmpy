@@ -48,6 +48,9 @@ class IChannel(Interface):
         "channel.")
     frameRemaining = Attribute(
         "The number of bytes that remain until another frame is completed.")
+    bodyRemaining = Attribute(
+        "The number of bytes that remain until this channel's body is "
+        "considered complete.")
 
     def registerProducer(producer):
         """
@@ -88,6 +91,9 @@ class IChannelManager(Interface):
     Defines the interface for managing channels. The channel manager handles
     the interactions between its registered channels and the outside world ..
     """
+
+    frameSize = Attribute("An C{int} that defines the size (in bytes) of "
+        "each frame body.")
 
     def getChannel(channelId):
         """

@@ -240,14 +240,14 @@ class ChannelConsumer(object):
         return data
 
 
-class ProtocolEncoder(BaseCodec):
+class Encoder(BaseCodec):
     """
     Interlaces all active channels to form one stream. At this point no
     attempt has been made to prioritise other channels over others.
     """
 
     def getJob(self):
-        return task.LoopingCall(self.encode)
+        return self.encode
 
     def getRelativeHeader(self, old, new):
         if old is None or new.relative is False:

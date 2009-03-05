@@ -77,6 +77,8 @@ class DummyChannelManager(object):
 
     implements(interfaces.IChannelManager)
 
+    frameSize = 128
+
     def __init__(self, channels=None):
         if channels is not None:
             self.channels = channels
@@ -98,10 +100,8 @@ class DummyChannel(object):
 
     implements(interfaces.IChannel)
 
-    frameSize = 128
-
     def __init__(self):
-        self.frameRemaining = self.frameSize
+        self.frameRemaining = DummyChannelManager.frameSize
         self.frames = 0
         self.buffer = ''
 
@@ -110,23 +110,23 @@ class DummyChannel(object):
 
         l = len(data)
 
-        if l < self.frameSize:
+        if l < DummyChannelManager.frameSize:
             self.frameRemaining -= l
 
             return
 
-        while l >= self.frameSize:
+        while l >= DummyChannelManager.frameSize:
             self.frames += 1
-            l -= self.frameSize
+            l -= DummyChannelManager.frameSize
 
-        if self.frameRemaining != self.frameSize and l + self.frameRemaining >= self.frameSize:
+        if self.frameRemaining != DummyChannelManager.frameSize and l + self.frameRemaining >= DummyChannelManager.frameSize:
             self.frames += 1
-            l -= self.frameSize
+            l -= DummyChannelManager.frameSize
 
         if l > 0:
             self.frameRemaining = l
         else:
-            self.frameRemaining = self.frameSize
+            self.frameRemaining = DummyChannelManager.frameSize
 
     def setHeader(self, header):
         if header.relative is False:
