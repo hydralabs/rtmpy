@@ -46,7 +46,7 @@ def decode_handshake(data):
     """
     Decodes a handshake packet into a C{tuple} (C{uptime}, C{ping}, C{data}).
 
-    @param data: C{str} or L{util.StringIO} instance
+    @param data: C{str} or L{util.BufferedByteStream} instance
     """
     created = False
 

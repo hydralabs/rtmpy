@@ -32,9 +32,10 @@ class EncodeError(Exception):
 class BaseCodec(object):
     """
     @ivar deferred: The deferred from the result of L{getJob}.
-    @type deferred: L{twisted.internet.defer.Deferred}
-    @ivar job: A L{task.LoopingCall} instance that is used to iteratively
-        call the method supplied by L{getJob}.
+    @type deferred: L{Deferred<twisted.internet.defer.Deferred>}
+    @ivar job: A L{task.LoopingCall<twisted.internet.task.LoopingCall>}
+        instance that is used to iteratively call the method supplied by
+        L{getJob}.
     """
 
     def __init__(self, manager):

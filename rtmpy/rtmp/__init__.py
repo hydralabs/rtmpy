@@ -149,10 +149,10 @@ class Channel(object):
     def write(self, data):
         """
         Called when a frame or partial frame is read from or written to the
-        RTMP byte stream. If an entire frame (or multiple frames) are
-        completed, then L{dispatchPacket} is called. Note that the number of
-        frames and the number of times that L{dispatchPacket} is called may
-        not necessarily be the same.
+        RTMP byte stream. If an entire frame (or multiple frames) completed,
+        then L{dispatchFrame} is called. Note that the number of frames and
+        the number of times that L{dispatchFrame} is called may not necessarily
+        be the same.
 
         @param data: A string of bytes.
         @type data: C{str}
@@ -247,6 +247,7 @@ class ChannelManager(object):
         @raise OverflowError: No free channelId available.
         """
 
+        # XXX: RTMPChannel doesn't exist?
         channel = self._channels[channel_id] = RTMPChannel(self, self.protocol, channel_id)
 
         if self.protocol.debug:

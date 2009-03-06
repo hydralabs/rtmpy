@@ -157,8 +157,9 @@ class IApplication(Interface):
     def rejectConnection(client, reason):
         """
         Rejects the connection from the client, C{reason} being a
-        L{failure.Failure} object or a string. Once the client has been
-        rejected, the connection to the client must be closed.
+        L{failure.Failure<twisted.python.failure.Failure>} object or a string.
+        Once the client has been rejected, the connection to the client must be
+        closed.
         """
 
     def acceptConnection(client):

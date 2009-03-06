@@ -177,8 +177,6 @@ def decodeHeader(stream):
 
     @param stream: The byte stream to read the header from.
     @type stream: C{rtmpy.util.BufferedByteStream}
-    @param headerLength: The length of the header.
-    @type headerLength: C{int}
     @return: The read header from the stream.
     @rtype: L{rtmp.Header}
     """
