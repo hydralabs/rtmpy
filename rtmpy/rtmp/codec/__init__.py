@@ -275,7 +275,7 @@ class ChannelContext(object):
 
         try:
             data = self.buffer.read(length)
-        except EOFError:
+        except (EOFError, IOError):
             self.buffer.seek(pos)
             data = None
 

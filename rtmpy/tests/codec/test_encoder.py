@@ -75,6 +75,48 @@ class ClassContextTestCase(BaseEncoderTestCase):
         self.assertTrue(h.relative)
 
 
+class GetDataTestCase(BaseEncoderTestCase):
+    """
+    Tests for L{codec.ChannelContext.getData}
+    """
+
+    def setUp(self):
+        BaseEncoderTestCase.setUp(self)
+
+        self.channel = DummyChannel()
+        self.context = codec.ChannelContext(self.channel, self.encoder)
+        self.context.active = True
+        self.encoder.channelContext = {self.channel: self.context}
+        self.buffer = self.context.buffer
+
+        self.encoder.activeChannels = [self.channel]
+
+    def test_empty(self):
+        self.assertEquals(self.buffer.getvalue(), '')
+        self.assertEquals(self.context.getData(1), None)
+        self.assertFalse(self.context.active)
+        self.assertEquals(self.encoder.activeChannels, [])
+
+    def test_read(self):
+        self.buffer.write('foobar')
+        self.buffer.seek(0)
+
+        self.assertEquals(self.context.getData(1), 'f')
+        self.assertEquals(self.buffer.getvalue(), 'oobar')
+        self.assertTrue(self.context.active)
+        self.assertEquals(self.encoder.activeChannels, [self.channel])
+
+    def test_under(self):
+        self.buffer.write('foobar')
+        self.buffer.seek(2)
+
+        self.assertEquals(self.context.getData(10), None)
+        self.assertEquals(self.buffer.getvalue(), 'foobar')
+        self.assertFalse(self.context.active)
+        self.assertEquals(self.encoder.activeChannels, [])
+        self.assertEquals(self.buffer.tell(), 2)
+
+
 class EncoderClassTestCase(BaseEncoderTestCase):
     """
     Tests for L{codec.Encoder}
