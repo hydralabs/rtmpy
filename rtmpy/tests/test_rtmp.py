@@ -1,5 +1,5 @@
-# Copyright (c) 2007-2008 The RTMPy Project.
-# See LICENSE.txt for details.
+# Copyright (c) 2007-2009 The RTMPy Project.
+# See LICENSE for details.
 
 """
 Tests for L{rtmpy.rtmp}

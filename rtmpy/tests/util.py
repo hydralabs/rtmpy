@@ -1,5 +1,5 @@
-# Copyright (c) 2007-2008 The RTMPy Project.
-# See LICENSE.txt for details.
+# Copyright (c) 2007-2009 The RTMPy Project.
+# See LICENSE for details.
 
 """
 Utility classes for testing.
@@ -156,7 +156,7 @@ class DummyChannel(object):
 
 class DummyHeader(object):
     """
-    A dumb object that implements L{header.IHeader}
+    A dumb object that implements L{header.IHeader}.
     """
 
     implements(interfaces.IHeader)
