@@ -87,54 +87,6 @@ class DecoderClassTestCase(BaseDecoderTestCase):
 
         return self.decoder.start().addCallback(cb)
 
-    def test_getBytesAvailableForChannel(self):
-        c = DummyChannel()
-        c.setHeader(DummyHeader(bodyLength=1000, relative=False))
-
-        self.assertEquals(self.buffer.remaining(), 0)
-        self.assertEquals(c.bodyRemaining, 1000)
-        self.assertEquals(self.decoder.getBytesAvailableForChannel(c), 0)
-
-        self.buffer.write(' ' * 10)
-        self.buffer.seek(0)
-        c.write(' ' * 10)
-
-        self.assertEquals(self.buffer.remaining(), 10)
-        self.assertEquals(c.bodyRemaining, 990)
-
-        self.assertEquals(self.decoder.getBytesAvailableForChannel(c), 10)
-
-        self.buffer.write(' ' * (DummyChannelManager.frameSize - 1))
-        self.buffer.seek(0)
-        c.write(' ' * (DummyChannelManager.frameSize - 11))
-
-        self.assertEquals(self.buffer.remaining(), 127)
-        self.assertEquals(c.bodyRemaining, 873)
-
-        self.assertEquals(self.decoder.getBytesAvailableForChannel(c), 1)
-
-        self.buffer.write(' ' * DummyChannelManager.frameSize)
-        self.buffer.seek(0)
-        c.write(' ')
-
-        self.assertEquals(self.buffer.remaining(), 128)
-        self.assertEquals(c.bodyRemaining, 872)
-
-        self.assertEquals(self.decoder.getBytesAvailableForChannel(c), 0)
-
-        c = DummyChannel()
-        c.setHeader(DummyHeader(bodyLength=1000, relative=False))
-        c.buffer = ' ' * 999
-
-        self.buffer.truncate()
-        self.buffer.write('a' * 10)
-        self.buffer.seek(0)
-
-        self.assertEquals(self.buffer.remaining(), 10)
-        self.assertEquals(c.bodyRemaining, 1)
-
-        self.assertEquals(self.decoder.getBytesAvailableForChannel(c), 1)
-
     def test_noop(self):
         """
         If the decoder can't continue then the buffer should be left untouched
@@ -156,6 +108,72 @@ class DecoderClassTestCase(BaseDecoderTestCase):
         self.assertEquals(self.buffer.getvalue(), 'foo')
         self.assertEquals(self.decoder.currentChannel, None)
         self.assertFalse(job.running)
+
+
+class GetBytesAvailableForChannelTestCase(BaseDecoderTestCase):
+    """
+    Tests for L{codec.Decoder.getBytesAvailableForChannel}.
+    """
+
+    def setUp(self):
+        BaseDecoderTestCase.setUp(self)
+
+        self.channel = DummyChannel()
+        self.channel.setHeader(DummyHeader(bodyLength=1000, relative=False))
+
+    def gba(self):
+        return self.decoder.getBytesAvailableForChannel(self.channel)
+
+    def test_noop(self):
+        self.assertEquals(self.buffer.remaining(), 0)
+        self.assertEquals(self.channel.bodyRemaining, 1000)
+        self.assertEquals(self.gba(), 0)
+
+    def test_partialBodyPartialFrame(self):
+        self.buffer.write(' ' * 10)
+        self.buffer.seek(0)
+        self.channel.write(' ' * 10)
+
+        self.assertEquals(self.buffer.remaining(), 10)
+        self.assertEquals(DummyChannelManager.frameSize, 128)
+        self.assertEquals(self.channel.bodyRemaining, 990)
+
+        self.assertEquals(self.gba(), 10)
+
+    def test_partialBodyNearlyFullFrame(self):
+        self.buffer.write(' ' * (DummyChannelManager.frameSize - 1))
+        self.buffer.seek(0)
+        self.channel.write(' ' * (DummyChannelManager.frameSize - 11))
+
+        self.assertEquals(self.buffer.remaining(), 127)
+        self.assertEquals(DummyChannelManager.frameSize, 128)
+        self.assertEquals(self.channel.bodyRemaining, 883)
+
+        self.assertEquals(self.gba(), 127)
+
+    def test_partialBodyFullFrame(self):
+        self.buffer.write(' ' * DummyChannelManager.frameSize)
+        self.buffer.seek(0)
+        self.channel.write(' ')
+
+        self.assertEquals(self.buffer.remaining(), 128)
+        self.assertEquals(DummyChannelManager.frameSize, 128)
+        self.assertEquals(self.channel.bodyRemaining, 999)
+
+        self.assertEquals(self.gba(), 128)
+
+    def test_nearlyFullBodyPartialFrame(self):
+        self.channel.buffer = ' ' * 999
+
+        self.buffer.truncate()
+        self.buffer.write('a' * 10)
+        self.buffer.seek(0)
+
+        self.assertEquals(self.buffer.remaining(), 10)
+        self.assertEquals(DummyChannelManager.frameSize, 128)
+        self.assertEquals(self.channel.bodyRemaining, 1)
+
+        self.assertEquals(self.gba(), 1)
 
 
 class DecodingTestCase(BaseDecoderTestCase):
