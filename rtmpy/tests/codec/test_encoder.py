@@ -49,7 +49,9 @@ class ClassContextTestCase(BaseEncoderTestCase):
     def test_write(self):
         self.assertFalse(self.context.active)
         self.assertEquals(self.buffer.tell(), 0)
-        self.assertEquals(self.encoder.activeChannels, set([]))
+
+        self.encoder.activeChannels = set([self.channel])
+        self.encoder.channelContext = {self.channel: self.context}
 
         self.context.write('hello')
         self.assertTrue(self.context.active)
@@ -117,10 +119,61 @@ class GetDataTestCase(BaseEncoderTestCase):
         self.assertEquals(self.buffer.tell(), 2)
 
 
-class EncoderClassTestCase(BaseEncoderTestCase):
+class EncoderTestCase(BaseEncoderTestCase):
     """
     Tests for L{codec.Encoder}
     """
 
+    def test_init(self):
+        self.assertEquals(self.encoder.channelContext, {})
+        self.assertEquals(self.encoder.activeChannels, set())
+        self.assertEquals(self.encoder.currentContext, None)
+
     def test_job(self):
         self.assertEquals(self.encoder.getJob(), self.encoder.encode)
+
+    def test_registerConsumer(self):
+        consumer = object()
+
+        self.encoder.registerConsumer(consumer)
+        self.assertIdentical(consumer, self.encoder.consumer)
+
+        otherConsumer = object()
+
+        self.encoder.registerConsumer(otherConsumer)
+        self.assertIdentical(otherConsumer, self.encoder.consumer)
+
+    def test_activateChannel(self):
+        channel = DummyChannel()
+
+        self.assertFalse(channel in self.encoder.channelContext.keys())
+        self.assertFalse(channel in self.encoder.activeChannels)
+
+        e = self.assertRaises(RuntimeError, self.encoder.activateChannel, channel)
+        self.assertEquals(str(e), 'Attempted to activate a non-existant channel')
+
+        self.encoder.channelContext = {channel: 'foo'}
+        self.assertFalse(channel in self.encoder.activeChannels)
+
+        self.encoder.activateChannel(channel)
+        self.assertTrue(channel in self.encoder.activeChannels)
+
+    def test_deactivateChannel(self):
+        channel = DummyChannel()
+
+        self.assertFalse(channel in self.encoder.channelContext.keys())
+        self.assertFalse(channel in self.encoder.activeChannels)
+
+        e = self.assertRaises(RuntimeError, self.encoder.deactivateChannel, channel)
+        self.assertEquals(str(e), 'Attempted to deactivate a non-existant channel')
+
+        context = codec.ChannelContext(channel, self.encoder)
+
+        self.encoder.channelContext[channel] = context
+        self.encoder.activeChannels.update([channel])
+
+        self.assertTrue(channel in self.encoder.channelContext.keys())
+        self.assertTrue(channel in self.encoder.activeChannels)
+
+        self.encoder.deactivateChannel(channel)
+        self.assertFalse(channel in self.encoder.activeChannels)

@@ -316,10 +316,13 @@ class Encoder(BaseCodec):
     @type currentContext: L{ChannelContext}
     """
 
-    channelContext = {}
-    activeChannels = set()
-    currentContext = None
-    consumer = None
+    def __init__(self, manager):
+        BaseCodec.__init__(self, manager)
+
+        self.channelContext = {}
+        self.activeChannels = set()
+        self.currentContext = None
+        self.consumer = None
 
     def getJob(self):
         return self.encode
@@ -330,11 +333,18 @@ class Encoder(BaseCodec):
     def activateChannel(self, channel):
         """
         """
+        if not channel in self.channelContext.keys():
+            raise RuntimeError('Attempted to activate a non-existant channel')
+
         self.activeChannels.update([channel])
 
     def deactivateChannel(self, channel):
         """
         """
+        if not channel in self.channelContext.keys():
+            raise RuntimeError('Attempted to deactivate a non-existant ' + \
+                'channel')
+
         self.activeChannels.remove(channel)
 
     def getNextChannel(self):
