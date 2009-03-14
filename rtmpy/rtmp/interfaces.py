@@ -34,6 +34,7 @@ class IHeader(Interface):
     streamId = Attribute(
         "An C{int} representing the linked stream.")
 
+
 class IChannel(Interface):
     """
     An RTMP channel. A channel acts as an intermediary between two endpoints, 
@@ -80,9 +81,11 @@ class IChannel(Interface):
         """
         """
 
+
 class IStream(Interface):
     """
     """
+
 
 class IChannelManager(Interface):
     """
@@ -136,4 +139,34 @@ class IChannelManager(Interface):
         """
         A frame of data has been received from the channel. This is only
         called by non-producing channels.
+        """
+
+
+class IChannelScheduler(Interface):
+    """
+    A channel scheduler is meant to iteratively supply 'active' channels via
+    the L{getNextChannel} method.
+    """
+
+    def activateChannel(channel):
+        """
+        Activates a channel for scheduling.
+
+        @param channel: The channel to activate.
+        @type channel: L{IChannel}
+        """
+
+    def deactivateChannel(channel):
+        """
+        Deactivates a channel for scheduling.
+
+        @param channel: The channel to deactivate.
+        @type channel: L{IChannel}
+        """
+
+    def getNextChannel():
+        """
+        Returns the next active channel. The definition of 'next' is up to the
+        implementing class. If there are no more active channels then C{None}
+        should be returned.
         """
