@@ -247,6 +247,7 @@ class ChannelContext(object):
     @type encoder: L{Encoder}
     @ivar active: Whether this channel is actively producing data.
     @type active: C{bool}
+    @ivar bytes: Number of frame bytes fetched by 
     """
 
     def __init__(self, channel, encoder):
@@ -256,6 +257,7 @@ class ChannelContext(object):
         self.buffer = util.BufferedByteStream()
         self.active = False
         self.header = None
+        self.bytes = 0
 
         self.channel.registerConsumer(self)
 
@@ -269,28 +271,35 @@ class ChannelContext(object):
             self.encoder.activateChannel(self.channel)
             self.active = True
 
-    def getData(self, length):
+    def getFrame(self):
         """
         Called by the encoder to return any data that may be available in the
-        buffer. If C{length} bytes cannot be retrieved then C{None} is
-        returned. Once the data has been read from the stream, it is consumed.
+        C{buffer}. If a frames worth of data cannot be satisified then C{None}
+        is returned. If a frame is ready then the buffer is updated
+        accordingly and the bytes are returned.
 
-        @param length: The length of data requested.
-        @type length: C{int} or C{None}
+        @return: The frame content bytes
+        @rtype: C{str}
         """
-        pos = self.buffer.tell()
+        length = self.getMinimumFrameSize()
 
-        try:
-            data = self.buffer.read(length)
-        except (EOFError, IOError):
-            self.buffer.seek(pos)
+        if length == 0:
             data = None
+        else:
+            self.buffer.seek(0)
+
+            try:
+                data = self.buffer.read(length)
+            except (EOFError, IOError):
+                data = None
 
         if len(self.buffer) == 0 or data is None:
             self.encoder.deactivateChannel(self.channel)
             self.active = False
         else:
             self.buffer.consume()
+
+        self.bytes += length
 
         return data
 
@@ -307,6 +316,24 @@ class ChannelContext(object):
 
         return header.diffHeaders(self.header, self.channel.getHeader())
 
+    def getMinimumFrameSize(self):
+        """
+        Returns the minimum number of bytes required to complete a frame.
+        @rtype: C{int}
+        """
+        bytesLeft = self.channel.bytes - self.bytes
+        frameSize = self.encoder.manager.frameSize
+
+        available = min(bytesLeft, frameSize)
+
+        if available < 0:
+            available = 0
+
+        return available
+
+    def resetHeader(self):
+        self.header = self.channel.getHeader()
+
 
 class Encoder(BaseCodec):
     """
@@ -315,8 +342,6 @@ class Encoder(BaseCodec):
 
     @ivar channelContext: A C{dict} of {channel: L{ChannelContext}} objects.
     @type channelContext: C{dict}
-    @ivar currentContext: A reference to the current context being encoded.
-    @type currentContext: L{ChannelContext}
     @ivar scheduler: An RTMP channel scheduler. This composition allows
         different scheduler strategies without 'infecting' this class.
     @type scheduler: L{interfaces.IChannelScheduler}
@@ -326,7 +351,6 @@ class Encoder(BaseCodec):
         BaseCodec.__init__(self, manager)
 
         self.channelContext = {}
-        self.currentContext = None
         self.consumer = None
         self.scheduler = None
 
@@ -363,7 +387,9 @@ class Encoder(BaseCodec):
         @raise 
         """
         if not channel in self.channelContext:
-            raise RuntimeError('Attempted to activate a non-existant channel')
+            self.channelContext[channel] = ChannelContext(channel, self)
+
+        self.channelContext[channel].active = True
 
         self.scheduler.activateChannel(channel)
 
@@ -374,46 +400,32 @@ class Encoder(BaseCodec):
             raise RuntimeError('Attempted to deactivate a non-existant ' + \
                 'channel')
 
+        self.channelContext[channel].active = False
         self.scheduler.deactivateChannel(channel)
 
-    def getMinimumFrameSize(self, channel):
+    def writeFrame(self, context):
         """
-        Returns the minimum number of bytes required to complete a frame.
+        Writes an RTMP header and body to L{buffer}, if there is enough data
+        available.
 
-        @param channel: The channel to check.
-        @type channel: L{interfaces.IChannel}
-        @rtype: C{int}
+        @param context: The channel context from which to write a frame.
+        @type context: L{ChannelContext}
         """
-        available = min(channel.bodyRemaining, self.manager.frameSize)
-
-        if available < 1:
-            raise RuntimeError('%d bytes (< 1) are available for frame ' \
-                '(channel:%d, manager:%d)' % (
-                    available, channel.bodyRemaining, self.manager.frameSize))
-
-        return available
-
-    def writeFrame(self):
-        """
-        Writes an RTMP header and body to L{buffer}, based on the current
-        context - if there is enough data available.
-        """
-        if self.currentContext is None:
+        if not context.active:
             return
 
-        context = self.currentContext
         channel = context.channel
+        bytes = context.getFrame()
 
-        data = context.getData(self.getMinimumFrameSize(channel))
-
-        if data is None:
+        if bytes is None:
             return
 
-        relativeHeader = context.getRelativeHeader()
-        context.header = channel.getHeader()
+        header.encodeHeader(self.buffer, context.getRelativeHeader())
+        self.buffer.write(bytes)
 
-        header.encodeHeader(self.buffer, relativeHeader)
-        self.buffer.write(data)
+        # reset the context to the latest absolute header from the channel
+        # so that any changes that occur next time get picked up
+        context.resetHeader()
 
     def encode(self):
         """
@@ -428,8 +440,7 @@ class Encoder(BaseCodec):
 
             return
 
-        self.currentContext = self.channelContext[channel]
-        self.writeFrame()
+        self.writeFrame(self.channelContext[channel])
 
         if len(self.buffer) > 0:
             self.consumer.write(self.buffer.getvalue())

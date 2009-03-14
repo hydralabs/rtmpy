@@ -43,13 +43,18 @@ class Channel(object):
     def __init__(self):
         self.frameRemaining = ChannelManager.frameSize
         self.frames = 0
+        self.bytes = 0
         self.buffer = ''
         self.consumer = None
 
     def write(self, data):
-        self.buffer += str(data)
-
         l = len(data)
+        self.bytes += l
+
+        if self.consumer:
+            self.consumer.write(data)
+        else:
+            self.buffer += str(data)
 
         if l < ChannelManager.frameSize:
             self.frameRemaining -= l
@@ -119,17 +124,31 @@ class LoopingScheduler(object):
     implements(interfaces.IChannelScheduler)
 
     def __init__(self):
-        self.activeChannels = {}
+        self.activeChannels = []
+        self.index = None
 
     def activateChannel(self, channel):
         """
         """
-        self.activeChannels[channel.getHeader().channelId] = channel
+        self.activeChannels.append(channel)
 
     def deactivateChannel(self, channel):
         """
         """
-        try:
-            del self.activeChannels[channel.getHeader().channelId]
-        except KeyError:
-            pass
+        self.activeChannels.remove(channel)
+
+    def getNextChannel(self):
+        """
+        """
+        if len(self.activeChannels) == 0:
+            return None
+
+        if self.index is None:
+            self.index = 0
+        else:
+            self.index += 1
+
+        if self.index >= len(self.activeChannels):
+            self.index = 0
+
+        return self.activeChannels[self.index]
