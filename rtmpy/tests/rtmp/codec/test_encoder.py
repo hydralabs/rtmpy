@@ -9,7 +9,7 @@ from twisted.trial import unittest
 
 from rtmpy.rtmp import codec, interfaces
 from rtmpy import util
-from rtmpy.tests.util import DummyChannelManager, DummyChannel, DummyHeader
+from rtmpy.tests.rtmp import mocks
 
 
 class BaseEncoderTestCase(unittest.TestCase):
@@ -17,7 +17,7 @@ class BaseEncoderTestCase(unittest.TestCase):
     """
 
     def setUp(self):
-        self.manager = DummyChannelManager()
+        self.manager = mocks.ChannelManager()
         self.encoder = codec.Encoder(self.manager)
         self.buffer = util.BufferedByteStream()
 
@@ -32,7 +32,7 @@ class ClassContextTestCase(BaseEncoderTestCase):
     def setUp(self):
         BaseEncoderTestCase.setUp(self)
 
-        self.channel = DummyChannel()
+        self.channel = mocks.Channel()
         self.context = codec.ChannelContext(self.channel, self.encoder)
         self.buffer = self.context.buffer
 
@@ -61,14 +61,14 @@ class ClassContextTestCase(BaseEncoderTestCase):
         self.assertEquals(self.encoder.activeChannels, set([self.channel]))
 
     def test_getRelativeHeader(self):
-        h = DummyHeader(relative=False, channelId=3, bodyLength=50,
+        h = mocks.Header(relative=False, channelId=3, bodyLength=50,
             timestamp=10)
         self.channel.setHeader(h)
 
         self.assertIdentical(self.context.getRelativeHeader(), h)
         self.assertIdentical(self.context.header, None)
 
-        self.context.header = DummyHeader(relative=False, channelId=3,
+        self.context.header = mocks.Header(relative=False, channelId=3,
             bodyLength=10, timestamp=2)
 
         h = self.context.getRelativeHeader()
@@ -85,7 +85,7 @@ class GetDataTestCase(BaseEncoderTestCase):
     def setUp(self):
         BaseEncoderTestCase.setUp(self)
 
-        self.channel = DummyChannel()
+        self.channel = mocks.Channel()
         self.context = codec.ChannelContext(self.channel, self.encoder)
         self.context.active = True
         self.encoder.channelContext = {self.channel: self.context}
@@ -144,7 +144,7 @@ class EncoderTestCase(BaseEncoderTestCase):
         self.assertIdentical(otherConsumer, self.encoder.consumer)
 
     def test_activateChannel(self):
-        channel = DummyChannel()
+        channel = mocks.Channel()
 
         self.assertFalse(channel in self.encoder.channelContext.keys())
         self.assertFalse(channel in self.encoder.activeChannels)
@@ -159,7 +159,7 @@ class EncoderTestCase(BaseEncoderTestCase):
         self.assertTrue(channel in self.encoder.activeChannels)
 
     def test_deactivateChannel(self):
-        channel = DummyChannel()
+        channel = mocks.Channel()
 
         self.assertFalse(channel in self.encoder.channelContext.keys())
         self.assertFalse(channel in self.encoder.activeChannels)

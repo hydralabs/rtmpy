@@ -9,7 +9,7 @@ from twisted.trial import unittest
 
 from rtmpy.rtmp.codec import header
 from rtmpy import util
-from rtmpy.tests.util import DummyHeader
+from rtmpy.tests.rtmp import mocks
 
 
 class DecodeHeaderByteTestCase(unittest.TestCase):
@@ -78,7 +78,7 @@ class GetHeaderSizeIndexTestCase(unittest.TestCase):
     def test_types(self):
         self.assertRaises(TypeError, header.getHeaderSizeIndex, object())
 
-        h = DummyHeader()
+        h = mocks.Header()
         self.assertTrue(header.IHeader.providedBy(h))
 
         try:
@@ -89,13 +89,13 @@ class GetHeaderSizeIndexTestCase(unittest.TestCase):
             pass
 
     def test_values(self):
-        h = DummyHeader()
+        h = mocks.Header()
         self.assertEquals(h.channelId, None)
 
         self.assertRaises(ValueError, header.getHeaderSizeIndex, h)
 
     def test_return(self):
-        h = DummyHeader(channelId=3)
+        h = mocks.Header(channelId=3)
 
         self.assertEquals(
             [h.timestamp, h.datatype, h.bodyLength, h.streamId],
@@ -115,7 +115,7 @@ class GetHeaderSizeIndexTestCase(unittest.TestCase):
         h.timestamp = None
         e = self.assertRaises(ValueError, header.getHeaderSizeIndex, h)
 
-        h = DummyHeader(channelId=23, streamId=234, bodyLength=1232,
+        h = mocks.Header(channelId=23, streamId=234, bodyLength=1232,
             datatype=2, timestamp=234234)
 
         self.assertEquals(header.getHeaderSizeIndex(h), 0)
@@ -141,7 +141,7 @@ class GetHeaderSizeTestCase(unittest.TestCase):
     def test_types(self):
         self.assertRaises(TypeError, header.getHeaderSize, object())
 
-        h = DummyHeader()
+        h = mocks.Header()
         self.assertTrue(header.IHeader.providedBy(h))
 
         try:
@@ -152,7 +152,7 @@ class GetHeaderSizeTestCase(unittest.TestCase):
             pass
 
     def test_return(self):
-        h = DummyHeader(channelId=3)
+        h = mocks.Header(channelId=3)
 
         self.assertEquals(
             [h.timestamp, h.datatype, h.bodyLength, h.streamId],
@@ -177,7 +177,7 @@ class EncodeHeaderTestCase(unittest.TestCase):
         self.stream = util.BufferedByteStream()
 
     def test_types(self):
-        h = DummyHeader()
+        h = mocks.Header()
         self.assertTrue(header.IHeader.providedBy(h))
         self.assertRaises(TypeError, header.encodeHeader, object(), h)
         self.assertRaises(TypeError, header.encodeHeader, self.stream, object())
@@ -197,7 +197,7 @@ class EncodeHeaderTestCase(unittest.TestCase):
         return self.stream.getvalue()
 
     def test_encode(self):
-        h = DummyHeader(channelId=3)
+        h = mocks.Header(channelId=3)
 
         self.assertEquals(
             [h.timestamp, h.datatype, h.bodyLength, h.streamId],
@@ -304,11 +304,11 @@ class DiffHeadersTestCase(unittest.TestCase):
         Generates an absolute header and guarantees that the attributes will
         be the same on each call.
         """
-        return DummyHeader(relative=False, channelId=3, timestamp=1000,
+        return mocks.Header(relative=False, channelId=3, timestamp=1000,
             bodyLength=2000, datatype=3, streamId=243)
 
     def test_types(self):
-        h = DummyHeader()
+        h = mocks.Header()
 
         self.assertTrue(header.IHeader.providedBy(h))
         self.assertRaises(TypeError, header.diffHeaders, h, object())
@@ -322,9 +322,9 @@ class DiffHeadersTestCase(unittest.TestCase):
             pass
 
     def test_absolute(self):
-        h1 = DummyHeader(relative=None)
-        h2 = DummyHeader(relative=True)
-        h3 = DummyHeader(relative=False)
+        h1 = mocks.Header(relative=None)
+        h2 = mocks.Header(relative=True)
+        h3 = mocks.Header(relative=False)
 
         e = self.assertRaises(ValueError, header.diffHeaders, h1, h1)
         self.assertEquals(str(e),
@@ -343,8 +343,8 @@ class DiffHeadersTestCase(unittest.TestCase):
             'Received a non-absolute header for new (relative = True)')
 
     def test_sameChannel(self):
-        h1 = DummyHeader(relative=False, channelId=3)
-        h2 = DummyHeader(relative=False, channelId=42)
+        h1 = mocks.Header(relative=False, channelId=3)
+        h2 = mocks.Header(relative=False, channelId=42)
 
         e = self.assertRaises(ValueError, header.diffHeaders, h1, h2)
         self.assertEquals(str(e), 'The two headers are not for the same channel')
@@ -451,17 +451,17 @@ class MergeHeadersTestCase(unittest.TestCase):
     """
 
     def setUp(self):
-        self.absolute = DummyHeader(relative=False, channelId=3,
+        self.absolute = mocks.Header(relative=False, channelId=3,
             timestamp=1000, bodyLength=2000, datatype=3, streamId=243)
 
     def _generate(self):
         """
         Generates a relative header and with the same channelId on each call.
         """
-        return DummyHeader(relative=True, channelId=3)
+        return mocks.Header(relative=True, channelId=3)
 
     def test_types(self):
-        h = DummyHeader()
+        h = mocks.Header()
 
         self.assertTrue(header.IHeader.providedBy(h))
         self.assertRaises(TypeError, header.mergeHeaders, h, object())
@@ -475,9 +475,9 @@ class MergeHeadersTestCase(unittest.TestCase):
             pass
 
     def test_absolute(self):
-        h1 = DummyHeader(relative=None)
-        h2 = DummyHeader(relative=True)
-        h3 = DummyHeader(relative=False)
+        h1 = mocks.Header(relative=None)
+        h2 = mocks.Header(relative=True)
+        h3 = mocks.Header(relative=False)
 
         e = self.assertRaises(ValueError, header.mergeHeaders, h1, h1)
         self.assertEquals(str(e),
@@ -496,8 +496,8 @@ class MergeHeadersTestCase(unittest.TestCase):
             'Received a non-absolute header for old (relative = True)')
 
     def test_sameChannel(self):
-        h1 = DummyHeader(relative=False, channelId=3)
-        h2 = DummyHeader(relative=True, channelId=42)
+        h1 = mocks.Header(relative=False, channelId=3)
+        h2 = mocks.Header(relative=True, channelId=42)
 
         e = self.assertRaises(ValueError, header.mergeHeaders, h1, h2)
         self.assertEquals(str(e), 'The two headers are not for the same channel')

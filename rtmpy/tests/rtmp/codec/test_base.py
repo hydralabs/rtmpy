@@ -10,7 +10,7 @@ from twisted.trial import unittest
 
 from rtmpy.rtmp import codec, interfaces
 from rtmpy import util
-from rtmpy.tests.util import DummyChannelManager
+from rtmpy.tests.rtmp import mocks
 
 class BaseCodecTestCase(unittest.TestCase):
     """
@@ -29,7 +29,7 @@ class BaseCodecTestCase(unittest.TestCase):
         codec.BaseCodec.getJob = self._getJob
 
     def test_job(self):
-        d = DummyChannelManager()
+        d = mocks.ChannelManager()
         c = codec.BaseCodec(d)
 
         self.assertRaises(NotImplementedError, self._getJob, c)
@@ -42,7 +42,7 @@ class BaseCodecTestCase(unittest.TestCase):
 
         codec.BaseCodec.getJob = lambda self: obj
 
-        d = DummyChannelManager()
+        d = mocks.ChannelManager()
         self.assertTrue(interfaces.IChannelManager.providedBy(d))
         c = codec.BaseCodec(d)
 
@@ -52,7 +52,7 @@ class BaseCodecTestCase(unittest.TestCase):
         self.assertTrue(isinstance(c.job, task.LoopingCall))
 
     def test_destroy_not_running(self):
-        d = DummyChannelManager()
+        d = mocks.ChannelManager()
         c = codec.BaseCodec(d)
 
         self.assertFalse(c.job.running)
@@ -61,7 +61,7 @@ class BaseCodecTestCase(unittest.TestCase):
 
     def test_destroy_running(self):
         self.executed = False
-        d = DummyChannelManager()
+        d = mocks.ChannelManager()
         c = codec.BaseCodec(d)
 
         def cb(lc):
@@ -75,7 +75,7 @@ class BaseCodecTestCase(unittest.TestCase):
         self.assertTrue(self.executed)
 
     def test_start(self):
-        d = DummyChannelManager()
+        d = mocks.ChannelManager()
         c = codec.BaseCodec(d)
 
         job = c.job
@@ -94,7 +94,7 @@ class BaseCodecTestCase(unittest.TestCase):
         self.assertIdentical(c.deferred, x, y)
 
     def test_pause(self):
-        d = DummyChannelManager()
+        d = mocks.ChannelManager()
         c = codec.BaseCodec(d)
         job = c.job
         c.deferred = object()
