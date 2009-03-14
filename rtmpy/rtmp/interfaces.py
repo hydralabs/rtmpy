@@ -3,14 +3,11 @@
 
 """
 Interface documentation.
-
-@since: 0.1
 """
 
 from twisted.internet import interfaces
 from zope.interface import Interface, Attribute, implements
 
-# First the basic components of RTMP bytestreams.
 
 class IHeader(Interface):
     """

@@ -211,5 +211,32 @@ class EncoderTestCase(BaseEncoderTestCase):
         self.encoder.deactivateChannel(channel)
         self.assertFalse(channel in self.scheduler.activeChannels.values())
 
-    def test_writeFrame(self):
-        pass
+    def test_getMinimumFrameSize(self):
+        channel = self._generateChannel()
+        header = channel.getHeader()
+        header.bodyLength = 50
+        self.manager.frameSize = 128
+
+        self.assertTrue(header.bodyLength < self.manager.frameSize)
+        self.assertEquals(self.encoder.getMinimumFrameSize(channel), 50)
+
+        header.bodyLength = 500
+
+        self.assertTrue(header.bodyLength > self.manager.frameSize)
+        self.assertEquals(
+            self.encoder.getMinimumFrameSize(channel), self.manager.frameSize)
+
+        header.bodyLength = -10
+        e = self.assertRaises(
+            RuntimeError, self.encoder.getMinimumFrameSize, channel)
+
+        self.assertEquals(str(e), '-10 bytes (< 1) are available for frame ' \
+            '(channel:-10, manager:128)')
+
+        header.bodyLength = 3445
+        self.manager.frameSize = 0
+        e = self.assertRaises(
+            RuntimeError, self.encoder.getMinimumFrameSize, channel)
+
+        self.assertEquals(str(e), '0 bytes (< 1) are available for frame ' \
+            '(channel:3445, manager:0)')

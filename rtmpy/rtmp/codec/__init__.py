@@ -17,13 +17,19 @@ from rtmpy.rtmp import interfaces
 from rtmpy.rtmp.codec import header
 
 
-class DecodeError(Exception):
+class BaseError(Exception):
+    """
+    Base class for codec errors.
+    """
+
+
+class DecodeError(BaseError):
     """
     Raised if there is an error decoding an RTMP bytestream.
     """
 
 
-class EncodeError(Exception):
+class EncodeError(BaseError):
     """
     Raised if there is an error encoding an RTMP bytestream.
     """
@@ -345,13 +351,18 @@ class Encoder(BaseCodec):
 
     def registerConsumer(self, consumer):
         """
+        Registers a consumer that will be the recipient of the encoded rtmp
+        stream.
         """
         self.consumer = consumer
 
     def activateChannel(self, channel):
         """
+        Flags a channel as actively producing data.
+
+        @raise 
         """
-        if not channel in self.channelContext.keys():
+        if not channel in self.channelContext:
             raise RuntimeError('Attempted to activate a non-existant channel')
 
         self.scheduler.activateChannel(channel)
@@ -359,11 +370,28 @@ class Encoder(BaseCodec):
     def deactivateChannel(self, channel):
         """
         """
-        if not channel in self.channelContext.keys():
+        if not channel in self.channelContext:
             raise RuntimeError('Attempted to deactivate a non-existant ' + \
                 'channel')
 
         self.scheduler.deactivateChannel(channel)
+
+    def getMinimumFrameSize(self, channel):
+        """
+        Returns the minimum number of bytes required to complete a frame.
+
+        @param channel: The channel to check.
+        @type channel: L{interfaces.IChannel}
+        @rtype: C{int}
+        """
+        available = min(channel.bodyRemaining, self.manager.frameSize)
+
+        if available < 1:
+            raise RuntimeError('%d bytes (< 1) are available for frame ' \
+                '(channel:%d, manager:%d)' % (
+                    available, channel.bodyRemaining, self.manager.frameSize))
+
+        return available
 
     def writeFrame(self):
         """
@@ -376,18 +404,13 @@ class Encoder(BaseCodec):
         context = self.currentContext
         channel = context.channel
 
-        available = min(
-            channel.bodyRemaining,
-            self.manager.frameSize
-        )
-
-        data = context.getData(available)
+        data = context.getData(self.getMinimumFrameSize(channel))
 
         if data is None:
             return
 
         relativeHeader = context.getRelativeHeader()
-        context.header = context.channel.getHeader()
+        context.header = channel.getHeader()
 
         header.encodeHeader(self.buffer, relativeHeader)
         self.buffer.write(data)
