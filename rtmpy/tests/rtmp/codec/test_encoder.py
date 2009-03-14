@@ -14,15 +14,32 @@ from rtmpy.tests.rtmp import mocks
 
 class BaseEncoderTestCase(unittest.TestCase):
     """
+    Base functionality for other unit tests.
     """
 
     def setUp(self):
         self.manager = mocks.ChannelManager()
         self.encoder = codec.Encoder(self.manager)
+        self.scheduler = mocks.LoopingScheduler()
+
         self.buffer = util.BufferedByteStream()
 
+        self.encoder.registerScheduler(self.scheduler)
         self.encoder.registerConsumer(self.buffer)
 
+        self._channelId = 0
+
+    def _generateChannel(self):
+        """
+        Generates a unique channel.
+        """
+        h = mocks.Header(channelId=self._channelId, relative=False)
+        self._channelId += 1
+
+        c = mocks.Channel()
+        c.setHeader(h)
+
+        return c
 
 class ClassContextTestCase(BaseEncoderTestCase):
     """
@@ -32,7 +49,7 @@ class ClassContextTestCase(BaseEncoderTestCase):
     def setUp(self):
         BaseEncoderTestCase.setUp(self)
 
-        self.channel = mocks.Channel()
+        self.channel = self._generateChannel()
         self.context = codec.ChannelContext(self.channel, self.encoder)
         self.buffer = self.context.buffer
 
@@ -85,19 +102,19 @@ class GetDataTestCase(BaseEncoderTestCase):
     def setUp(self):
         BaseEncoderTestCase.setUp(self)
 
-        self.channel = mocks.Channel()
+        self.channel = self._generateChannel()
         self.context = codec.ChannelContext(self.channel, self.encoder)
         self.context.active = True
         self.encoder.channelContext = {self.channel: self.context}
         self.buffer = self.context.buffer
 
-        self.encoder.activeChannels = [self.channel]
+        self.scheduler.activateChannel(self.channel)
 
     def test_empty(self):
         self.assertEquals(self.buffer.getvalue(), '')
         self.assertEquals(self.context.getData(1), None)
         self.assertFalse(self.context.active)
-        self.assertEquals(self.encoder.activeChannels, [])
+        self.assertEquals(self.scheduler.activeChannels, {})
 
     def test_read(self):
         self.buffer.write('foobar')
@@ -106,7 +123,7 @@ class GetDataTestCase(BaseEncoderTestCase):
         self.assertEquals(self.context.getData(1), 'f')
         self.assertEquals(self.buffer.getvalue(), 'oobar')
         self.assertTrue(self.context.active)
-        self.assertEquals(self.encoder.activeChannels, [self.channel])
+        self.assertEquals(self.scheduler.activeChannels, {0: self.channel})
 
     def test_under(self):
         self.buffer.write('foobar')
@@ -115,7 +132,7 @@ class GetDataTestCase(BaseEncoderTestCase):
         self.assertEquals(self.context.getData(10), None)
         self.assertEquals(self.buffer.getvalue(), 'foobar')
         self.assertFalse(self.context.active)
-        self.assertEquals(self.encoder.activeChannels, [])
+        self.assertEquals(self.scheduler.activeChannels, {})
         self.assertEquals(self.buffer.tell(), 2)
 
 
@@ -125,12 +142,29 @@ class EncoderTestCase(BaseEncoderTestCase):
     """
 
     def test_init(self):
-        self.assertEquals(self.encoder.channelContext, {})
-        self.assertEquals(self.encoder.activeChannels, set())
-        self.assertEquals(self.encoder.currentContext, None)
+        e = codec.Encoder(self.manager)
+
+        self.assertEquals(e.channelContext, {})
+        self.assertEquals(e.currentContext, None)
+        self.assertEquals(e.consumer, None)
+        self.assertEquals(e.scheduler, None)
 
     def test_job(self):
         self.assertEquals(self.encoder.getJob(), self.encoder.encode)
+
+    def test_registerScheduler(self):
+        e = codec.Encoder(self.manager)
+
+        s = mocks.LoopingScheduler()
+
+        self.assertTrue(interfaces.IChannelScheduler.providedBy(s))
+        self.assertEquals(e.scheduler, None)
+
+        r = self.assertRaises(TypeError, e.registerScheduler, object())
+        self.assertEquals(str(r), 'Expected IChannelScheduler interface')
+
+        e.registerScheduler(s)
+        self.assertIdentical(e.scheduler, s)
 
     def test_registerConsumer(self):
         consumer = object()
@@ -144,25 +178,25 @@ class EncoderTestCase(BaseEncoderTestCase):
         self.assertIdentical(otherConsumer, self.encoder.consumer)
 
     def test_activateChannel(self):
-        channel = mocks.Channel()
+        channel = self._generateChannel()
 
         self.assertFalse(channel in self.encoder.channelContext.keys())
-        self.assertFalse(channel in self.encoder.activeChannels)
+        self.assertFalse(channel in self.scheduler.activeChannels)
 
         e = self.assertRaises(RuntimeError, self.encoder.activateChannel, channel)
         self.assertEquals(str(e), 'Attempted to activate a non-existant channel')
 
         self.encoder.channelContext = {channel: 'foo'}
-        self.assertFalse(channel in self.encoder.activeChannels)
+        self.assertFalse(channel in self.scheduler.activeChannels)
 
         self.encoder.activateChannel(channel)
-        self.assertTrue(channel in self.encoder.activeChannels)
+        self.assertTrue(channel in self.scheduler.activeChannels.values())
 
     def test_deactivateChannel(self):
-        channel = mocks.Channel()
+        channel = self._generateChannel()
 
         self.assertFalse(channel in self.encoder.channelContext.keys())
-        self.assertFalse(channel in self.encoder.activeChannels)
+        self.assertFalse(channel in self.scheduler.activeChannels)
 
         e = self.assertRaises(RuntimeError, self.encoder.deactivateChannel, channel)
         self.assertEquals(str(e), 'Attempted to deactivate a non-existant channel')
@@ -170,10 +204,12 @@ class EncoderTestCase(BaseEncoderTestCase):
         context = codec.ChannelContext(channel, self.encoder)
 
         self.encoder.channelContext[channel] = context
-        self.encoder.activeChannels.update([channel])
+        self.encoder.activateChannel(channel)
 
         self.assertTrue(channel in self.encoder.channelContext.keys())
-        self.assertTrue(channel in self.encoder.activeChannels)
 
         self.encoder.deactivateChannel(channel)
-        self.assertFalse(channel in self.encoder.activeChannels)
+        self.assertFalse(channel in self.scheduler.activeChannels.values())
+
+    def test_writeFrame(self):
+        pass

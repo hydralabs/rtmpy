@@ -109,3 +109,27 @@ class Header(object):
         self.datatype = kwargs.get('datatype', None)
         self.bodyLength = kwargs.get('bodyLength', None)
         self.streamId = kwargs.get('streamId', None)
+
+
+class LoopingScheduler(object):
+    """
+    A mock object that fake-implements L{interfaces.IChannelScheduler}.
+    """
+
+    implements(interfaces.IChannelScheduler)
+
+    def __init__(self):
+        self.activeChannels = {}
+
+    def activateChannel(self, channel):
+        """
+        """
+        self.activeChannels[channel.getHeader().channelId] = channel
+
+    def deactivateChannel(self, channel):
+        """
+        """
+        try:
+            del self.activeChannels[channel.getHeader().channelId]
+        except KeyError:
+            pass

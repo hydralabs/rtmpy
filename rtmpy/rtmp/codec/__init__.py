@@ -270,7 +270,7 @@ class ChannelContext(object):
         returned. Once the data has been read from the stream, it is consumed.
 
         @param length: The length of data requested.
-        @type length: C{int}
+        @type length: C{int} or C{None}
         """
         pos = self.buffer.tell()
 
@@ -313,7 +313,7 @@ class Encoder(BaseCodec):
     @type currentContext: L{ChannelContext}
     @ivar scheduler: An RTMP channel scheduler. This composition allows
         different scheduler strategies without 'infecting' this class.
-    @type scheduler: 
+    @type scheduler: L{interfaces.IChannelScheduler}
     """
 
     def __init__(self, manager):
@@ -326,8 +326,15 @@ class Encoder(BaseCodec):
 
     def registerScheduler(self, scheduler):
         """
-        Registers a RTMP channel scheduler for the encoder to use.
+        Registers a RTMP channel scheduler for the encoder to use when
+        determining which channel to encode next.
+
+        @param scheduler: The scheduler to register.
+        @type scheduler: L{IChannelScheduler}
         """
+        if not interfaces.IChannelScheduler.providedBy(scheduler):
+            raise TypeError('Expected IChannelScheduler interface')
+
         self.scheduler = scheduler
 
     def getJob(self):
@@ -360,8 +367,12 @@ class Encoder(BaseCodec):
 
     def writeFrame(self):
         """
-        Writes an RTMP header and body to 
+        Writes an RTMP header and body to L{buffer}, based on the current
+        context - if there is enough data available.
         """
+        if self.currentContext is None:
+            return
+
         context = self.currentContext
         channel = context.channel
 
