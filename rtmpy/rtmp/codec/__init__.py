@@ -165,6 +165,8 @@ class Decoder(BaseCodec):
             # header and frame body will be next in the stream
             self.currentChannel = None
         elif self.currentChannel.bodyRemaining == 0:
+            # the channel is now complete
+            self.manager.channelComplete(self.currentChannel)
             self.currentChannel = None
 
     def canContinue(self, minBytes=1):
@@ -195,6 +197,7 @@ class Decoder(BaseCodec):
             return
 
         h = self.readHeader()
+        print h.__dict__
 
         if h is None:
             # not enough bytes left in the stream to continue decoding, we
@@ -213,15 +216,16 @@ class Decoder(BaseCodec):
         Attempt to decode the buffer. If a successful frame was decoded from
         the stream then the decoded bytes are removed.
         """
+        # start from the beginning of the buffer
+        self.buffer.seek(0)
+
         if not self.canContinue():
             self.pause()
 
             return
 
-        # start from the beginning of the buffer
-        self.buffer.seek(0)
-
         self._decode()
+
         # delete the bytes that have already been decoded
         self.buffer.consume()
 

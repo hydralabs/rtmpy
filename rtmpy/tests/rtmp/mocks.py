@@ -32,6 +32,8 @@ class ChannelManager(object):
 
         return self.channels[id]
 
+    def channelComplete(self, channel):
+        channel.reset()
 
 class Channel(object):
     """
@@ -41,6 +43,9 @@ class Channel(object):
     implements(interfaces.IChannel)
 
     def __init__(self):
+        self.reset()
+
+    def reset(self):
         self.frameRemaining = ChannelManager.frameSize
         self.frames = 0
         self.bytes = 0

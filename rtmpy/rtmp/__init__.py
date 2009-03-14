@@ -126,10 +126,18 @@ class Channel(object):
         return self.header
 
     def setHeader(self, header):
-        assert IHeader.providedBy(header), "Expected header to implement IHeader"
+        assert interfaces.IHeader.providedBy(header), "Expected header to implement IHeader"
 
-        # TODO: merge the header here
-        self.header = header
+        if header.relative is False:
+            self.header = header
+
+            return
+
+        assert header.channelId == self.header.channelId
+
+        from rtmpy.rtmp.codec.header import mergeHeaders
+
+        self.header = mergeHeaders(self.header, header)
 
     def reset(self):
         """
@@ -218,7 +226,8 @@ class ChannelManager(object):
 
     implements(interfaces.IChannelManager)
 
-    channels = {}
+    def __init__(self):
+        self.channels = {}
 
     def getChannel(self, channelId):
         """
@@ -235,40 +244,9 @@ class ChannelManager(object):
         try:
             return self.channels[channelId]
         except KeyError:
-            return None
+            self.channels[channelId] = Channel()
 
-    def createChannel(self):
-        """
-        Creates and returns a newly created channel. The channel is registered
-        to the first available channelId (see L{getNextAvailableChannelId}).
-
-        @return: The newly created channel.
-        @rtype: L{RTMPChannel}
-        @raise OverflowError: No free channelId available.
-        """
-
-        # XXX: RTMPChannel doesn't exist?
-        channel = self._channels[channel_id] = RTMPChannel(self, self.protocol, channel_id)
-
-        if self.protocol.debug:
-            _debug(self, "Creating channel %d, %r" % (channel_id, channel))
-
-        return channel
-
-    def removeChannel(self, channel_id):
-        """
-        Removes a RTMP channel.
-
-        @param channel_id: The index of the to channel be closed.
-        @type channel_id: C{int}
-        """
-        if channel_id >= self.max_channels or channel_id < 0:
-            raise IndexError, "channel index %d is out of range" % channel_id
-
-        if self.protocol.debug:
-            _debug(self, "Removing channel %d, %r" % (channel_id, self._channels[channel_id]))
-
-        del self._channels[channel_id]
+        return self.channels[channelId]
 
     def getNextAvailableChannelId(self):
         """
@@ -292,17 +270,6 @@ class ChannelManager(object):
 
         return count
 
-    def onCompleteBody(self, channel):
-        """
-        Called when a channel has received all of its data.
-        
-        @note: This may change to C{onData} at some point as we start to look
-            at streaming larger chunks of data, e.g. video/audio
-        """
-        self.removeChannel(channel.channel_id)
-
-class Context(ChannelManager):
-    pass
 
 class BaseProtocol(protocol.Protocol, EventDispatcher):
     """
