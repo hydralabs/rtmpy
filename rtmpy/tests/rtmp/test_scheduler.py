@@ -47,21 +47,22 @@ class BaseChannelSchedulerTestCase(unittest.TestCase):
         self.assertEquals(s.activeChannels, {})
 
         s.activateChannel(c)
-        self.assertEquals(s.activeChannels, {c.getHeader().channelId: c})
+        self.assertTrue(c in s.activeChannels)
 
-        s.activateChannel(c)
-        self.assertEquals(s.activeChannels, {c.getHeader().channelId: c})
+        e = self.assertRaises(IndexError, s.activateChannel, c)
+        self.assertEquals(str(e), 'channel already activated')
 
     def test_deactivateChannel(self):
         s = self._generateScheduler()
         c = self._generateChannel()
 
-        s.deactivateChannel(c)
-        self.assertEquals(s.activeChannels, {self._channelId - 1: None})
+        e = self.assertRaises(IndexError, s.deactivateChannel, c)
+        self.assertEquals(str(e), 'channel not activated')
 
-        s.activeChannels = {self._channelId - 1: c}
+        s.activateChannel(c)
         s.deactivateChannel(c)
-        self.assertEquals(s.activeChannels, {self._channelId - 1: None})
+        self.assertFalse(c in s.activeChannels)
+        self.assertEquals(s.activeChannels[0], None)
 
     def test_getNextChannel(self):
         s = self._generateScheduler()
