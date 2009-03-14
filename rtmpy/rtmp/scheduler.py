@@ -53,7 +53,7 @@ class BaseChannelScheduler(object):
 
         idx = self.activeChannels.getReferenceTo(channel)
         self.activeChannels.list[idx] = None
-        self.activeChannels.dict[idx] = None
+        self.activeChannels.dict[id(channel)] = None
 
     def getNextChannel(self):
         """
