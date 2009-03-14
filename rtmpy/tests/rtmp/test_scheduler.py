@@ -9,7 +9,7 @@ from twisted.internet import defer, task
 from twisted.trial import unittest
 
 from rtmpy.rtmp import interfaces, scheduler
-from rtmpy.tests.util import DummyChannel, DummyHeader
+from rtmpy.tests.rtmp import mocks
 
 
 class BaseChannelSchedulerTestCase(unittest.TestCase):
@@ -23,10 +23,10 @@ class BaseChannelSchedulerTestCase(unittest.TestCase):
     def _generateChannel(self):
         """
         """
-        h = DummyHeader(channelId=self._channelId, relative=False)
+        h = mocks.Header(channelId=self._channelId, relative=False)
         self._channelId += 1
 
-        c = DummyChannel()
+        c = mocks.Channel()
         c.setHeader(h)
 
         return c

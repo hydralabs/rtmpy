@@ -309,25 +309,36 @@ class Encoder(BaseCodec):
 
     @ivar channelContext: A C{dict} of {channel: L{ChannelContext}} objects.
     @type channelContext: C{dict}
-    @ivar activeChannels: A C{set} of channels that are actively producing
-        data.
-    @type activeChannels: C{set}
     @ivar currentContext: A reference to the current context being encoded.
     @type currentContext: L{ChannelContext}
+    @ivar scheduler: An RTMP channel scheduler. This composition allows
+        different scheduler strategies without 'infecting' this class.
+    @type scheduler: 
     """
 
     def __init__(self, manager):
         BaseCodec.__init__(self, manager)
 
         self.channelContext = {}
-        self.activeChannels = set()
         self.currentContext = None
         self.consumer = None
+        self.scheduler = None
+
+    def registerScheduler(self, scheduler):
+        """
+        Registers a RTMP channel scheduler for the encoder to use.
+        """
+        self.scheduler = scheduler
 
     def getJob(self):
+        """
+        @see L{BaseCodec.getJob}
+        """
         return self.encode
 
     def registerConsumer(self, consumer):
+        """
+        """
         self.consumer = consumer
 
     def activateChannel(self, channel):
@@ -336,7 +347,7 @@ class Encoder(BaseCodec):
         if not channel in self.channelContext.keys():
             raise RuntimeError('Attempted to activate a non-existant channel')
 
-        self.activeChannels.update([channel])
+        self.scheduler.activateChannel(channel)
 
     def deactivateChannel(self, channel):
         """
@@ -345,14 +356,11 @@ class Encoder(BaseCodec):
             raise RuntimeError('Attempted to deactivate a non-existant ' + \
                 'channel')
 
-        self.activeChannels.remove(channel)
-
-    def getNextChannel(self):
-        """
-        """
+        self.scheduler.deactivateChannel(channel)
 
     def writeFrame(self):
         """
+        Writes an RTMP header and body to 
         """
         context = self.currentContext
         channel = context.channel
@@ -374,7 +382,12 @@ class Encoder(BaseCodec):
         self.buffer.write(data)
 
     def encode(self):
-        channel = self.getNextChannel()
+        """
+        Called to encode an RTMP frame (header and body) and write the result
+        to the C{consumer}. If there is nothing to do then L{pause} will be
+        called.
+        """
+        channel = self.scheduler.getNextChannel()
 
         if channel is None:
             self.pause()
@@ -382,7 +395,9 @@ class Encoder(BaseCodec):
             return
 
         self.currentContext = self.channelContext[channel]
-
         self.writeFrame()
-        self.consumer.write(self.buffer.getvalue())
-        self.buffer.truncate()
+
+        if len(self.buffer) > 0:
+            self.consumer.write(self.buffer.getvalue())
+
+            self.buffer.truncate(0)
