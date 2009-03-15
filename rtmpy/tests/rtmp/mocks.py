@@ -33,6 +33,7 @@ class ChannelManager(object):
         return self.channels[id]
 
     def channelComplete(self, channel):
+        print 'channel complete, body: %r' % channel.buffer
         channel.reset()
 
 class Channel(object):

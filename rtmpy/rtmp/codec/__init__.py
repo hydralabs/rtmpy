@@ -197,7 +197,6 @@ class Decoder(BaseCodec):
             return
 
         h = self.readHeader()
-        print h.__dict__
 
         if h is None:
             # not enough bytes left in the stream to continue decoding, we
