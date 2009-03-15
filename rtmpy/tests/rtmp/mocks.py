@@ -56,8 +56,9 @@ class Channel(object):
         self.registerManager(manager)
         self.reset()
 
+        self.header = None
+
     def registerManager(self, manager):
-        
         self.manager = manager
 
     def reset(self):
@@ -122,6 +123,21 @@ class Channel(object):
         if len(self.buffer) > 0:
             self.consumer.write(self.buffer)
             self.buffer = 0
+
+    def __repr__(self):
+        h = self.header
+
+        if h is None:
+            s = 'anonymous'
+        else:
+            s = str(self.header.channelId)
+
+        return '<%s.%s %s at 0x%x>' % (
+            self.__class__.__module__,
+            self.__class__.__name__,
+            s,
+            id(self)
+        )
 
 
 class Header(object):

@@ -12,6 +12,7 @@ RTMP codecs. Encoders and decoders for rtmp streams.
 
 from twisted.internet import task
 
+from rtmpy import rtmp
 from rtmpy import util
 from rtmpy.rtmp import interfaces
 from rtmpy.rtmp.codec import header
@@ -83,6 +84,9 @@ class BaseCodec(object):
 
         self.deferred = self.job.start(when, now=False)
 
+        if rtmp.DEBUG:
+            rtmp.log(self, 'Started job')
+
         return self.deferred
 
     def pause(self):
@@ -93,6 +97,9 @@ class BaseCodec(object):
         if self.job.running:
             self.job.stop()
             self.deferred = None
+
+            if rtmp.DEBUG:
+                rtmp.log(self, 'Stopped job')
 
 
 class Decoder(BaseCodec):
@@ -127,6 +134,10 @@ class Decoder(BaseCodec):
         except EOFError:
             self.buffer.seek(headerPosition)
 
+            if rtmp.DEBUG:
+                rtmp.log(self, 'Not enough data to read header. ' \
+                    'Rewinding to %d' % (headerPosition,))
+
             return None
 
     def getBytesAvailableForChannel(self, channel):
@@ -152,7 +163,14 @@ class Decoder(BaseCodec):
         if self.currentChannel is None:
             raise DecodeError('Channel is required to read frame')
 
+        if rtmp.DEBUG:
+            rtmp.log(self, 'Reading frame for %r %r' % (
+                self.currentChannel, self.currentChannel.getHeader()))
+
         available = self.getBytesAvailableForChannel(self.currentChannel)
+
+        if rtmp.DEBUG:
+            rtmp.log(self, '%d bytes available' % (available,))
 
         if available < 0:
             raise RuntimeError
@@ -170,6 +188,9 @@ class Decoder(BaseCodec):
             self.currentChannel = None
         elif self.currentChannel.bodyRemaining == 0:
             # the channel is now complete
+            if rtmp.DEBUG:
+                rtmp.log(self, 'Channel completed')
+
             self.manager.channelComplete(self.currentChannel)
             self.currentChannel = None
 
@@ -192,10 +213,17 @@ class Decoder(BaseCodec):
 
     def _decode(self):
         if self.currentChannel is not None:
+            if rtmp.DEBUG:
+                rtmp.log(self, 'Continuing to read frame for %r' % (
+                    self.currentChannel,))
+
             self.readFrame()
 
         if not self.canContinue():
             # the buffer is empty
+            if rtmp.DEBUG:
+                rtmp.log(self, 'buffer exhausted')
+
             self.pause()
 
             return
@@ -206,9 +234,16 @@ class Decoder(BaseCodec):
         if h is None:
             # not enough bytes left in the stream to continue decoding, we
             # require a complete header to decode
+            if rtmp.DEBUG:
+                rtmp.log(self, 'Not enough buffer to read header ' \
+                    '(%d:remaining)' % (self.buffer.remaining(),))
+
             self.pause()
 
             return
+
+        if rtmp.DEBUG:
+            rtmp.log(self, 'Read header %r' % (h,))
 
         self.currentChannel = self.manager.getChannel(h.channelId)
         self.currentChannel.setHeader(h)
@@ -223,12 +258,22 @@ class Decoder(BaseCodec):
         # start from the beginning of the buffer
         self.buffer.seek(0)
 
+        if rtmp.DEBUG:
+            rtmp.log(self, 'Decode (%d:remaining)'% (self.buffer.remaining(),))
+
         if not self.canContinue():
+            if rtmp.DEBUG:
+                rtmp.log(self, 'Buffer exhausted')
+
             self.pause()
 
             return
 
         self._decode()
+
+        if rtmp.DEBUG:
+            rtmp.log(self, 'Complete decode (buffer: tell:%d,' \
+                ' length:%d)' % (self.buffer.tell(), len(self.buffer)))
 
         # delete the bytes that have already been decoded
         self.buffer.consume()
@@ -237,6 +282,9 @@ class Decoder(BaseCodec):
         """
         Adds data to the end of the stream. 
         """
+        if rtmp.DEBUG:
+            rtmp.log(self, 'Received %d bytes' % (len(data),))
+
         self.buffer.seek(0, 2)
         self.buffer.write(data)
 

@@ -23,7 +23,6 @@ packets are split up into fixed size body chunks.
 
 from twisted.internet import reactor, protocol, defer, task
 from twisted.internet import interfaces as tw_interfaces
-from twisted.python import log
 from zope.interface import implements, providedBy
 from pyamf.util import hexdump, IndexedCollection, BufferedByteStream
 
@@ -34,12 +33,14 @@ from rtmpy import util
 #: Default port 1935 is a registered U{IANA<http://iana.org>} port.
 RTMP_PORT = 1935
 
-PROTOCOL_ERROR = 'rtmp.protocol.error'
-
 MAX_CHANNELS = 64
-MAX_STREAMS = 0xffff
+MAX_STREAMS = 0xffffff
 
-DEBUG = True
+DEBUG = False
+
+def log(obj, msg):
+    print repr(obj), msg
+
 
 class ChannelTypes:
     """
@@ -81,10 +82,8 @@ class Header(object):
         self.relative = kwargs.get('relative', None)
 
     def __repr__(self):
-        v = []
-
-        for x in ('relative', 'channelId', 'streamId', 'datatype', 'bodyLength', 'timestamp'):
-            v.append('%s=%r' % (x, self.__dict__[x]))
+        v = ['%s=%r' % (x, getattr(self, x)) for x in ('relative', 'channelId',
+            'streamId', 'datatype', 'bodyLength', 'timestamp')]
 
         s = '<%s.%s %s at 0x%x>' % (
             self.__class__.__module__, self.__class__.__name__, ' '.join(v), id(self))
