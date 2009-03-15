@@ -188,6 +188,9 @@ def decodeHeader(stream):
     if size == 1:
         return header
 
+    if rtmp.DEBUG:
+        rtmp.log(stream, 'header size = %d' % (size,))
+
     endian = stream.endian
     stream.endian = util.BufferedByteStream.ENDIAN_BIG
 

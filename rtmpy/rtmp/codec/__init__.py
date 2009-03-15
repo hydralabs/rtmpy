@@ -246,7 +246,16 @@ class Decoder(BaseCodec):
             rtmp.log(self, 'Read header %r' % (h,))
 
         self.currentChannel = self.manager.getChannel(h.channelId)
+
+        if rtmp.DEBUG:
+            if h.relative is True:
+                rtmp.log(self, 'before %r' % (self.currentChannel.getHeader(),))
+
         self.currentChannel.setHeader(h)
+
+        if rtmp.DEBUG:
+            if h.relative is True:
+                rtmp.log(self, 'after %r' % (self.currentChannel.getHeader(),))
 
         self.readFrame()
 

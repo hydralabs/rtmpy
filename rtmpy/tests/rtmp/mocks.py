@@ -30,14 +30,17 @@ class ChannelManager(object):
         try:
             return self.channels[id]
         except KeyError:
+            print 'create channel ', id
             channel = self.channels[id] = Channel(self)
 
         return self.channels[id]
 
     def channelComplete(self, channel):
-        self.complete.append((channel.getHeader().channelId, channel.buffer))
+        header = channel.getHeader()
 
-        if channel.header.datatype == 1:
+        self.complete.append((header.channelId, channel.buffer))
+
+        if header.datatype == 1:
             from pyamf.util import BufferedByteStream
             x = BufferedByteStream(channel.buffer)
             self.frameSize = x.read_ulong()
@@ -131,6 +134,8 @@ class Channel(object):
             s = 'anonymous'
         else:
             s = str(self.header.channelId)
+
+        s += ' %d/%d' % (self.bytes, self.header.bodyLength)
 
         return '<%s.%s %s at 0x%x>' % (
             self.__class__.__module__,
