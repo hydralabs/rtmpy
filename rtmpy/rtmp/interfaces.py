@@ -48,9 +48,12 @@ class IChannel(Interface):
         "The number of bytes that remain until this channel's body is "
         "considered complete.")
 
-    def registerProducer(producer):
+    def registerManager(manager):
         """
-        Registers a producer for this channel.
+        Registers a channel manager.
+
+        @param manager: L{IChannelManager}
+        @raise TypeError: If manager does not provide L{IChannelManager}
         """
 
     def registerConsumer(consumer):
@@ -79,11 +82,6 @@ class IChannel(Interface):
         """
 
 
-class IStream(Interface):
-    """
-    """
-
-
 class IChannelManager(Interface):
     """
     Defines the interface for managing channels. The channel manager handles
@@ -99,19 +97,6 @@ class IChannelManager(Interface):
 
         @raise IndexError: C{channelId} is not in range.
         @rtype: L{IChannel}
-        """
-
-    def createChannel():
-        """
-        Creates a channel using an unused channel id.
-        """
-
-    def removeChannel(channel):
-        """
-        Removes a channel from this manager.
-
-        @param channel: An implementation of L{IChannel}.
-        @raise IndexError: The channel isn't registered to this manager.
         """
 
     def getNextAvailableChannelId():
@@ -130,12 +115,6 @@ class IChannelManager(Interface):
         @raise IndexError: The channel isn't registered to this manager.
         @raise IndexError: The channelId is out of range.
         @rtype: L{IHeader} or C{None}
-        """
-
-    def frameReceived(channel, data):
-        """
-        A frame of data has been received from the channel. This is only
-        called by non-producing channels.
         """
 
 

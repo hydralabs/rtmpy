@@ -104,7 +104,7 @@ class DecoderClassTestCase(BaseDecoderTestCase):
 
         self.decoder.decode()
 
-        self.assertEquals(self.buffer.tell(), 3)
+        self.assertEquals(self.buffer.tell(), 0)
         self.assertEquals(self.buffer.getvalue(), 'foo')
         self.assertEquals(self.decoder.currentChannel, None)
         self.assertFalse(job.running)
@@ -118,7 +118,7 @@ class GetBytesAvailableForChannelTestCase(BaseDecoderTestCase):
     def setUp(self):
         BaseDecoderTestCase.setUp(self)
 
-        self.channel = mocks.Channel()
+        self.channel = mocks.Channel(self.manager)
         self.channel.setHeader(mocks.Header(bodyLength=1000, relative=False))
 
     def gba(self):
@@ -135,42 +135,42 @@ class GetBytesAvailableForChannelTestCase(BaseDecoderTestCase):
         self.channel.write(' ' * 10)
 
         self.assertEquals(self.buffer.remaining(), 10)
-        self.assertEquals(mocks.ChannelManager.frameSize, 128)
+        self.assertEquals(self.manager.frameSize, 128)
         self.assertEquals(self.channel.bodyRemaining, 990)
 
         self.assertEquals(self.gba(), 10)
 
     def test_partialBodyNearlyFullFrame(self):
-        self.buffer.write(' ' * (mocks.ChannelManager.frameSize - 1))
+        self.buffer.write(' ' * (self.manager.frameSize - 1))
         self.buffer.seek(0)
-        self.channel.write(' ' * (mocks.ChannelManager.frameSize - 11))
+        self.channel.write(' ' * (self.manager.frameSize - 11))
 
         self.assertEquals(self.buffer.remaining(), 127)
-        self.assertEquals(mocks.ChannelManager.frameSize, 128)
+        self.assertEquals(self.manager.frameSize, 128)
         self.assertEquals(self.channel.bodyRemaining, 883)
 
         self.assertEquals(self.gba(), 127)
 
     def test_partialBodyFullFrame(self):
-        self.buffer.write(' ' * mocks.ChannelManager.frameSize)
+        self.buffer.write(' ' * self.manager.frameSize)
         self.buffer.seek(0)
         self.channel.write(' ')
 
         self.assertEquals(self.buffer.remaining(), 128)
-        self.assertEquals(mocks.ChannelManager.frameSize, 128)
+        self.assertEquals(self.manager.frameSize, 128)
         self.assertEquals(self.channel.bodyRemaining, 999)
 
         self.assertEquals(self.gba(), 128)
 
     def test_nearlyFullBodyPartialFrame(self):
-        self.channel.buffer = ' ' * 999
+        self.channel.write(' ' * 999)
 
         self.buffer.truncate()
         self.buffer.write('a' * 10)
         self.buffer.seek(0)
 
         self.assertEquals(self.buffer.remaining(), 10)
-        self.assertEquals(mocks.ChannelManager.frameSize, 128)
+        self.assertEquals(self.manager.frameSize, 128)
         self.assertEquals(self.channel.bodyRemaining, 1)
 
         self.assertEquals(self.gba(), 1)
@@ -240,8 +240,9 @@ class DecodingTestCase(BaseDecoderTestCase):
         return self.deferred.addCallback(cb)
 
     def test_partialBody(self):
-        c = mocks.Channel()
+        c = mocks.Channel(self.manager)
         c.setHeader(mocks.Header(bodyLength=1000, relative=False))
+
         self.decoder.currentChannel = c
 
         self.buffer.write('hello')
@@ -258,12 +259,12 @@ class DecodingTestCase(BaseDecoderTestCase):
         return self.deferred.addCallback(cb)
 
     def test_fullFrame(self):
-        c = mocks.Channel()
-        c.setHeader(mocks.Header(bodyLength=1000, relative=False))
+        c = mocks.Channel(self.manager)
+        c.setHeader(mocks.Header(channelId=3, bodyLength=1000, relative=False))
 
         self.decoder.currentChannel = c
 
-        self.buffer.write(' ' * mocks.ChannelManager.frameSize)
+        self.buffer.write(' ' * self.manager.frameSize)
         self.buffer.seek(0)
 
         def cb(lc):
@@ -272,13 +273,13 @@ class DecodingTestCase(BaseDecoderTestCase):
             self.assertFalse(self.job.running)
 
             self.assertEquals(c.frames, 1)
-            self.assertEquals(c.buffer, ' ' * mocks.ChannelManager.frameSize)
+            self.assertEquals(c.buffer, ' ' * self.manager.frameSize)
 
         return self.deferred.addCallback(cb)
 
     def test_singleHeaderFullBody(self):
         # a full header channelId 3, datatype 2, bodyLength 50, streamId 1, timestamp 10
-        self.buffer.write('\x03\x00\x00\n\x00\x002\x02\x00\x00\x00\x01')
+        self.buffer.write('\x03\x00\x00\n\x00\x002\x02\x01\x00\x00\x00')
         # complete the frame
         self.buffer.write('a' * 50)
 
@@ -290,7 +291,7 @@ class DecodingTestCase(BaseDecoderTestCase):
             self.assertFalse(self.job.running)
 
             c = self.manager.channels[3]
-            h = c.header
+            h = c.getHeader()
 
             self.assertEquals(h.channelId, 3)
             self.assertEquals(h.datatype, 2)
@@ -298,7 +299,9 @@ class DecodingTestCase(BaseDecoderTestCase):
             self.assertEquals(h.streamId, 1)
             self.assertEquals(h.timestamp, 10)
 
-            self.assertEquals(c.buffer, 'a' * 50)
+            self.assertEquals(self.manager.complete, [(3, 'a' * 50)])
+
+            self.assertEquals(c.buffer, '')
 
             self.assertEquals(self.decoder.currentChannel, None)
 
@@ -306,17 +309,17 @@ class DecodingTestCase(BaseDecoderTestCase):
 
     def test_multipleHeaders2channels(self):
         # a full header channelId 3, datatype 2, bodyLength 500, streamId 1, timestamp 10
-        self.buffer.write('\x03\x00\x00\n\x00\x01\xf4\x02\x00\x00\x00\x01')
+        self.buffer.write('\x03\x00\x00\n\x00\x01\xf4\x02\x01\x00\x00\x00')
         # complete the frame
-        self.buffer.write('a' * mocks.ChannelManager.frameSize)
+        self.buffer.write('a' * self.manager.frameSize)
         # a full header channelId 5, datatype 5, bodyLength 500, streamId 1, timestamp 50
-        self.buffer.write('\x05\x00\x002\x00\x01\xf4\x05\x00\x00\x00\x01')
+        self.buffer.write('\x05\x00\x002\x00\x01\xf4\x05\x01\x00\x00\x00')
         # complete the frame
-        self.buffer.write('b' * mocks.ChannelManager.frameSize)
+        self.buffer.write('b' * self.manager.frameSize)
         # a relative header for channelId 3
         self.buffer.write('\xc3')
         # complete the frame
-        self.buffer.write('c' * mocks.ChannelManager.frameSize)
+        self.buffer.write('c' * self.manager.frameSize)
 
         self.buffer.seek(0)
 
@@ -335,7 +338,8 @@ class DecodingTestCase(BaseDecoderTestCase):
             self.assertEquals(h.streamId, 1)
             self.assertEquals(h.timestamp, 10)
 
-            self.assertEquals(c.buffer, 'a' * mocks.ChannelManager.frameSize + 'c' * mocks.ChannelManager.frameSize)
+            self.assertEquals(c.buffer, 'a' * self.manager.frameSize + \
+                'c' * self.manager.frameSize)
 
             c = self.manager.channels[5]
             h = c.header
@@ -346,7 +350,7 @@ class DecodingTestCase(BaseDecoderTestCase):
             self.assertEquals(h.streamId, 1)
             self.assertEquals(h.timestamp, 50)
 
-            self.assertEquals(c.buffer, 'b' * mocks.ChannelManager.frameSize)
+            self.assertEquals(c.buffer, 'b' * self.manager.frameSize)
 
             self.assertEquals(self.decoder.currentChannel, None)
 
@@ -364,7 +368,7 @@ class FrameReadingTestCase(BaseDecoderTestCase):
         self.assertEquals(str(e), 'Channel is required to read frame')
 
     def test_notavailable(self):
-        channel = self.decoder.currentChannel = mocks.Channel()
+        channel = self.decoder.currentChannel = mocks.Channel(self.manager)
         channel.setHeader(mocks.Header(bodyLength=1000, relative=False))
 
         self.assertEquals(self.buffer.getvalue(), '')
@@ -378,7 +382,7 @@ class FrameReadingTestCase(BaseDecoderTestCase):
         self.assertEquals(channel.frames, 0)
 
     def test_partial(self):
-        channel = self.decoder.currentChannel = mocks.Channel()
+        channel = self.decoder.currentChannel = mocks.Channel(self.manager)
         channel.setHeader(mocks.Header(bodyLength=1000, relative=False))
 
         self.buffer.write('foo.bar.baz')
@@ -395,10 +399,10 @@ class FrameReadingTestCase(BaseDecoderTestCase):
         self.assertEquals(channel.frames, 0)
 
     def test_full(self):
-        channel = self.decoder.currentChannel = mocks.Channel()
+        channel = self.decoder.currentChannel = mocks.Channel(self.manager)
         channel.setHeader(mocks.Header(bodyLength=1000, relative=False))
 
-        self.buffer.write(' ' * mocks.ChannelManager.frameSize)
+        self.buffer.write(' ' * self.manager.frameSize)
         self.buffer.seek(0)
 
         self.assertEquals(self.buffer.tell(), 0)
@@ -407,16 +411,16 @@ class FrameReadingTestCase(BaseDecoderTestCase):
 
         self.decoder.readFrame()
 
-        self.assertEquals(self.buffer.tell(), mocks.ChannelManager.frameSize)
-        self.assertEquals(channel.buffer, ' ' * mocks.ChannelManager.frameSize)
+        self.assertEquals(self.buffer.tell(), self.manager.frameSize)
+        self.assertEquals(channel.buffer, ' ' * self.manager.frameSize)
         self.assertEquals(channel.frames, 1)
         self.assertEquals(self.decoder.currentChannel, None)
 
     def test_moreThanOne(self):
-        channel = self.decoder.currentChannel = mocks.Channel()
+        channel = self.decoder.currentChannel = mocks.Channel(self.manager)
         channel.setHeader(mocks.Header(bodyLength=1000, relative=False))
 
-        self.buffer.write(' ' * (mocks.ChannelManager.frameSize + 50))
+        self.buffer.write(' ' * (self.manager.frameSize + 50))
         self.buffer.seek(0)
 
         self.assertEquals(self.buffer.tell(), 0)
@@ -425,15 +429,15 @@ class FrameReadingTestCase(BaseDecoderTestCase):
 
         self.decoder.readFrame()
 
-        self.assertEquals(self.buffer.tell(), mocks.ChannelManager.frameSize)
-        self.assertEquals(channel.buffer, ' ' * mocks.ChannelManager.frameSize)
+        self.assertEquals(self.buffer.tell(), self.manager.frameSize)
+        self.assertEquals(channel.buffer, ' ' * self.manager.frameSize)
         self.assertEquals(channel.frames, 1)
         self.assertEquals(self.decoder.currentChannel, None)
 
         self.decoder.currentChannel = channel
         self.decoder.readFrame()
 
-        self.assertEquals(self.buffer.tell(), mocks.ChannelManager.frameSize + 50)
-        self.assertEquals(channel.buffer, ' ' * (mocks.ChannelManager.frameSize + 50))
+        self.assertEquals(self.buffer.tell(), self.manager.frameSize + 50)
+        self.assertEquals(channel.buffer, ' ' * (self.manager.frameSize + 50))
         self.assertEquals(channel.frames, 1)
         self.assertEquals(self.decoder.currentChannel, channel)

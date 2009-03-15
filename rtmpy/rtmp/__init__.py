@@ -80,6 +80,16 @@ class Header(object):
 
         self.relative = kwargs.get('relative', None)
 
+    def __repr__(self):
+        v = []
+
+        for x in ('relative', 'channelId', 'streamId', 'datatype', 'bodyLength', 'timestamp'):
+            v.append('%s=%r' % (x, self.__dict__[x]))
+
+        s = '<%s.%s %s at 0x%x>' % (
+            self.__class__.__module__, self.__class__.__name__, ' '.join(v), id(self))
+
+        return s
 
 class Channel(object):
     """
@@ -148,11 +158,6 @@ class Channel(object):
         self.bytes = 0
         self.frames = 0
         self.header = None
-
-    def clear(self):
-        """
-        """
-        self.frame = BufferedByteStream()
 
     def write(self, data):
         """

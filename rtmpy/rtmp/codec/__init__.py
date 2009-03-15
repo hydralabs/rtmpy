@@ -153,10 +153,14 @@ class Decoder(BaseCodec):
             raise DecodeError('Channel is required to read frame')
 
         available = self.getBytesAvailableForChannel(self.currentChannel)
-        frames = self.currentChannel.frames
+
+        if available < 0:
+            raise RuntimeError
 
         if available == 0:
             return
+
+        frames = self.currentChannel.frames
 
         self.currentChannel.write(self.buffer.read(available))
 
@@ -196,6 +200,7 @@ class Decoder(BaseCodec):
 
             return
 
+        pos = self.buffer.tell()
         h = self.readHeader()
 
         if h is None:

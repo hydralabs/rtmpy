@@ -16,25 +16,34 @@ class ChannelManager(object):
 
     implements(interfaces.IChannelManager)
 
-    frameSize = 128
-
     def __init__(self, channels=None):
         if channels is not None:
             self.channels = channels
         else:
             self.channels = {}
 
+        self.frameSize = 128
+
+        self.complete = []
+
     def getChannel(self, id):
         try:
             return self.channels[id]
         except KeyError:
-            self.channels[id] = Channel()
+            channel = self.channels[id] = Channel(self)
 
         return self.channels[id]
 
     def channelComplete(self, channel):
-        print 'channel complete, body: %r' % channel.buffer
+        self.complete.append((channel.getHeader().channelId, channel.buffer))
+
+        if channel.header.datatype == 1:
+            from pyamf.util import BufferedByteStream
+            x = BufferedByteStream(channel.buffer)
+            self.frameSize = x.read_ulong()
+
         channel.reset()
+
 
 class Channel(object):
     """
@@ -43,11 +52,16 @@ class Channel(object):
 
     implements(interfaces.IChannel)
 
-    def __init__(self):
+    def __init__(self, manager):
+        self.registerManager(manager)
         self.reset()
 
+    def registerManager(self, manager):
+        
+        self.manager = manager
+
     def reset(self):
-        self.frameRemaining = ChannelManager.frameSize
+        self.frameRemaining = self.manager.frameSize
         self.frames = 0
         self.bytes = 0
         self.buffer = ''
@@ -62,24 +76,24 @@ class Channel(object):
         else:
             self.buffer += str(data)
 
-        if l < ChannelManager.frameSize:
+        if l < self.manager.frameSize:
             self.frameRemaining -= l
 
             return
 
-        while l >= ChannelManager.frameSize:
+        while l >= self.manager.frameSize:
             self.frames += 1
-            l -= ChannelManager.frameSize
+            l -= self.manager.frameSize
 
-        if self.frameRemaining != ChannelManager.frameSize and \
-            l + self.frameRemaining >= ChannelManager.frameSize:
+        if self.frameRemaining != self.manager.frameSize and \
+                    l + self.frameRemaining >= self.manager.frameSize:
             self.frames += 1
-            l -= ChannelManager.frameSize
+            l -= self.manager.frameSize
 
         if l > 0:
             self.frameRemaining = l
         else:
-            self.frameRemaining = ChannelManager.frameSize
+            self.frameRemaining = self.manager.frameSize
 
     def setHeader(self, header):
         if header.relative is False:
@@ -98,12 +112,16 @@ class Channel(object):
         return self.header
 
     def bodyRemaining(self):
-        return self.header.bodyLength - len(self.buffer)
+        return self.header.bodyLength - self.bytes
 
     bodyRemaining = property(bodyRemaining)
 
     def registerConsumer(self, consumer):
         self.consumer = consumer
+
+        if len(self.buffer) > 0:
+            self.consumer.write(self.buffer)
+            self.buffer = 0
 
 
 class Header(object):
