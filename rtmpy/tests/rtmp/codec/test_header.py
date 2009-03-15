@@ -283,7 +283,7 @@ class DecodeHeaderTestCase(unittest.TestCase):
         self.assertEquals(h.streamId, None)
 
     def test_decodeSize12(self):
-        h = self._decode('\x15\x03\x92\xfa\x00z\n\x03\x00\x00\x00-')
+        h = self._decode('\x15\x03\x92\xfa\x00z\n\x03-\x00\x00\x00')
 
         self.assertTrue(header.IHeader.providedBy(h))
         self.assertEquals(h.channelId, 21)
@@ -371,7 +371,7 @@ class DiffHeadersTestCase(unittest.TestCase):
 
         self.assertTrue(header.IHeader.providedBy(h))
         self.assertTrue(h.relative)
-        self.assertEquals(h.timestamp, 234234)
+        self.assertEquals(h.timestamp, 235234)
         self.assertEquals(h.bodyLength, None)
         self.assertEquals(h.datatype, None)
         self.assertEquals(h.streamId, None)
@@ -404,7 +404,7 @@ class DiffHeadersTestCase(unittest.TestCase):
         self.assertTrue(header.IHeader.providedBy(h))
         self.assertTrue(h.relative)
         self.assertEquals(h.timestamp, None)
-        self.assertEquals(h.bodyLength, 1)
+        self.assertEquals(h.bodyLength, 2001)
         self.assertEquals(h.datatype, None)
         self.assertEquals(h.streamId, None)
         self.assertEquals(h.channelId, 3)
@@ -438,8 +438,8 @@ class DiffHeadersTestCase(unittest.TestCase):
 
         self.assertTrue(header.IHeader.providedBy(h))
         self.assertTrue(h.relative)
-        self.assertEquals(h.timestamp, 233234)
-        self.assertEquals(h.bodyLength, 1)
+        self.assertEquals(h.timestamp, 234234)
+        self.assertEquals(h.bodyLength, 2001)
         self.assertEquals(h.datatype, 0)
         self.assertEquals(h.streamId, 12)
         self.assertEquals(h.channelId, 3)
@@ -523,7 +523,7 @@ class MergeHeadersTestCase(unittest.TestCase):
 
         self.assertTrue(header.IHeader.providedBy(h))
         self.assertFalse(h.relative)
-        self.assertEquals(h.timestamp, self.absolute.timestamp + 3)
+        self.assertEquals(h.timestamp, 3)
         self.assertEquals(h.bodyLength, self.absolute.bodyLength)
         self.assertEquals(h.datatype, self.absolute.datatype)
         self.assertEquals(h.streamId, self.absolute.streamId)
@@ -552,7 +552,7 @@ class MergeHeadersTestCase(unittest.TestCase):
         self.assertTrue(header.IHeader.providedBy(h))
         self.assertFalse(h.relative)
         self.assertEquals(h.timestamp, self.absolute.timestamp)
-        self.assertEquals(h.bodyLength, self.absolute.bodyLength + 42)
+        self.assertEquals(h.bodyLength, 42)
         self.assertEquals(h.datatype, self.absolute.datatype)
         self.assertEquals(h.streamId, self.absolute.streamId)
         self.assertEquals(h.channelId, self.absolute.channelId)
@@ -583,8 +583,8 @@ class MergeHeadersTestCase(unittest.TestCase):
 
         self.assertTrue(header.IHeader.providedBy(h))
         self.assertFalse(h.relative)
-        self.assertEquals(h.timestamp, 235234)
-        self.assertEquals(h.bodyLength, 4001)
+        self.assertEquals(h.timestamp, 234234)
+        self.assertEquals(h.bodyLength, 2001)
         self.assertEquals(h.datatype, 0)
         self.assertEquals(h.streamId, 12)
         self.assertEquals(h.channelId, self.absolute.channelId)

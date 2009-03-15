@@ -188,6 +188,9 @@ def decodeHeader(stream):
     if size == 1:
         return header
 
+    endian = stream.endian
+    stream.endian = util.BufferedByteStream.ENDIAN_BIG
+
     if size >= 4:
         header.timestamp = stream.read_24bit_uint()
 
@@ -196,16 +199,24 @@ def decodeHeader(stream):
         header.datatype = stream.read_uchar()
 
     if size >= 12:
+        # streamId is little endian
+        stream.endian = util.BufferedByteStream.ENDIAN_LITTLE
         header.streamId = stream.read_ulong()
+
+    if header.timestamp == 0xffffff:
+        stream.endian = util.BufferedByteStream.ENDIAN_BIG
+        header.timestamp = stream.read_ulong()
+
+    stream.endian = endian
 
     return header
 
 
 def diffHeaders(old, new):
     """
-    Returns a header based on the differences between two headers.
-    Both C{old} and C{new} must implement L{IHeader}, be from the same channel
-    and be absolute.
+    Returns a header based on the differences between two headers. Both C{old}
+    and C{new} must implement L{IHeader}, be from the same channel and be
+    absolute.
 
     @param old: The first header to compare.
     @type old: L{IHeader}
@@ -233,25 +244,17 @@ def diffHeaders(old, new):
 
     header = rtmp.Header(channelId=old.channelId, relative=True)
 
-    header.timestamp = new.timestamp - old.timestamp
-
-    if header.timestamp == 0:
-        header.timestamp = None
+    if new.timestamp != old.timestamp:
+        header.timestamp = new.timestamp
 
     if new.datatype != old.datatype:
         header.datatype = new.datatype
-    else:
-        header.datatype = None
 
-    header.bodyLength = new.bodyLength - old.bodyLength
-
-    if header.bodyLength == 0:
-        header.bodyLength = None
+    if new.bodyLength != old.bodyLength:
+        header.bodyLength = new.bodyLength
 
     if new.streamId != old.streamId:
         header.streamId = new.streamId
-    else:
-        header.streamId = None
 
     return header
 
@@ -290,7 +293,7 @@ def mergeHeaders(old, new):
     header = rtmp.Header(channelId=old.channelId, relative=False)
 
     if new.timestamp is not None:
-        header.timestamp = old.timestamp + new.timestamp
+        header.timestamp = new.timestamp
     else:
         header.timestamp = old.timestamp
 
@@ -300,7 +303,7 @@ def mergeHeaders(old, new):
         header.datatype = old.datatype
 
     if new.bodyLength is not None:
-        header.bodyLength = old.bodyLength + new.bodyLength
+        header.bodyLength = new.bodyLength
     else:
         header.bodyLength = old.bodyLength
 
