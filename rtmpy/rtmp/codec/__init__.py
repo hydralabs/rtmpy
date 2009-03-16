@@ -336,6 +336,10 @@ class ChannelContext(object):
             self.encoder.activateChannel(self.channel)
             self.active = True
 
+    def _deactivate(self):
+        self.encoder.deactivateChannel(self.channel)
+        self.active = False
+
     def getFrame(self):
         """
         Called by the encoder to return any data that may be available in the
@@ -349,18 +353,19 @@ class ChannelContext(object):
         length = self.getMinimumFrameSize()
 
         if length == 0:
+            self._deactivate()
+
+            return
+
+        self.buffer.seek(0)
+
+        try:
+            data = self.buffer.read(length)
+        except (EOFError, IOError):
             data = None
-        else:
-            self.buffer.seek(0)
 
-            try:
-                data = self.buffer.read(length)
-            except (EOFError, IOError):
-                data = None
-
-        if len(self.buffer) == 0 or data is None:
-            self.encoder.deactivateChannel(self.channel)
-            self.active = False
+        if data is None:
+            self._deactivate()
         else:
             self.buffer.consume()
 
@@ -396,7 +401,10 @@ class ChannelContext(object):
 
         return available
 
-    def resetHeader(self):
+    def syncHeader(self):
+        """
+        Called to syncronise the contexts header with the channels.
+        """
         self.header = self.channel.getHeader()
 
 
@@ -490,7 +498,7 @@ class Encoder(BaseCodec):
 
         # reset the context to the latest absolute header from the channel
         # so that any changes that occur next time get picked up
-        context.resetHeader()
+        context.syncHeader()
 
     def encode(self):
         """
