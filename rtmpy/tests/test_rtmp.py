@@ -170,6 +170,24 @@ class ChannelTestCase(unittest.TestCase):
 
         self.assertIdentical(c.getHeader(), o)
 
+    def test_repr(self):
+        c = rtmp.Channel()
+
+        self.assertEquals(repr(c),
+            '<rtmpy.rtmp.Channel header=None at 0x%x>' % (id(c),))
+
+        h = mocks.Header(relative=False, bodyLength=50, datatype=2,
+            timestamp=45, channelId=10, streamId=1)
+
+        m = mocks.ChannelManager()
+        c.registerManager(m)
+
+        c.setHeader(h)
+
+        self.assertEquals(repr(c),
+            '<rtmpy.rtmp.Channel channelId=10 datatype=2 frameRemaining=128' \
+                ' frames=0 bytes=0 bodyRemaining=50 at 0x%x>' % (id(c),))
+
 
 class ChannelHeaderTestCase(unittest.TestCase):
     """

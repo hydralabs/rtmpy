@@ -186,6 +186,14 @@ def decodeHeader(stream):
     size, channelId = decodeHeaderByte(stream.read_uchar())
     relative = size != 12
 
+    if rtmp.DEBUG:
+        from pyamf.util import hexdump
+
+        stream.seek(-1, 1)
+
+        print hexdump(stream.peek(size + 1))
+        stream.seek(1, 1)
+
     header = rtmp.Header(channelId=channelId, relative=relative)
 
     if size == 1:
@@ -214,6 +222,9 @@ def decodeHeader(stream):
         header.timestamp = stream.read_ulong()
 
     stream.endian = endian
+
+    if rtmp.DEBUG:
+        rtmp.log(stream, 'header read = %r' % (header,))
 
     return header
 

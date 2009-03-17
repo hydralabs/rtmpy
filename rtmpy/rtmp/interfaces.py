@@ -102,6 +102,12 @@ class IChannel(Interface):
         except the header.
         """
 
+    def onComplete():
+        """
+        Called when the channel has received all of the body data. Used to
+        inform the manager and observer of the event.
+        """
+
 
 class IChannelManager(Interface):
     """
@@ -109,8 +115,8 @@ class IChannelManager(Interface):
     channels and the outside world.
     """
 
-    frameSize = Attribute("An C{int} that defines the size (in bytes) of "
-        "each frame body.")
+    frameSize = Attribute(
+        "An C{int} that defines the size (in bytes) of each frame body.")
 
     def getChannel(channelId):
         """
@@ -131,13 +137,13 @@ class IChannelManager(Interface):
     def channelComplete(channel):
         """
         Called when enough data has been written to the channel to satisfy
-        the body. The manager's job is to act appropriately on the event and
-        then call L{IChannel.reset} to reset the channel for later use.
+        the body. The manager's job is to act appropriately on the event.
         """
 
     def initialiseChannel(channel):
         """
         Called when a channel needs to be initialised to begin accepting data.
+        This method must call L{IChannel.reset}.
 
         @param channel: The channel to initialise.
         @type channel: L{IChannel}
@@ -145,7 +151,7 @@ class IChannelManager(Interface):
 
     def setFrameSize(size):
         """
-        Called to set the frame size, informs all registered channels of the
+        Called to set the frame size, informing all registered channels of the
         update.
 
         @param size: The new frame size.

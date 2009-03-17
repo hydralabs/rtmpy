@@ -144,8 +144,11 @@ class Decoder(BaseCodec):
         """
         Returns the number of bytes available in the buffer to be read as an
         RTMP stream.
+
+        @type channel: L{interfaces.IChannel}
         """
         return min(
+            channel.frameRemaining,
             self.buffer.remaining(),
             channel.bodyRemaining,
             self.manager.frameSize
@@ -164,8 +167,7 @@ class Decoder(BaseCodec):
             raise DecodeError('Channel is required to read frame')
 
         if rtmp.DEBUG:
-            rtmp.log(self, 'Reading frame for %r %r' % (
-                self.currentChannel, self.currentChannel.getHeader()))
+            rtmp.log(self, 'Reading frame for %r' % (self.currentChannel,))
 
         available = self.getBytesAvailableForChannel(self.currentChannel)
 
@@ -180,7 +182,7 @@ class Decoder(BaseCodec):
 
         frames = self.currentChannel.frames
 
-        self.currentChannel.write(self.buffer.read(available))
+        self.currentChannel.dataReceived(self.buffer.read(available))
 
         if self.currentChannel.frames != frames:
             # a complete frame was read from the stream which means a new
@@ -189,7 +191,7 @@ class Decoder(BaseCodec):
         elif self.currentChannel.bodyRemaining == 0:
             # the channel is now complete
             if rtmp.DEBUG:
-                rtmp.log(self, 'Channel completed')
+                rtmp.log(self, '%r completed' % (self.currentChannel,))
 
             self.manager.channelComplete(self.currentChannel)
             self.currentChannel = None
@@ -212,11 +214,10 @@ class Decoder(BaseCodec):
         return (remaining >= minBytes)
 
     def _decode(self):
-        if self.currentChannel is not None:
-            if rtmp.DEBUG:
-                rtmp.log(self, 'Continuing to read frame for %r' % (
-                    self.currentChannel,))
+        if rtmp.DEBUG:
+            rtmp.log(self, 'currentChannel = %r' % (self.currentChannel,))
 
+        if self.currentChannel is not None:
             self.readFrame()
 
         if not self.canContinue():
@@ -268,7 +269,8 @@ class Decoder(BaseCodec):
         self.buffer.seek(0)
 
         if rtmp.DEBUG:
-            rtmp.log(self, 'Decode (%d:remaining)'% (self.buffer.remaining(),))
+            rtmp.log(self, 'Decode (tell:%d, length:%d)' % (
+                self.buffer.tell(), len(self.buffer),))
 
         if not self.canContinue():
             if rtmp.DEBUG:
@@ -280,12 +282,12 @@ class Decoder(BaseCodec):
 
         self._decode()
 
-        if rtmp.DEBUG:
-            rtmp.log(self, 'Complete decode (buffer: tell:%d,' \
-                ' length:%d)' % (self.buffer.tell(), len(self.buffer)))
-
         # delete the bytes that have already been decoded
         self.buffer.consume()
+
+        if rtmp.DEBUG:
+            rtmp.log(self, 'Complete decode (buffer: length:%d)' % (
+                len(self.buffer)))
 
     def dataReceived(self, data):
         """
@@ -514,6 +516,6 @@ class Encoder(BaseCodec):
         self.writeFrame(self.channelContext[channel])
 
         if len(self.buffer) > 0:
-            self.consumer.write(self.buffer.getvalue())
+            self.consumer.dataReceived(self.buffer.getvalue())
 
             self.buffer.truncate(0)

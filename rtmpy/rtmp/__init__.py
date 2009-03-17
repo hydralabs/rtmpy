@@ -61,7 +61,7 @@ def log(obj, msg):
     Used to log interesting messages from within this module (and submodules).
     Should only be called if L{DEBUG} = C{True}
     """
-    print type(obj), repr(obj), msg
+    print repr(obj), msg
 
 
 class Header(object):
@@ -188,6 +188,9 @@ class Channel(object):
         @param header: The header to apply to this channel.
         @type header: L{interfaces.IHeader}
         """
+        if DEBUG:
+            log(self, 'setHeader(%s)' % (header,))
+
         if not interfaces.IHeader.providedBy(header):
             raise TypeError("Expected header to implement IHeader")
 
@@ -220,6 +223,9 @@ class Channel(object):
 
     def _write(self, data):
         """
+        If an observer is registered then L{IChannelObserver.dataReceived} is
+        called, otherwise the data is buffered until an observer is
+        registered.
         """
         if self.observer is not None:
             self.observer.dataReceived(data)
@@ -231,6 +237,8 @@ class Channel(object):
 
     def _adjustFrameRemaining(self, l):
         """
+        Adjusts the C{frames} and C{frameRemaining} attributes based on the
+        supplied length C{l}.
         """
         size = self.manager.frameSize
 
@@ -243,8 +251,7 @@ class Channel(object):
             l -= self.frameRemaining
             self.frameRemaining = size
 
-        if l > 0:
-            self.frameRemaining -= l
+        self.frameRemaining -= l
 
     def dataReceived(self, data):
         """
@@ -264,6 +271,9 @@ class Channel(object):
                 'expected (attempted:%d remaining:%d total:%d)' % (
                     l, self.bodyRemaining, self.bytes + self.bodyRemaining))
 
+        if DEBUG:
+            log(self, 'Received %d bytes' % (l,))
+
         self._write(data)
 
         self.bytes += l
@@ -271,8 +281,43 @@ class Channel(object):
 
         self._adjustFrameRemaining(l)
 
-        if self.bodyRemaining == 0:
-            self.manager.channelComplete(self)
+    def onComplete(self):
+        """
+        Called when the channel has receieved the correct amount of data.
+        """
+        if self.manager is None:
+            raise NoManagerError('A registered manager is required to ' \
+                'complete a channel')
+
+        self.manager.channelComplete(self)
+
+        if self.observer:
+            self.observer.bodyComplete()
+
+        self.reset()
+
+    def __repr__(self):
+        s = []
+        attrs = ['frameRemaining', 'frames', 'bytes', 'bodyRemaining']
+
+        if self.header is None:
+            s.append('header=None')
+        else:
+            s.append('channelId=%d' % (self.header.channelId,))
+            s.append('datatype=%d' % (self.header.datatype,))
+
+        for a in attrs:
+            if not hasattr(self, a):
+                continue
+
+            s.append('%s=%r' % (a, getattr(self, a)))
+
+        return '<%s.%s %s at 0x%x>' % (
+            self.__class__.__module__,
+            self.__class__.__name__,
+            ' '.join(s),
+            id(self)
+        )
 
 
 class ChannelManager(object):
@@ -305,13 +350,18 @@ class ChannelManager(object):
                 channelId,))
 
         try:
-            return self.channels[channelId]
+            channel = self.channels[channelId]
         except KeyError:
-            channel = self.channels[channelId] = Channel()
+            if DEBUG:
+                log(self, 'Creating channel %d' % (channelId,))
 
+            channel = self.channels[channelId] = Channel()
             channel.registerManager(self)
 
-        return self.channels[channelId]
+        if DEBUG:
+            log(self, 'Getting channel %r' % (channel,))
+
+        return channel
 
     def getNextAvailableChannelId(self):
         """
@@ -335,18 +385,6 @@ class ChannelManager(object):
 
         return count
 
-    def setObserver(self, channel, observer):
-        """
-        """
-        if channel not in self.channels.keys():
-            raise ChannelError('%r is not registered to this manager' % (
-                channel,))
-
-        if observer in observers:
-            return
-
-        channel.registerObserver(observer)
-
     def channelComplete(self, channel):
         """
         Called when the body of the channel has been satified.
@@ -354,7 +392,31 @@ class ChannelManager(object):
         if channel.observer:
             channel.observer.bodyComplete()
 
-        # TODO - more stuff here
+        header = channel.getHeader()
+
+        if header.datatype == 1 and header.streamId == 0:
+            # change the frame size
+            d = BufferedByteStream(channel.buffer)
+            size = d.read_ulong()
+
+            if DEBUG:
+                log(self, 'Setting frame size to %d' % (size,))
+
+            self.setFrameSize(int(size))
+
+        channel.reset()
+
+    def initialiseChannel(self, channel):
+        """
+        Called when a header has been applied to an inactive channel.
+        """
+        channel.reset()
+
+    def setFrameSize(self, size):
+        self.frameSize = size
+
+        for channel in self.channels.values():
+            channel.frameRemaining = size
 
 
 class BaseProtocol(protocol.Protocol, EventDispatcher):
