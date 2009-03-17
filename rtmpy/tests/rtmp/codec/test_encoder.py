@@ -36,7 +36,9 @@ class BaseEncoderTestCase(unittest.TestCase):
         h = mocks.Header(channelId=self._channelId, relative=False)
         self._channelId += 1
 
-        c = mocks.Channel(self.manager)
+        c = mocks.Channel()
+        c.registerManager(self.manager)
+        c.reset()
         c.setHeader(h)
 
         return c

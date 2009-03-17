@@ -19,6 +19,7 @@ class BaseChannelSchedulerTestCase(unittest.TestCase):
 
     def setUp(self):
         self._channelId = 0
+        self.manager = mocks.ChannelManager()
 
     def _generateChannel(self):
         """
@@ -28,6 +29,8 @@ class BaseChannelSchedulerTestCase(unittest.TestCase):
 
         c = mocks.Channel()
         c.setHeader(h)
+        c.registerManager(self.manager)
+        c.reset()
 
         return c
 

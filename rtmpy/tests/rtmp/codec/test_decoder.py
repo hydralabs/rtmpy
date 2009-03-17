@@ -20,6 +20,17 @@ class BaseDecoderTestCase(unittest.TestCase):
         self.decoder = codec.Decoder(self.manager)
         self.buffer = self.decoder.buffer
 
+    def _generateChannel(self, header=None):
+        c = mocks.Channel()
+        c.registerManager(self.manager)
+
+        c.reset()
+
+        if header is not None:
+            c.setHeader(header)
+
+        return c
+
 
 class DecoderClassTestCase(BaseDecoderTestCase):
     """
@@ -118,8 +129,8 @@ class GetBytesAvailableForChannelTestCase(BaseDecoderTestCase):
     def setUp(self):
         BaseDecoderTestCase.setUp(self)
 
-        self.channel = mocks.Channel(self.manager)
-        self.channel.setHeader(mocks.Header(bodyLength=1000, relative=False))
+        self.channel = self._generateChannel(
+            mocks.Header(bodyLength=1000, relative=False))
 
     def gba(self):
         return self.decoder.getBytesAvailableForChannel(self.channel)
@@ -240,8 +251,7 @@ class DecodingTestCase(BaseDecoderTestCase):
         return self.deferred.addCallback(cb)
 
     def test_partialBody(self):
-        c = mocks.Channel(self.manager)
-        c.setHeader(mocks.Header(bodyLength=1000, relative=False))
+        c = self._generateChannel(mocks.Header(bodyLength=1000, relative=False))
 
         self.decoder.currentChannel = c
 
@@ -259,8 +269,8 @@ class DecodingTestCase(BaseDecoderTestCase):
         return self.deferred.addCallback(cb)
 
     def test_fullFrame(self):
-        c = mocks.Channel(self.manager)
-        c.setHeader(mocks.Header(channelId=3, bodyLength=1000, relative=False))
+        c = self._generateChannel(mocks.Header(channelId=3, bodyLength=1000,
+            relative=False))
 
         self.decoder.currentChannel = c
 
@@ -301,7 +311,7 @@ class DecodingTestCase(BaseDecoderTestCase):
 
             self.assertEquals(self.manager.complete, [(3, 'a' * 50)])
 
-            self.assertEquals(c.buffer, '')
+            self.assertEquals(c.buffer, 'a' * 50)
 
             self.assertEquals(self.decoder.currentChannel, None)
 
@@ -368,8 +378,8 @@ class FrameReadingTestCase(BaseDecoderTestCase):
         self.assertEquals(str(e), 'Channel is required to read frame')
 
     def test_notavailable(self):
-        channel = self.decoder.currentChannel = mocks.Channel(self.manager)
-        channel.setHeader(mocks.Header(bodyLength=1000, relative=False))
+        channel = self.decoder.currentChannel = self._generateChannel(
+            mocks.Header(bodyLength=1000, relative=False))
 
         self.assertEquals(self.buffer.getvalue(), '')
         self.assertEquals(channel.buffer, '')
@@ -382,8 +392,8 @@ class FrameReadingTestCase(BaseDecoderTestCase):
         self.assertEquals(channel.frames, 0)
 
     def test_partial(self):
-        channel = self.decoder.currentChannel = mocks.Channel(self.manager)
-        channel.setHeader(mocks.Header(bodyLength=1000, relative=False))
+        channel = self.decoder.currentChannel = self._generateChannel(
+            mocks.Header(bodyLength=1000, relative=False))
 
         self.buffer.write('foo.bar.baz')
         self.buffer.seek(0)
@@ -399,8 +409,8 @@ class FrameReadingTestCase(BaseDecoderTestCase):
         self.assertEquals(channel.frames, 0)
 
     def test_full(self):
-        channel = self.decoder.currentChannel = mocks.Channel(self.manager)
-        channel.setHeader(mocks.Header(bodyLength=1000, relative=False))
+        channel = self.decoder.currentChannel = self._generateChannel(
+            mocks.Header(bodyLength=1000, relative=False))
 
         self.buffer.write(' ' * self.manager.frameSize)
         self.buffer.seek(0)
@@ -417,8 +427,8 @@ class FrameReadingTestCase(BaseDecoderTestCase):
         self.assertEquals(self.decoder.currentChannel, None)
 
     def test_moreThanOne(self):
-        channel = self.decoder.currentChannel = mocks.Channel(self.manager)
-        channel.setHeader(mocks.Header(bodyLength=1000, relative=False))
+        channel = self.decoder.currentChannel = self._generateChannel(
+            mocks.Header(bodyLength=1000, relative=False))
 
         self.buffer.write(' ' * (self.manager.frameSize + 50))
         self.buffer.seek(0)

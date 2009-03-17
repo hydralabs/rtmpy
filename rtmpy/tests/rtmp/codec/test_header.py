@@ -8,7 +8,7 @@ Tests for L{rtmpy.rtmp.codec.header}.
 from twisted.trial import unittest
 
 from rtmpy.rtmp.codec import header
-from rtmpy import util
+from rtmpy import util, rtmp
 from rtmpy.tests.rtmp import mocks
 
 
@@ -55,14 +55,20 @@ class EncodeHeaderByteTestCase(unittest.TestCase):
         for x in header.HEADER_SIZES:
             try:
                 header.encodeHeaderByte(x, 0)
-            except ValueError:
-                self.fail('Raised ValueError on %d' % (x,))
+            except rtmp.HeaderError:
+                self.fail('Raised rtmp.HeaderError on %d' % (x,))
 
         self.assertFalse(16 in header.HEADER_SIZES)
-        self.assertRaises(ValueError, header.encodeHeaderByte, 16, 0)
+        e = self.assertRaises(rtmp.HeaderError,
+            header.encodeHeaderByte, 16, 0)
+        self.assertEquals(str(e), 'Unexpected headerLength value (got 16)')
 
-        self.assertRaises(ValueError, header.encodeHeaderByte, 1, -1)
-        self.assertRaises(ValueError, header.encodeHeaderByte, 1, 0x40)
+        e = self.assertRaises(rtmp.HeaderError,
+            header.encodeHeaderByte, 1, -1)
+        self.assertEquals(str(e), 'Expected channelId between 0x00 and 0x3f')
+        e = self.assertRaises(rtmp.HeaderError,
+            header.encodeHeaderByte, 1, 0x40)
+        self.assertEquals(str(e), 'Expected channelId between 0x00 and 0x3f')
 
     def test_return(self):
         self.assertEquals(header.encodeHeaderByte(12, 0), 0)
@@ -92,7 +98,7 @@ class GetHeaderSizeIndexTestCase(unittest.TestCase):
         h = mocks.Header()
         self.assertEquals(h.channelId, None)
 
-        self.assertRaises(ValueError, header.getHeaderSizeIndex, h)
+        self.assertRaises(rtmp.HeaderError, header.getHeaderSizeIndex, h)
 
     def test_return(self):
         h = mocks.Header(channelId=3)
@@ -113,7 +119,7 @@ class GetHeaderSizeIndexTestCase(unittest.TestCase):
 
         self.assertEquals(header.getHeaderSizeIndex(h), 1)
         h.timestamp = None
-        e = self.assertRaises(ValueError, header.getHeaderSizeIndex, h)
+        e = self.assertRaises(rtmp.HeaderError, header.getHeaderSizeIndex, h)
 
         h = mocks.Header(channelId=23, streamId=234, bodyLength=1232,
             datatype=2, timestamp=234234)
@@ -121,15 +127,15 @@ class GetHeaderSizeIndexTestCase(unittest.TestCase):
         self.assertEquals(header.getHeaderSizeIndex(h), 0)
 
         h.bodyLength = None
-        e = self.assertRaises(ValueError, header.getHeaderSizeIndex, h)
+        e = self.assertRaises(rtmp.HeaderError, header.getHeaderSizeIndex, h)
         h.bodyLength = 1232
 
         h.datatype = None
-        e = self.assertRaises(ValueError, header.getHeaderSizeIndex, h)
+        e = self.assertRaises(rtmp.HeaderError, header.getHeaderSizeIndex, h)
         h.datatype = 2
 
         h.timestamp = None
-        e = self.assertRaises(ValueError, header.getHeaderSizeIndex, h)
+        e = self.assertRaises(rtmp.HeaderError, header.getHeaderSizeIndex, h)
         h.timestamp = 2345123
 
 
@@ -326,19 +332,19 @@ class DiffHeadersTestCase(unittest.TestCase):
         h2 = mocks.Header(relative=True)
         h3 = mocks.Header(relative=False)
 
-        e = self.assertRaises(ValueError, header.diffHeaders, h1, h1)
+        e = self.assertRaises(rtmp.HeaderError, header.diffHeaders, h1, h1)
         self.assertEquals(str(e),
             'Received a non-absolute header for old (relative = None)')
 
-        e = self.assertRaises(ValueError, header.diffHeaders, h2, h2)
+        e = self.assertRaises(rtmp.HeaderError, header.diffHeaders, h2, h2)
         self.assertEquals(str(e),
             'Received a non-absolute header for old (relative = True)')
 
-        e = self.assertRaises(ValueError, header.diffHeaders, h3, h1)
+        e = self.assertRaises(rtmp.HeaderError, header.diffHeaders, h3, h1)
         self.assertEquals(str(e),
             'Received a non-absolute header for new (relative = None)')
 
-        e = self.assertRaises(ValueError, header.diffHeaders, h3, h2)
+        e = self.assertRaises(rtmp.HeaderError, header.diffHeaders, h3, h2)
         self.assertEquals(str(e),
             'Received a non-absolute header for new (relative = True)')
 
@@ -346,7 +352,7 @@ class DiffHeadersTestCase(unittest.TestCase):
         h1 = mocks.Header(relative=False, channelId=3)
         h2 = mocks.Header(relative=False, channelId=42)
 
-        e = self.assertRaises(ValueError, header.diffHeaders, h1, h2)
+        e = self.assertRaises(rtmp.HeaderError, header.diffHeaders, h1, h2)
         self.assertEquals(str(e), 'The two headers are not for the same channel')
 
     def test_nodiff(self):
@@ -479,19 +485,19 @@ class MergeHeadersTestCase(unittest.TestCase):
         h2 = mocks.Header(relative=True)
         h3 = mocks.Header(relative=False)
 
-        e = self.assertRaises(ValueError, header.mergeHeaders, h1, h1)
+        e = self.assertRaises(rtmp.HeaderError, header.mergeHeaders, h1, h1)
         self.assertEquals(str(e),
             'Received a non-absolute header for old (relative = None)')
 
-        e = self.assertRaises(ValueError, header.mergeHeaders, h2, h2)
+        e = self.assertRaises(rtmp.HeaderError, header.mergeHeaders, h2, h2)
         self.assertEquals(str(e),
             'Received a non-absolute header for old (relative = True)')
 
-        e = self.assertRaises(ValueError, header.mergeHeaders, h3, h1)
+        e = self.assertRaises(rtmp.HeaderError, header.mergeHeaders, h3, h1)
         self.assertEquals(str(e),
             'Received a non-relative header for new (relative = None)')
 
-        e = self.assertRaises(ValueError, header.mergeHeaders, h2, h3)
+        e = self.assertRaises(rtmp.HeaderError, header.mergeHeaders, h2, h3)
         self.assertEquals(str(e),
             'Received a non-absolute header for old (relative = True)')
 
@@ -499,7 +505,7 @@ class MergeHeadersTestCase(unittest.TestCase):
         h1 = mocks.Header(relative=False, channelId=3)
         h2 = mocks.Header(relative=True, channelId=42)
 
-        e = self.assertRaises(ValueError, header.mergeHeaders, h1, h2)
+        e = self.assertRaises(rtmp.HeaderError, header.mergeHeaders, h1, h2)
         self.assertEquals(str(e), 'The two headers are not for the same channel')
 
     def test_nodiff(self):

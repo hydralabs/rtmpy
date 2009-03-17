@@ -17,8 +17,6 @@ multiplexing many NetStreams using different channels. Within these channels
 packets are split up into fixed size body chunks.
 
 @see: U{RTMP (external)<http://rtmpy.org/wiki/RTMP>}
-
-@since: 0.1
 """
 
 from twisted.internet import reactor, protocol, defer, task
@@ -37,7 +35,6 @@ MAX_CHANNELS = 64
 MAX_STREAMS = 0xffff
 
 DEBUG = False
-DEBUG_TYPES = []
 
 
 class BaseError(Exception):
@@ -46,48 +43,32 @@ class BaseError(Exception):
     """
 
 
-class ChannelError(BaseError):
+class HeaderError(BaseError):
     """
-    Raised if something unexpected occurs whilst dealing with RTMP Channels.
-    """
-
-
-def log(type, obj, msg):
-    """
-    Used to log interesting messages from within this module (and submodules)
-    """
-    if type not in DEBUG_TYPES:
-        return
-
-    print type, repr(obj), msg
-
-
-class ChannelTypes:
-    """
-    RTMP Channel data types.
+    Raised if a header related operation failed.
     """
 
-    FRAME_SIZE = 0x01
-    # 0x02 is unknown
-    BYTES_READ = 0x03
-    PING = 0x04
-    SERVER_BANDWIDTH = 0x05
-    CLIENT_BANDWIDTH = 0x06
-    AUDIO_DATA = 0x07
-    VIDEO_DATA = 0x08
-    # 0x0a - 0x0e is unknown
-    FLEX_SHARED_OBJECT = 0x10 # ?
-    FLEX_MESSAGE = 0x11
-    NOTIFY = 0x12
-    SHARED_OBJECT = 0x13
-    INVOKE = 0x14
-    # 0x15 anyone?
-    FLV_DATA = 0x16
+
+class NoManagerError(BaseError):
+    """
+    Raised if an operation performed on a channel requires a registered
+    manager
+    """
+
+
+def log(obj, msg):
+    """
+    Used to log interesting messages from within this module (and submodules).
+    Should only be called if L{DEBUG} = C{True}
+    """
+    print type(obj), repr(obj), msg
 
 
 class Header(object):
     """
     An RTMP Header. Holds contextual information for an RTMP Channel.
+
+    @see: L{interfaces.IHeader}
     """
 
     implements(interfaces.IHeader)
@@ -135,6 +116,12 @@ class Channel(object):
 
     implements(interfaces.IChannel)
 
+    def __init__(self):
+        self.manager = None
+        self.header = None
+        self.buffer = None
+        self.observer = None
+
     def registerManager(self, manager):
         """
         Registers a manager to this channel.
@@ -166,22 +153,21 @@ class Channel(object):
     def reset(self):
         """
         Called to reset the channel's context.
+
+        @note: Does not reset any header information that may already be
+            applied to this channel.
+        @raise ChannelError: If no manager has been registered.
         """
+        if self.manager is None:
+            raise NoManagerError('Resetting a channel requires a ' \
+                'registered manager')
+
         self.frameRemaining = self.manager.frameSize
         self.frames = 0
         self.bytes = 0
         self.buffer = None
         self.observer = None
-        self.header = None
         self.bodyRemaining = None
-
-    def setFrameSize(self, size):
-        """
-        Called (usually by the manager) when the frame size of the RTMP
-        channels change.
-        """
-        # sizes are only set between frames, so this is okay
-        self.frameRemaining = self.manager.frameSize
 
     def getHeader(self):
         """
@@ -194,24 +180,38 @@ class Channel(object):
 
     def setHeader(self, header):
         """
+        Applies a new header to this channel. If this channel has no previous
+        header then the new header must be absolute (relative=True). Otherwise
+        the new values will be applied to the existing header. Setting the
+        header requires a registered manager.
+
+        @param header: The header to apply to this channel.
+        @type header: L{interfaces.IHeader}
         """
         if not interfaces.IHeader.providedBy(header):
             raise TypeError("Expected header to implement IHeader")
 
-        if self.header is not None:
+        if self.manager is None:
+            raise NoManagerError('Setting the header requires a registered ' \
+                'manager')
+
+        if self.header is None:
+            if header.relative is True:
+                raise HeaderError('Tried to set a relative header as ' \
+                    'absolute')
+        else:
             if header.channelId != self.header.channelId:
-                raise RuntimeError('Tried to assign a header from a ' \
+                raise HeaderError('Tried to assign a header from a ' \
                     'different channel (original:%d, new:%d)' % (
                         self.header.channelId, header.channelId))
-        else:
-            if header.relative is True:
-                raise ChannelError('')
-
-            self.manager.activateChannel(self)
 
         if header.relative is False:
-            self.header = header
+            old_header, self.header = self.header, header
+
+            if old_header is None:
+                self.manager.initialiseChannel(self)
         else:
+            # this stops a circular import error
             from rtmpy.rtmp.codec.header import mergeHeaders
 
             self.header = mergeHeaders(self.header, header)
@@ -222,7 +222,7 @@ class Channel(object):
         """
         """
         if self.observer is not None:
-            self.observer.dataReceieved(data)
+            self.observer.dataReceived(data)
         else:
             if self.buffer is None:
                 self.buffer = ''
@@ -234,23 +234,17 @@ class Channel(object):
         """
         size = self.manager.frameSize
 
-        if l < size:
-            self.frameRemaining -= l
-
-            return
-
         while l >= size:
             self.frames += 1
             l -= size
 
-        if self.frameRemaining != size and l + self.frameRemaining >= size:
+        if l >= self.frameRemaining:
             self.frames += 1
-            l -= size
+            l -= self.frameRemaining
+            self.frameRemaining = size
 
         if l > 0:
-            self.frameRemaining = l
-        else:
-            self.frameRemaining = size
+            self.frameRemaining -= l
 
     def dataReceived(self, data):
         """
@@ -261,13 +255,14 @@ class Channel(object):
         @type data: C{str}
         """
         if self.header is None:
-            raise RuntimeError("Cannot write to a channel with no header")
+            raise HeaderError("Cannot write to a channel with no header")
 
         l = len(data)
 
         if self.bodyRemaining - l < 0:
-            # tried to write more data than was expected
-            raise RuntimeError('Too much data!')
+            raise OverflowError('Attempted to write more data than was ' \
+                'expected (attempted:%d remaining:%d total:%d)' % (
+                    l, self.bodyRemaining, self.bytes + self.bodyRemaining))
 
         self._write(data)
 

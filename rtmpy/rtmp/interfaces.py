@@ -2,10 +2,9 @@
 # See LICENSE for details.
 
 """
-Interface documentation.
+Interface documentation for RTMP primitives.
 """
 
-from twisted.internet import interfaces
 from zope.interface import Interface, Attribute, implements
 
 
@@ -49,7 +48,7 @@ class IChannel(Interface):
         "considered complete.")
     observer = Attribute(
         "An L{IChannelObserver} object that listens for events on this "
-        "channel")
+        "channel.")
 
     def registerManager(manager):
         """
@@ -61,7 +60,8 @@ class IChannel(Interface):
 
     def registerObserver(observer):
         """
-        Registers an observer for this channel.
+        Registers an observer for this channel. If the channel is buffering
+        data then the observer must be notified immediately.
 
         @param observer: L{IChannelObserver}
         @raise TypeError: If observer does not provide L{IChannelObserver}
@@ -70,7 +70,7 @@ class IChannel(Interface):
     def getHeader():
         """
         Returns the header for this channel. Returns C{None} if no header was
-        applied to this channel
+        applied to this channel.
 
         @rtype: L{IHeader} or C{None}.
         """
@@ -79,29 +79,34 @@ class IChannel(Interface):
         """
         Sets the header for this channel. If the header is relative, then it
         is 'merged' with the last absolute header. If no header has been
-        applied to this channel then L{IChannelManager.activateChannel} must
+        applied to this channel then L{IChannelManager.initialiseChannel} must
         be called.
 
+        @param header: The header to apply to this channel.
         @type header: L{IHeader}
+        @raise TypeError: If C{header} does not provide L{IHeader}
         """
 
     def dataReceived(data):
         """
         Called when data has been received for this channel. The channel must
         buffer the data until an observer has been registered.
+
+        @type data: C{str}
         """
 
     def reset():
         """
         Called to reset the context information. Called when after a channel
-        completes its body.
+        completes its body. This function should reset all contextual values
+        except the header.
         """
 
 
 class IChannelManager(Interface):
     """
-    Defines the interface for managing channels. The channel manager handles
-    the interactions between its registered channels and the outside world ..
+    The channel manager handles the interactions between its registered
+    channels and the outside world.
     """
 
     frameSize = Attribute("An C{int} that defines the size (in bytes) of "
@@ -130,8 +135,21 @@ class IChannelManager(Interface):
         then call L{IChannel.reset} to reset the channel for later use.
         """
 
-    def activateChannel(channel):
+    def initialiseChannel(channel):
         """
+        Called when a channel needs to be initialised to begin accepting data.
+
+        @param channel: The channel to initialise.
+        @type channel: L{IChannel}
+        """
+
+    def setFrameSize(size):
+        """
+        Called to set the frame size, informs all registered channels of the
+        update.
+
+        @param size: The new frame size.
+        @type size: C{int}
         """
 
 
@@ -151,7 +169,7 @@ class IChannelObserver(Interface):
 class IChannelScheduler(Interface):
     """
     A channel scheduler is meant to iteratively supply 'active' channels via
-    the L{getNextChannel} method.
+    the L{getNextChannel} method. Used for RTMP encoding.
     """
 
     def activateChannel(channel):

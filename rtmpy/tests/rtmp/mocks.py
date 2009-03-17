@@ -25,13 +25,15 @@ class ChannelManager(object):
         self.frameSize = 128
 
         self.complete = []
+        self.initialised = []
 
     def getChannel(self, id):
         try:
             return self.channels[id]
         except KeyError:
-            print 'create channel ', id
-            channel = self.channels[id] = Channel(self)
+            channel = self.channels[id] = Channel()
+            channel.registerManager(self)
+            channel.reset()
 
         return self.channels[id]
 
@@ -40,12 +42,16 @@ class ChannelManager(object):
 
         self.complete.append((header.channelId, channel.buffer))
 
-        if header.datatype == 1:
-            from pyamf.util import BufferedByteStream
-            x = BufferedByteStream(channel.buffer)
-            self.frameSize = x.read_ulong()
+    def initialiseChannel(self, channel):
+        self.initialised.append(channel)
 
         channel.reset()
+
+    def setFrameSize(self, size):
+        self.frameSize = size
+
+        for channel in self.channels.values():
+            channel.frameRemaining = size
 
 
 class Channel(object):
@@ -55,10 +61,7 @@ class Channel(object):
 
     implements(interfaces.IChannel)
 
-    def __init__(self, manager):
-        self.registerManager(manager)
-        self.reset()
-
+    def __init__(self):
         self.header = None
 
     def registerManager(self, manager):
@@ -126,23 +129,6 @@ class Channel(object):
         if len(self.buffer) > 0:
             self.consumer.write(self.buffer)
             self.buffer = 0
-
-    def __repr__(self):
-        h = self.header
-
-        if h is None:
-            s = 'anonymous'
-        else:
-            s = str(self.header.channelId)
-
-        s += ' %d/%d' % (self.bytes, self.header.bodyLength)
-
-        return '<%s.%s %s at 0x%x>' % (
-            self.__class__.__module__,
-            self.__class__.__name__,
-            s,
-            id(self)
-        )
 
 
 class Header(object):

@@ -39,7 +39,7 @@ def decodeHeaderByte(byte):
     try:
         return HEADER_SIZES[index], byte & 0x3f
     except IndexError:
-        raise ValueError('Invalid header size (got %d)' % (index,))
+        raise rtmp.HeaderError('Invalid header size (got %d)' % (index,))
 
 
 def encodeHeaderByte(headerLength, channelId):
@@ -63,11 +63,11 @@ def encodeHeaderByte(headerLength, channelId):
     try:
         index = HEADER_SIZES.index(headerLength)
     except ValueError:
-        raise ValueError('Unexpected headerLength value (got %d)' % (
+        raise rtmp.HeaderError('Unexpected headerLength value (got %d)' % (
             headerLength,))
 
     if channelId > 0x3f or channelId < 0:
-        raise ValueError('Expected channelId between 0x00 and 0x3f')
+        raise rtmp.HeaderError('Expected channelId between 0x00 and 0x3f')
 
     return (index << 6) | channelId
 
@@ -83,20 +83,23 @@ def getHeaderSizeIndex(header):
     @rtype: C{int}
     """
     if not IHeader.providedBy(header):
-        raise TypeError('IHeader interface expected')
+        raise TypeError('IHeader interface expected (got:%s)' % (
+            type(header),))
 
     if header.channelId is None:
-        raise ValueError('Header channelId cannot be None')
+        raise rtmp.HeaderError('Header channelId cannot be None')
 
     if header.streamId is not None:
         if None in [header.bodyLength, header.datatype, header.timestamp]:
-            raise ValueError('Dependant values unmet (got:%r)' % (header,))
+            raise rtmp.HeaderError('Dependant values unmet (got:%r)' % (
+                header,))
 
         return 0
 
     if [header.bodyLength, header.datatype] != [None, None]:
         if header.timestamp is None:
-            raise ValueError('Dependant values unmet (got:%r)' % (header,))
+            raise rtmp.HeaderError('Dependant values unmet (got:%r)' % (
+                header,))
 
         return 1
 
@@ -123,7 +126,7 @@ def getHeaderSize(header):
     try:
         return HEADER_SIZES[index]
     except IndexError:
-        raise ValueError("Unable to determine header size (got %r)" % (
+        raise rtmp.HeaderError("Unable to determine header size (got %r)" % (
             header,))
 
 
@@ -235,15 +238,15 @@ def diffHeaders(old, new):
         raise TypeError("Expected IHeader for new (got %r)" % (new,))
 
     if old.relative is not False:
-        raise ValueError("Received a non-absolute header for old " \
+        raise rtmp.HeaderError("Received a non-absolute header for old " \
             "(relative = %r)" % (old.relative))
 
     if new.relative is not False:
-        raise ValueError("Received a non-absolute header for new " \
+        raise rtmp.HeaderError("Received a non-absolute header for new " \
             "(relative = %r)" % (new.relative))
 
     if old.channelId != new.channelId:
-        raise ValueError("The two headers are not for the same channel")
+        raise rtmp.HeaderError("The two headers are not for the same channel")
 
     header = rtmp.Header(channelId=old.channelId, relative=True)
 
@@ -283,15 +286,15 @@ def mergeHeaders(old, new):
         raise TypeError("Expected IHeader for new (got %r)" % (new,))
 
     if old.relative is not False:
-        raise ValueError("Received a non-absolute header for old " \
+        raise rtmp.HeaderError("Received a non-absolute header for old " \
             "(relative = %r)" % (old.relative))
 
     if new.relative is not True:
-        raise ValueError("Received a non-relative header for new " \
+        raise rtmp.HeaderError("Received a non-relative header for new " \
             "(relative = %r)" % (new.relative))
 
     if old.channelId != new.channelId:
-        raise ValueError("The two headers are not for the same channel")
+        raise rtmp.HeaderError("The two headers are not for the same channel")
 
     header = rtmp.Header(channelId=old.channelId, relative=False)
 
