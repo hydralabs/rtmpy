@@ -99,3 +99,28 @@ class ChannelTestCase(unittest.TestCase):
         c.registerManager(m)
 
         self.assertIdentical(m, c.manager)
+
+    def test_registerObserver(self):
+        c = rtmp.Channel()
+
+        e = self.assertRaises(TypeError, c.registerObserver, object())
+        self.assertEquals(str(e), 'Expected IChannelObserver for observer ' \
+            '(got <type \'object\'>)')
+
+        o = mocks.ChannelObserver()
+        self.assertTrue(interfaces.IChannelObserver.providedBy(o))
+        c.registerObserver(o)
+
+        self.assertIdentical(o, c.observer)
+
+        # make sure that the observer gets notified if the channel is
+        # buffering data.
+
+        c = rtmp.Channel()
+        c.buffer = 'hello'
+
+        o = mocks.ChannelObserver()
+        c.registerObserver(o)
+
+        self.assertEquals(o.events, [('data-received', 'hello')])
+        self.assertEquals(o.buffer, 'hello')

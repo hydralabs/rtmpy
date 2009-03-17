@@ -197,3 +197,24 @@ class LoopingScheduler(object):
             self.index = 0
 
         return self.activeChannels[self.index]
+
+
+class ChannelObserver(object):
+    """
+    A mock object that listens to events from channel
+    """
+
+    implements(interfaces.IChannelObserver)
+
+    def __init__(self):
+        self.events = []
+        self.channel = None
+        self.buffer = ''
+
+    def dataReceived(self, data):
+        self.events.append(('data-received', data))
+
+        self.buffer += str(data)
+
+    def bodyComplete(self):
+        self.events.append(('body-complete',))

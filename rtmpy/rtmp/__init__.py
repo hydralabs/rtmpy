@@ -159,7 +159,7 @@ class Channel(object):
 
         self.observer = observer
 
-        if self.buffer is not None:
+        if hasattr(self, 'buffer') and self.buffer is not None:
             self.observer.dataReceived(self.buffer)
             self.buffer = None
 
