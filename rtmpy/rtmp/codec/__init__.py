@@ -249,13 +249,13 @@ class Decoder(BaseCodec):
 
         if rtmp.DEBUG:
             if h.relative is True:
-                rtmp.log(self, 'before %r' % (self.currentChannel.getHeader(),))
+                rtmp.log(self, 'before %r' % self.currentChannel.getHeader())
 
         self.currentChannel.setHeader(h)
 
         if rtmp.DEBUG:
             if h.relative is True:
-                rtmp.log(self, 'after %r' % (self.currentChannel.getHeader(),))
+                rtmp.log(self, 'after %r' % self.currentChannel.getHeader())
 
         self.readFrame()
 
@@ -456,18 +456,16 @@ class Encoder(BaseCodec):
     def activateChannel(self, channel):
         """
         Flags a channel as actively producing data.
-
-        @raise 
         """
         if not channel in self.channelContext:
             self.channelContext[channel] = ChannelContext(channel, self)
 
         self.channelContext[channel].active = True
-
         self.scheduler.activateChannel(channel)
 
     def deactivateChannel(self, channel):
         """
+        Flags a channel as not actively producing data.
         """
         if not channel in self.channelContext:
             raise RuntimeError('Attempted to deactivate a non-existant ' + \

@@ -1,5 +1,5 @@
 # -*- test-case-name: rtmpy.tests.test_rtmp -*-
-#
+
 # Copyright (c) 2007-2009 The RTMPy Project.
 # See LICENSE for details.
 
@@ -22,24 +22,44 @@ packets are split up into fixed size body chunks.
 """
 
 from twisted.internet import reactor, protocol, defer, task
-from twisted.internet import interfaces as tw_interfaces
-from zope.interface import implements, providedBy
-from pyamf.util import hexdump, IndexedCollection, BufferedByteStream
+from zope.interface import implements
+from pyamf.util import IndexedCollection, BufferedByteStream
 
 from rtmpy.rtmp import interfaces
 from rtmpy.dispatcher import EventDispatcher
-from rtmpy import util
 
-#: Default port 1935 is a registered U{IANA<http://iana.org>} port.
+
+#: The default RTMP port is a registered at U{IANA<http://iana.org>}.
 RTMP_PORT = 1935
 
+DEFAULT_FRAME_SIZE = 128
 MAX_CHANNELS = 64
-MAX_STREAMS = 0xffffff
+MAX_STREAMS = 0xffff
 
 DEBUG = False
+DEBUG_TYPES = []
 
-def log(obj, msg):
-    print repr(obj), msg
+
+class BaseError(Exception):
+    """
+    A base class for all RTMP related errors.
+    """
+
+
+class ChannelError(BaseError):
+    """
+    Raised if something unexpected occurs whilst dealing with RTMP Channels.
+    """
+
+
+def log(type, obj, msg):
+    """
+    Used to log interesting messages from within this module (and submodules)
+    """
+    if type not in DEBUG_TYPES:
+        return
+
+    print type, repr(obj), msg
 
 
 class ChannelTypes:
@@ -67,7 +87,7 @@ class ChannelTypes:
 
 class Header(object):
     """
-    An RTMP Header.
+    An RTMP Header. Holds contextual information for an RTMP Channel.
     """
 
     implements(interfaces.IHeader)
@@ -82,23 +102,22 @@ class Header(object):
         self.relative = kwargs.get('relative', None)
 
     def __repr__(self):
-        v = ['%s=%r' % (x, getattr(self, x)) for x in ('relative', 'channelId',
-            'streamId', 'datatype', 'bodyLength', 'timestamp')]
+        s = ['%s=%r' % (k, v) for k, v in self.__dict__.iteritems()]
 
         s = '<%s.%s %s at 0x%x>' % (
-            self.__class__.__module__, self.__class__.__name__, ' '.join(v), id(self))
+            self.__class__.__module__,
+            self.__class__.__name__,
+            ' '.join(s),
+            id(self))
 
         return s
+
 
 class Channel(object):
     """
     Acts as a container for an RTMP channel. Does not know anything of
-    encoding or decoding channels, it is literally meant as a dump from the
-    protocol.
-
-    A channel is meant to to agnostic to whether it is a producing channel
-    (receiving data from the stream) or a consuming channel (receiving data
-    from the connection).
+    encoding or decoding channels, it is literally meant as a proxy between
+    the byte stream and an observer.
 
     @ivar manager: The manager for this channel. The channel will report back
         to the manager about various activities it is performing.
@@ -106,65 +125,137 @@ class Channel(object):
     @ivar header: The calculated header for this channel. RTMP can send
         relative headers, which will be merged with the previous headers to
         calculate the absolute values for the header.
-    @type header: L{Header}
-
-    NJ: not sure about this lot ..
-    @ivar bytesRecieved: Number of bytes read from the stream so far.
-    @type bytesRecieved: C{int}
-    @ivar framesRecieved: A calculated field that returns the number of bytes
-        required to complete the current chunk.
-    @type framesRecieved: C{int}
+    @type header: L{Header} or C{None}
+    @ivar frameRemaining: The amount of data that needs to be received before
+        a frame can be considered complete.
+    @type frameRemaining: C{int}
+    @ivar buffer: Any buffered data before an observer was registered.
+    @type buffer: C{str} or C{None}
     """
 
     implements(interfaces.IChannel)
 
     def registerManager(self, manager):
         """
-        Registers this channel to C{manager}.
-
-        @type manager: L{ChannelManager}
+        Registers a manager to this channel.
         """
+        if not interfaces.IChannelManager.providedBy(manager):
+            raise TypeError('Expected IChannelManager for manager ' \
+                '(got %s)' % (type(manager),))
+
         self.manager = manager
-        self.reset()
+
+    def registerObserver(self, observer):
+        """
+        Registers an observer to this channel. If there is any buffered data,
+        the observer will be notified immediately.
+
+        @param observer: The observer for this channel.
+        @type observer: L{interfaces.IChannelObserver}
+        """
+        if not interfaces.IChannelObserver.providedBy(observer):
+            raise TypeError('Expected IChannelObserver for observer ' \
+                '(got %s)' % (type(observer),))
+
+        self.observer = observer
+
+        if self.buffer is not None:
+            self.observer.dataReceived(self.buffer)
+            self.buffer = None
+
+    def reset(self):
+        """
+        Called to reset the channel's context.
+        """
+        self.frameRemaining = self.manager.frameSize
+        self.frames = 0
+        self.bytes = 0
+        self.buffer = None
+        self.observer = None
+        self.header = None
+        self.bodyRemaining = None
+
+    def setFrameSize(self, size):
+        """
+        Called (usually by the manager) when the frame size of the RTMP
+        channels change.
+        """
+        # sizes are only set between frames, so this is okay
+        self.frameRemaining = self.manager.frameSize
 
     def getHeader(self):
         """
         Gets the header for this channel. The header contains the absolute
         values for all received headers in the stream.
+
+        @rtype: L{interfaces.IHeader} or C{None}
         """
         return self.header
 
     def setHeader(self, header):
-        assert interfaces.IHeader.providedBy(header), "Expected header to implement IHeader"
+        """
+        """
+        if not interfaces.IHeader.providedBy(header):
+            raise TypeError("Expected header to implement IHeader")
+
+        if self.header is not None:
+            if header.channelId != self.header.channelId:
+                raise RuntimeError('Tried to assign a header from a ' \
+                    'different channel (original:%d, new:%d)' % (
+                        self.header.channelId, header.channelId))
+        else:
+            if header.relative is True:
+                raise ChannelError('')
+
+            self.manager.activateChannel(self)
 
         if header.relative is False:
             self.header = header
+        else:
+            from rtmpy.rtmp.codec.header import mergeHeaders
+
+            self.header = mergeHeaders(self.header, header)
+
+        self.bodyRemaining = self.header.bodyLength - self.bytes
+
+    def _write(self, data):
+        """
+        """
+        if self.observer is not None:
+            self.observer.dataReceieved(data)
+        else:
+            if self.buffer is None:
+                self.buffer = ''
+
+            self.buffer += data
+
+    def _adjustFrameRemaining(self, l):
+        """
+        """
+        size = self.manager.frameSize
+
+        if l < size:
+            self.frameRemaining -= l
 
             return
 
-        assert header.channelId == self.header.channelId
+        while l >= size:
+            self.frames += 1
+            l -= size
 
-        from rtmpy.rtmp.codec.header import mergeHeaders
+        if self.frameRemaining != size and l + self.frameRemaining >= size:
+            self.frames += 1
+            l -= size
 
-        self.header = mergeHeaders(self.header, header)
+        if l > 0:
+            self.frameRemaining = l
+        else:
+            self.frameRemaining = size
 
-    def reset(self):
-        """
-        """
-        self.clear()
-
-        self._frameRemaining = self.manager.getFrameSize()
-        self.bytes = 0
-        self.frames = 0
-        self.header = None
-
-    def write(self, data):
+    def dataReceived(self, data):
         """
         Called when a frame or partial frame is read from or written to the
-        RTMP byte stream. If an entire frame (or multiple frames) completed,
-        then L{dispatchFrame} is called. Note that the number of frames and
-        the number of times that L{dispatchFrame} is called may not necessarily
-        be the same.
+        RTMP byte stream. If the 
 
         @param data: A string of bytes.
         @type data: C{str}
@@ -172,50 +263,21 @@ class Channel(object):
         if self.header is None:
             raise RuntimeError("Cannot write to a channel with no header")
 
-        frameSize = self.manager.getFrameSize()
-        dataLength = len(data)
+        l = len(data)
 
-        if dataLength < self._frameRemaining:
-            # we won't be completing any frames this time.
-            self.bytes += dataLength
-            self.frame.write(data)
-            self._frameRemaining -= dataLength
+        if self.bodyRemaining - l < 0:
+            # tried to write more data than was expected
+            raise RuntimeError('Too much data!')
 
-            return
+        self._write(data)
 
-        self.bytes += self._frameRemaining
-        self.frame.write(data[:self._frameRemaining - 1])
-        dataLength -= self._frameRemaining
+        self.bytes += l
+        self.bodyRemaining -= l
 
-        # we now have a full frame
-        self.dispatchFrame()
+        self._adjustFrameRemaining(l)
 
-        while dataLength >= frameSize:
-            data = data[:frameSize - 1]
-            self.write(data)
-            dataLength -= frameSize
-
-        self.bytes += dataLength
-        self.packet.write(data)
-        self._frameRemaining = frameSize - dataLength
-
-    def dispatchFrame(self):
-        self.manager.frameReceived(self, self.packet.getvalue())
-        self.clear()
-        self.frames += 1
-
-    def channelId(self):
-        if self.header is None:
-            raise AttributeError("No channelId without a header")
-
-        return self.header.channelId
-
-    channelId = property(channelId)
-
-    def bodyRemaining(self):
-        return self.header.bodyLength - len(self.buffer)
-
-    bodyRemaining = property(bodyRemaining)
+        if self.bodyRemaining == 0:
+            self.manager.channelComplete(self)
 
 
 class ChannelManager(object):
@@ -232,23 +294,27 @@ class ChannelManager(object):
 
     def __init__(self):
         self.channels = {}
+        self.frameSize = DEFAULT_FRAME_SIZE
 
     def getChannel(self, channelId):
         """
         Returns a channel based on channelId. If the channel doesn't exist,
-        then C{None} is returned.
+        then one is created.
 
         @param channelId: Index for the channel to retrieve.
         @type channelId: C{int}
         @rtype: L{Channel}
         """
         if MAX_CHANNELS < channelId < 0:
-            raise IndexError("channelId is out of range (got:%d)" % (channelId,))
+            raise IndexError("channelId is out of range (got:%d)" % (
+                channelId,))
 
         try:
             return self.channels[channelId]
         except KeyError:
-            self.channels[channelId] = Channel()
+            channel = self.channels[channelId] = Channel()
+
+            channel.registerManager(self)
 
         return self.channels[channelId]
 
@@ -274,6 +340,27 @@ class ChannelManager(object):
 
         return count
 
+    def setObserver(self, channel, observer):
+        """
+        """
+        if channel not in self.channels.keys():
+            raise ChannelError('%r is not registered to this manager' % (
+                channel,))
+
+        if observer in observers:
+            return
+
+        channel.registerObserver(observer)
+
+    def channelComplete(self, channel):
+        """
+        Called when the body of the channel has been satified.
+        """
+        if channel.observer:
+            channel.observer.bodyComplete()
+
+        # TODO - more stuff here
+
 
 class BaseProtocol(protocol.Protocol, EventDispatcher):
     """
@@ -281,28 +368,23 @@ class BaseProtocol(protocol.Protocol, EventDispatcher):
     packets as they arrive.
 
     @ivar buffer: Contains any remaining unparsed data from the C{transport}.
-    @type buffer: L{util.BufferedByteStream}
+    @type buffer: L{BufferedByteStream}
     @ivar state: The state of the protocol. Can be either C{HANDSHAKE} or
         C{STREAM}.
     @type state: C{str}
     """
 
-    chunk_size = 128
-
     HANDSHAKE = 'handshake'
     STREAM = 'stream'
 
-    #handshakeTimeout = DEFAULT_HANDSHAKE_TIMEOUT
-    debug = False
-
     def connectionMade(self):
-        if self.debug:
-            _debug(self, "Connection made")
+        if DEBUG:
+            log('protocol', self, "Connection made")
 
         protocol.Protocol.connectionMade(self)
 
         self.state = BaseProtocol.HANDSHAKE
-        self.buffer = util.BufferedByteStream()
+        self.buffer = BufferedByteStream()
         self.my_handshake = None
         self.received_handshake = None
 
@@ -455,6 +537,3 @@ class BaseProtocol(protocol.Protocol, EventDispatcher):
             _debug(self, "Handshake timedout")
 
         self.transport.loseConnection()
-
-    def registerProducingChannel(self, channel):
-        self.encoder.registerChannel(channel)

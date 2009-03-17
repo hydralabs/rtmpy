@@ -47,6 +47,9 @@ class IChannel(Interface):
     bodyRemaining = Attribute(
         "The number of bytes that remain until this channel's body is "
         "considered complete.")
+    observer = Attribute(
+        "An L{IChannelObserver} object that listens for events on this "
+        "channel")
 
     def registerManager(manager):
         """
@@ -56,15 +59,18 @@ class IChannel(Interface):
         @raise TypeError: If manager does not provide L{IChannelManager}
         """
 
-    def registerConsumer(consumer):
+    def registerObserver(observer):
         """
-        Registers a consumer for this channel.
+        Registers an observer for this channel.
+
+        @param observer: L{IChannelObserver}
+        @raise TypeError: If observer does not provide L{IChannelObserver}
         """
 
     def getHeader():
         """
-        Returns the last header read from/written to the stream. Returns
-        C{None} if no header was applied to this channel
+        Returns the header for this channel. Returns C{None} if no header was
+        applied to this channel
 
         @rtype: L{IHeader} or C{None}.
         """
@@ -72,13 +78,23 @@ class IChannel(Interface):
     def setHeader(header):
         """
         Sets the header for this channel. If the header is relative, then it
-        is 'merged' with the last absolute header.
+        is 'merged' with the last absolute header. If no header has been
+        applied to this channel then L{IChannelManager.activateChannel} must
+        be called.
 
         @type header: L{IHeader}
         """
 
-    def write(data):
+    def dataReceived(data):
         """
+        Called when data has been received for this channel. The channel must
+        buffer the data until an observer has been registered.
+        """
+
+    def reset():
+        """
+        Called to reset the context information. Called when after a channel
+        completes its body.
         """
 
 
@@ -107,14 +123,28 @@ class IChannelManager(Interface):
         @raise OverflowError: There are no free channels.
         """
 
-    def getLastHeader(channelId):
+    def channelComplete(channel):
         """
-        Returns the last header for a channelId.
+        Called when enough data has been written to the channel to satisfy
+        the body. The manager's job is to act appropriately on the event and
+        then call L{IChannel.reset} to reset the channel for later use.
+        """
 
-        @type channelId: C{int}
-        @raise IndexError: The channel isn't registered to this manager.
-        @raise IndexError: The channelId is out of range.
-        @rtype: L{IHeader} or C{None}
+    def activateChannel(channel):
+        """
+        """
+
+
+class IChannelObserver(Interface):
+    """
+    """
+
+    def dataReceived(data):
+        """
+        """
+
+    def bodyComplete():
+        """
         """
 
 
