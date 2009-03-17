@@ -10,6 +10,7 @@ from twisted.internet import defer, reactor
 
 from rtmpy import rtmp
 from rtmpy.rtmp import interfaces
+from rtmpy.tests.rtmp import mocks
 
 
 class HeaderTestCase(unittest.TestCase):
@@ -85,3 +86,16 @@ class ChannelTestCase(unittest.TestCase):
         c = rtmp.Channel()
 
         self.assertEquals(c.__dict__, {})
+
+    def test_registerManager(self):
+        c = rtmp.Channel()
+
+        e = self.assertRaises(TypeError, c.registerManager, object())
+        self.assertEquals(str(e), 'Expected IChannelManager for manager ' \
+            '(got <type \'object\'>)')
+
+        m = mocks.ChannelManager()
+        self.assertTrue(interfaces.IChannelManager.providedBy(m))
+        c.registerManager(m)
+
+        self.assertIdentical(m, c.manager)
