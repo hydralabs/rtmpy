@@ -74,7 +74,7 @@ class Channel(object):
         self.buffer = ''
         self.consumer = None
 
-    def write(self, data):
+    def dataReceived(self, data):
         l = len(data)
         self.bytes += l
 

@@ -143,7 +143,7 @@ class GetBytesAvailableForChannelTestCase(BaseDecoderTestCase):
     def test_partialBodyPartialFrame(self):
         self.buffer.write(' ' * 10)
         self.buffer.seek(0)
-        self.channel.write(' ' * 10)
+        self.channel.dataReceived(' ' * 10)
 
         self.assertEquals(self.buffer.remaining(), 10)
         self.assertEquals(self.manager.frameSize, 128)
@@ -154,27 +154,27 @@ class GetBytesAvailableForChannelTestCase(BaseDecoderTestCase):
     def test_partialBodyNearlyFullFrame(self):
         self.buffer.write(' ' * (self.manager.frameSize - 1))
         self.buffer.seek(0)
-        self.channel.write(' ' * (self.manager.frameSize - 11))
+        self.channel.dataReceived(' ' * (self.manager.frameSize - 11))
 
         self.assertEquals(self.buffer.remaining(), 127)
         self.assertEquals(self.manager.frameSize, 128)
         self.assertEquals(self.channel.bodyRemaining, 883)
 
-        self.assertEquals(self.gba(), 127)
+        self.assertEquals(self.gba(), 11)
 
     def test_partialBodyFullFrame(self):
         self.buffer.write(' ' * self.manager.frameSize)
         self.buffer.seek(0)
-        self.channel.write(' ')
+        self.channel.dataReceived(' ')
 
         self.assertEquals(self.buffer.remaining(), 128)
         self.assertEquals(self.manager.frameSize, 128)
         self.assertEquals(self.channel.bodyRemaining, 999)
 
-        self.assertEquals(self.gba(), 128)
+        self.assertEquals(self.gba(), 127)
 
     def test_nearlyFullBodyPartialFrame(self):
-        self.channel.write(' ' * 999)
+        self.channel.dataReceived(' ' * 999)
 
         self.buffer.truncate()
         self.buffer.write('a' * 10)
