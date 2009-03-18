@@ -155,14 +155,23 @@ def encodeHeader(stream, header):
             return
 
         if size >= 4:
-            stream.write_24bit_uint(header.timestamp)
+            if header.timestamp >= 0xffffff:
+                stream.write_24bit_uint(0xffffff)
+            else:
+                stream.write_24bit_uint(header.timestamp)
 
         if size >= 8:
             stream.write_24bit_uint(header.bodyLength)
             stream.write_uchar(header.datatype)
 
         if size >= 12:
+            stream.endian = util.BufferedByteStream.ENDIAN_LITTLE
             stream.write_ulong(header.streamId)
+
+        if size >= 4:
+            if header.timestamp >= 0xffffff:
+                stream.endian = util.BufferedByteStream.ENDIAN_BIG
+                stream.write_ulong(header.timestamp)
 
     oldEndian = stream.endian
     stream.endian = util.BufferedByteStream.ENDIAN_NETWORK
@@ -185,14 +194,6 @@ def decodeHeader(stream):
     """
     size, channelId = decodeHeaderByte(stream.read_uchar())
     relative = size != 12
-
-    if rtmp.DEBUG:
-        from pyamf.util import hexdump
-
-        stream.seek(-1, 1)
-
-        print hexdump(stream.peek(size + 1))
-        stream.seek(1, 1)
 
     header = rtmp.Header(channelId=channelId, relative=relative)
 

@@ -186,7 +186,8 @@ class EncodeHeaderTestCase(unittest.TestCase):
         h = mocks.Header()
         self.assertTrue(header.IHeader.providedBy(h))
         self.assertRaises(TypeError, header.encodeHeader, object(), h)
-        self.assertRaises(TypeError, header.encodeHeader, self.stream, object())
+        self.assertRaises(TypeError,
+            header.encodeHeader, self.stream, object())
 
         try:
             self.assertRaises(TypeError, header.encodeHeader, self.stream, h)
@@ -222,7 +223,8 @@ class EncodeHeaderTestCase(unittest.TestCase):
         self.assertEquals(self._encode(h), 'U\x03\x92\xfa\x00z\n\x03')
 
         h.streamId = 45
-        self.assertEquals(self._encode(h), '\x15\x03\x92\xfa\x00z\n\x03\x00\x00\x00-')
+        self.assertEquals(self._encode(h),
+            '\x15\x03\x92\xfa\x00z\n\x03-\x00\x00\x00')
 
     def test_encode_little_endian(self):
         """
@@ -232,7 +234,22 @@ class EncodeHeaderTestCase(unittest.TestCase):
         self.stream.endian = util.BufferedByteStream.ENDIAN_LITTLE
 
         self.test_encode()
-        self.assertEquals(self.stream.endian, util.BufferedByteStream.ENDIAN_LITTLE)
+        self.assertEquals(self.stream.endian,
+            util.BufferedByteStream.ENDIAN_LITTLE)
+
+    def test_extended_timestamp(self):
+        h = mocks.Header(channelId=34, timestamp=0x1000000)
+
+        self.assertEquals(self._encode(h), '\xa2\xff\xff\xff\x01\x00\x00\x00')
+
+        h.datatype = 3
+        h.bodyLength = 31242
+        self.assertEquals(self._encode(h),
+            'b\xff\xff\xff\x00z\n\x03\x01\x00\x00\x00')
+
+        h.streamId = 45
+        self.assertEquals(self._encode(h),
+            '"\xff\xff\xff\x00z\n\x03-\x00\x00\x00\x01\x00\x00\x00')
 
 
 class DecodeHeaderTestCase(unittest.TestCase):
@@ -299,6 +316,38 @@ class DecodeHeaderTestCase(unittest.TestCase):
         self.assertEquals(h.datatype, 3)
         self.assertEquals(h.streamId, 45)
 
+    def test_extended_timestamp(self):
+        h = self._decode('\xa2\xff\xff\xff\x01\x00\x00\x00')
+
+        self.assertTrue(header.IHeader.providedBy(h))
+        self.assertEquals(h.channelId, 34)
+        self.assertEquals(h.relative, True)
+        self.assertEquals(h.timestamp, 0x1000000)
+        self.assertEquals(h.bodyLength, None)
+        self.assertEquals(h.datatype, None)
+        self.assertEquals(h.streamId, None)
+
+        h = self._decode('b\xff\xff\xff\x00z\n\x03\x01\x00\x00\x00')
+
+        self.assertTrue(header.IHeader.providedBy(h))
+        self.assertEquals(h.channelId, 34)
+        self.assertEquals(h.relative, True)
+        self.assertEquals(h.timestamp, 0x1000000)
+        self.assertEquals(h.bodyLength, 31242)
+        self.assertEquals(h.datatype, 3)
+        self.assertEquals(h.streamId, None)
+
+        h = self._decode(
+            '"\xff\xff\xff\x00z\n\x03-\x00\x00\x00\x01\x00\x00\x00')
+
+        self.assertTrue(header.IHeader.providedBy(h))
+        self.assertEquals(h.channelId, 34)
+        self.assertEquals(h.relative, False)
+        self.assertEquals(h.timestamp, 0x1000000)
+        self.assertEquals(h.bodyLength, 31242)
+        self.assertEquals(h.datatype, 3)
+        self.assertEquals(h.streamId, 45)
+
 
 class DiffHeadersTestCase(unittest.TestCase):
     """
@@ -353,7 +402,8 @@ class DiffHeadersTestCase(unittest.TestCase):
         h2 = mocks.Header(relative=False, channelId=42)
 
         e = self.assertRaises(rtmp.HeaderError, header.diffHeaders, h1, h2)
-        self.assertEquals(str(e), 'The two headers are not for the same channel')
+        self.assertEquals(str(e), 'The two headers are not for the ' \
+            'same channel')
 
     def test_nodiff(self):
         old = self._generate()
@@ -506,7 +556,8 @@ class MergeHeadersTestCase(unittest.TestCase):
         h2 = mocks.Header(relative=True, channelId=42)
 
         e = self.assertRaises(rtmp.HeaderError, header.mergeHeaders, h1, h2)
-        self.assertEquals(str(e), 'The two headers are not for the same channel')
+        self.assertEquals(str(e), 'The two headers are not for the ' \
+            'same channel')
 
     def test_nodiff(self):
         new = self._generate()
