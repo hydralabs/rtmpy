@@ -25,7 +25,7 @@ class BaseEncoderTestCase(unittest.TestCase):
         self.buffer = util.BufferedByteStream()
 
         self.encoder.registerScheduler(self.scheduler)
-        self.encoder.registerConsumer(self.buffer)
+        self.encoder.registerConsumer(self)
 
         self._channelId = 0
 
@@ -42,6 +42,9 @@ class BaseEncoderTestCase(unittest.TestCase):
         c.setHeader(h)
 
         return c
+
+    def dataReceived(self, data):
+        self.buffer.write(data)
 
 class ChannelContextTestCase(BaseEncoderTestCase):
     """
@@ -163,7 +166,7 @@ class GetDataTestCase(BaseEncoderTestCase):
         self.assertEquals(self.scheduler.activeChannels, [])
 
     def test_read(self):
-        self.channel.write('a' * 150)
+        self.channel.dataReceived('a' * 150)
 
         self.assertEquals(self.context.getFrame(), 'a' * 128)
         self.assertEquals(self.buffer.getvalue(), 'a' * 22)
@@ -268,13 +271,13 @@ class EncoderTestCase(BaseEncoderTestCase):
 
         self.encoder.activateChannel(ch)
         context = self.encoder.channelContext[ch]
-        ch.write('f' * 50)
+        ch.dataReceived('f' * 50)
 
         self.assertEquals(self.scheduler.getNextChannel(), ch)
 
         def cb(lc):
             self.assertEquals(self.buffer.getvalue(),
-                '\x00#\xb9r\x00\x002\x04\x00\x00\x00\x08' + ('f' * 50))
+                '\x00#\xb9r\x00\x002\x04\x08\x00\x00\x00' + ('f' * 50))
 
             self.assertEquals(self.encoder.buffer.getvalue(), '')
 
@@ -324,7 +327,7 @@ class FrameWritingTestCase(BaseEncoderTestCase):
         header.relative = False
         header.timestamp = 13123
 
-        channel.write('a' * 200)
+        channel.dataReceived('a' * 200)
 
         self.assertEquals(self.buffer.getvalue(), '')
         self.assertEquals(
@@ -332,7 +335,7 @@ class FrameWritingTestCase(BaseEncoderTestCase):
 
         self.encoder.writeFrame(context)
         self.assertEquals(self.buffer.getvalue(), '\x00\x003C\x00\x03\xe8\x03'
-            '\x00\x00\x00F' + ('a' * self.manager.frameSize))
+            'F\x00\x00\x00' + ('a' * self.manager.frameSize))
 
         self.assertEquals(context.buffer.getvalue(), 'a' * 72)
         self.assertIdentical(context.header, header)
@@ -343,7 +346,7 @@ class FrameWritingTestCase(BaseEncoderTestCase):
         self.encoder.writeFrame(context)
 
         self.assertEquals(self.buffer.getvalue(), '\x00\x003C\x00\x03\xe8\x03'
-            '\x00\x00\x00Faaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa'
+            'F\x00\x00\x00aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa'
             'aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa'
             'aaaaaaaaaaaaa\xc0aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa'
             'aaaaaaaaaaaaaaaaaaaaaaaaa')
