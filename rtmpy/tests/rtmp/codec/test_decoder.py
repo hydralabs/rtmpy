@@ -391,6 +391,16 @@ class FrameReadingTestCase(BaseDecoderTestCase):
         self.assertEquals(channel.buffer, '')
         self.assertEquals(channel.frames, 0)
 
+    def test_negative_availability(self):
+        self.decoder.currentChannel = c = mocks.Channel()
+        c.header = mocks.Header(bodyLength=10)
+        c.bytes = 0
+
+        c.frameRemaining = -1
+
+        e = self.assertRaises(codec.DecodeError, self.decoder.readFrame)
+        self.assertEquals(str(e), '-1 bytes available for %r' % (c,))
+
     def test_partial(self):
         channel = self.decoder.currentChannel = self._generateChannel(
             mocks.Header(bodyLength=1000, relative=False))

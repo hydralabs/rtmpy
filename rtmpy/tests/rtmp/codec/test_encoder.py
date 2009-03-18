@@ -100,6 +100,36 @@ class ChannelContextTestCase(BaseEncoderTestCase):
         self.assertTrue(interfaces.IHeader.providedBy(h))
         self.assertTrue(h.relative)
 
+    def test_bufferError(self):
+        self.executed = False
+
+        class ReadErroringBuffer(object):
+            error_class = EOFError
+
+            def read(self, *args, **kwargs):
+                raise ReadErroringBuffer.error_class
+
+            def seek(self, *args, **kwargs):
+                pass
+
+        def deactivateChannel(channel):
+            self.executed = True
+
+        self.context.buffer = ReadErroringBuffer()
+        self.context.getMinimumFrameSize = lambda: 10
+
+        self.encoder.deactivateChannel = deactivateChannel
+
+        self.assertRaises(EOFError, self.context.buffer.read, 0)
+
+        self.context.getFrame()
+        self.assertTrue(self.executed)
+
+        self.executed = False
+        ReadErroringBuffer.error_class = IOError
+
+        self.context.getFrame()
+        self.assertTrue(self.executed)
 
 class MinimumFrameSizeTestCase(BaseEncoderTestCase):
     """

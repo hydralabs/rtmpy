@@ -36,10 +36,7 @@ def decodeHeaderByte(byte):
 
     index = byte >> 6
 
-    try:
-        return HEADER_SIZES[index], byte & 0x3f
-    except IndexError:
-        raise rtmp.HeaderError('Invalid header size (got %d)' % (index,))
+    return HEADER_SIZES[index], byte & 0x3f
 
 
 def encodeHeaderByte(headerLength, channelId):
@@ -119,15 +116,10 @@ def getHeaderSize(header):
     @param header: An L{IHeader} object.
     @return: The number of bytes required to encode C{header}.
     @rtype: C{int}
-    @raise ValueError: Unable to determine the header size.
     """
     index = getHeaderSizeIndex(header)
 
-    try:
-        return HEADER_SIZES[index]
-    except IndexError:
-        raise rtmp.HeaderError("Unable to determine header size (got %r)" % (
-            header,))
+    return HEADER_SIZES[index]
 
 
 def encodeHeader(stream, header):

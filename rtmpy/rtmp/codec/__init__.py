@@ -175,7 +175,8 @@ class Decoder(BaseCodec):
             rtmp.log(self, '%d bytes available' % (available,))
 
         if available < 0:
-            raise RuntimeError
+            raise DecodeError('%d bytes available for %r' % (
+                available, self.currentChannel,))
 
         if available == 0:
             return
