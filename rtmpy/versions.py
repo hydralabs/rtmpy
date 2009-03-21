@@ -16,13 +16,30 @@ class Version(object):
     """
 
     def __init__(self, *args):
-        if len(args) == 1 and isinstance(args[0], basestring):
-            # maybe a regex here?
-            self._buildParts(*args[0].split(','))
+        if len(args) == 1:
+            if isinstance(args[0], (int, long)):
+                self._fromInt(args[0])
 
-            return
+                return
+            elif isinstance(args[0], basestring):
+                # maybe a regex here?
+                self._buildParts(*args[0].split(','))
+
+                return
 
         self._buildParts(*args)
+
+    def _fromInt(self, i):
+        self.parts = []
+
+        if i > 0xffffffff or i < 0:
+            raise ValueError('positive int up to 0xffffffff expected ' \
+                '(i:%d)' % (i,))
+
+        for x in xrange(0, 4):
+            self.parts.append((i >> (24 - (x * 8))) & 0xff)
+
+        self._int = i
 
     def _buildParts(self, *args):
         self.parts = []
@@ -75,3 +92,6 @@ class Version(object):
 
         if isinstance(other, basestring):
             return cmp(str(self), other)
+
+
+H264_MIN_VERSION = Version('9,0,8,21')

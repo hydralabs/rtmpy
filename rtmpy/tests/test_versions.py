@@ -38,6 +38,10 @@ class VersionTestCase(unittest.TestCase):
         v = Version('10,0,12,36')
         self.assertEquals(v.parts, [10, 0, 12, 36])
 
+        # single int
+        v = Version(0x0a000c24)
+        self.assertEquals(v.parts, [10, 0, 12, 36])
+
     def test_values(self):
         e = self.assertRaises(ValueError, Version, '10')
         self.assertEquals(str(e), 'Expected 4 parts for version (got:1)')
@@ -56,8 +60,8 @@ class VersionTestCase(unittest.TestCase):
         self.assertEquals(str(e), 'Invalid version number (received:257)')
 
         # as above but now with ints
-        e = self.assertRaises(ValueError, Version, 10)
-        self.assertEquals(str(e), 'Expected 4 parts for version (got:1)')
+        e = self.assertRaises(ValueError, Version, 10, 12)
+        self.assertEquals(str(e), 'Expected 4 parts for version (got:2)')
 
         e = self.assertRaises(ValueError, Version, 10, 12, 14, 15, 15)
         self.assertEquals(str(e), 'Expected 4 parts for version (got:5)')
@@ -68,6 +72,10 @@ class VersionTestCase(unittest.TestCase):
         e = self.assertRaises(ValueError, Version, 257, 13, 14, 0)
         self.assertEquals(str(e), 'Invalid version number (received:257)')
 
+        e = self.assertRaises(ValueError, Version, 0x100000000)
+        self.assertEquals(str(e),
+            'positive int up to 0xffffffff expected (i:4294967296)')
+
     def test_delete_int(self):
         v = Version('10,0,12,36')
         self.assertFalse(hasattr(v, '_int'))
@@ -75,6 +83,9 @@ class VersionTestCase(unittest.TestCase):
         v._int = 'foo'
         v._buildParts('10', '0', '12', '36')
         self.assertFalse(hasattr(v, '_int'))
+
+        v = Version(0x0a000c24)
+        self.assertTrue(hasattr(v, '_int'))
 
     def test_int(self):
         v = Version('10,0,12,36')
