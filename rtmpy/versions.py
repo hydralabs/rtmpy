@@ -4,7 +4,7 @@
 # See LICENSE for details.
 
 """
-Versions for Adobe products.
+Versions for products.
 
 @see L{Version}
 """
@@ -12,7 +12,7 @@ Versions for Adobe products.
 
 class Version(object):
     """
-    Represents a Flash version number, e.g. 10,0,12,36
+    Represents a version number, e.g. 10,0,12,36
     """
 
     def __init__(self, *args):
@@ -94,4 +94,4 @@ class Version(object):
             return cmp(str(self), other)
 
 
-H264_MIN_VERSION = Version('9,0,8,21')
+H264_MIN_VERSION = Version('9,0,115,0')
