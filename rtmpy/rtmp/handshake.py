@@ -153,6 +153,9 @@ class ClientToken(Token):
     """
 
     def generatePayload(self):
+        if self.payload is not None:
+            return
+
         self.payload = util.BufferedByteStream()
 
         self.payload.write_ulong(self.uptime)
@@ -163,29 +166,32 @@ class ClientToken(Token):
     def getDigest(self):
         """
         Returns an SHA-256 HMAC based on the payload. If the L{version} of
-        this token is less than L{versions.H264_FLASH_MIN_VERSION} then
+        this token is less than L{versions.H264_MIN_FLASH} then
         C{None} will be returned.
 
         @rtype: C{str} or C{None}
         @raise HandshakeError: No payload exists
         """
+        if hasattr(self, '_digest'):
+            return self._digest
+
         if self.payload is None:
             raise HandshakeError('No digest available for an empty handshake')
 
-        if self.version < versions.H264_FLASH_MIN_VERSION:
+        if self.version < versions.H264_MIN_FLASH:
             return None
 
         b = self.payload
         pos = b.tell()
-        b.seek(0)
+        b.seek(8)
 
         s = sum([b.read_uchar() for x in xrange(0, 4)])
-        b.seek(s % 728)
+        b.seek(s % 728 + 12)
 
-        digest = b.read(32)
+        self._digest = b.read(32)
         b.seek(pos)
 
-        return digest
+        return self._digest
 
 
 class ServerToken(Token):
@@ -207,6 +213,9 @@ class ServerToken(Token):
         client does not have a valid digest (read:C{None}) then some random
         bytes will be generated.
         """
+        if self.payload is not None:
+            return
+
         self.payload = util.BufferedByteStream()
 
         self.payload.write_ulong(self.uptime)
@@ -214,31 +223,40 @@ class ServerToken(Token):
 
         if self.client.getDigest() is None:
             self.payload.write(generateBytes(HANDSHAKE_LENGTH - 8))
+            self.payload.write(self.client.encode())
+            self.payload.seek(0)
 
             return
 
         self.payload.write(generateBytes(
             HANDSHAKE_LENGTH - 8 - SHA256_DIGEST_LENGTH))
 
-        # this is incomplete
+        digest = self.getDigest()
 
+        if digest is None:
+            raise HandshakeError('Client not H.264 compatible')
+
+        client = self.client.encode()
         self.payload.seek(0, 2)
-        self.payload.write(self.getDigest())
+        self.payload.write(_digest(digest, client) + client)
         self.payload.seek(0)
 
     def getDigest(self):
         """
         Returns an SHA-256 HMAC based on the payload. If the L{version} of
-        this token is less than L{versions.H264_FMS_MIN_VERSION} then
+        this token is less than L{versions.H264_MIN_FMS} then
         C{None} will be returned.
 
         @rtype: C{str} or C{None}
         @raise HandshakeError: No payload exists.
         """
+        if hasattr(self, '_digest'):
+            return self._digest
+
         if self.payload is None:
             raise HandshakeError('No digest available for an empty handshake')
 
-        if self.version < versions.H264_FMS_MIN_VERSION:
+        if self.version < versions.H264_MIN_FMS:
             return None
 
         client_digest = self.client.getDigest()
@@ -246,7 +264,9 @@ class ServerToken(Token):
         if client_digest is None:
             return None
 
-        return _digest(client_digest, self.payload.getvalue())
+        self._digest = _digest(SECRET_SERVER_KEY, self.payload.getvalue())
+
+        return self._digest
 
 
 class BaseNegotiator(object):
@@ -317,9 +337,9 @@ class ClientNegotiator(BaseNegotiator):
             uptime = util.uptime()
 
         if version is None:
-            version = versions.H264_FLASH_MIN_VERSION
+            version = versions.H264_MIN_FLASH
 
-        if version < versions.H264_FLASH_MIN_VERSION:
+        if version < versions.H264_MIN_FLASH:
             version = 0
 
         self.client = ClientToken(uptime, version)
@@ -408,9 +428,9 @@ class ServerNegotiator(BaseNegotiator):
             uptime = util.uptime()
 
         if version is None:
-            version = versions.H264_FMS_MIN_VERSION
+            version = versions.H264_MIN_FMS
 
-        if version < versions.H264_FMS_MIN_VERSION:
+        if version < versions.H264_MIN_FMS:
             version = 0
 
         self.server = ServerToken(client, uptime, version)
@@ -438,14 +458,13 @@ class ServerNegotiator(BaseNegotiator):
                 'handshake')
 
         self.client = decodeClientHandshake(data)
-        self.client_payload = data
 
         self.generateToken()
         self.header = getHeader(self.client)
         self.server_payload = self.server.encode()
 
         self.observer.write(
-            self.header + self.server_payload + self.client_payload)
+            self.header + self.server_payload)
 
         # at this point, as far as the server is concerned, handshaking has
         # been successful

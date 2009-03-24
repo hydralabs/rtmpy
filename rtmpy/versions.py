@@ -94,5 +94,5 @@ class Version(object):
             return cmp(str(self), other)
 
 
-H264_FLASH_MIN_VERSION = Version('9,0,115,0')
-H264_FMS_MIN_VERSION = Version('3,0,1,1')
+H264_MIN_FLASH = Version('9,0,115,0')
+H264_MIN_FMS = Version('3,0,1,1')
