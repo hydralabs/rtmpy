@@ -363,37 +363,30 @@ class ByteGeneratingTestCase(unittest.TestCase):
             "int expected for length (got:<type 'object'>)")
 
 
-class HandshakeClassTestCase(unittest.TestCase):
+class HelperTestCase(unittest.TestCase):
     """
+    Tests for L{handshake._digest}
     """
 
-    def test_init(self):
-        h = handshake.Handshake()
+    def test_digest(self):
+        self.assertEquals(handshake._digest('foo', 'bar'), '\xf92\x0b\xaf' \
+            '\x02I\x16\x9es\x85\x0c\xd6\x15m\xed\x01\x06\xe2\xbbj\xd8\xca' \
+            '\xb0\x1b{\xbb\xeb\xe6\xd1\x06S\x17')
 
-        self.assertEquals(h.__dict__, {
-            'client': None,
-            'server': None
-        })
+    def test_getHeader(self):
+        t = handshake.ClientToken()
+        self.assertEquals(t.context, None)
 
-    def test_getClient(self):
-        h = handshake.Handshake()
-        self.assertEquals(h.client, None)
-        c = h.getClient()
+        self.assertEquals(handshake.getHeader(t), '\x03')
 
-        self.assertIdentical(h.client, c)
-        self.assertTrue(isinstance(c, handshake.ClientToken))
-        self.assertEquals(c.uptime, 0)
-        self.assertEquals(c.version, versions.H264_MIN_VERSION)
+        t.context = object()
+        self.assertEquals(handshake.getHeader(t), '\x06')
 
-        h = handshake.Handshake()
+        t = handshake.ServerToken(handshake.ClientToken())
+        self.assertEquals(t.context, None)
 
-        x = h.client = object()
+        self.assertEquals(handshake.getHeader(t), '\x03')
 
-        c = h.getClient()
-        self.assertIdentical(h.client, c, x)
-
-    def test_setClient(self):
-        h = handshake.Handshake()
-        self.assertEquals(h.client, None)
-
+        t.context = object()
+        self.assertEquals(handshake.getHeader(t), '\x06')
         

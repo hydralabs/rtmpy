@@ -77,7 +77,6 @@ class IHandshakeNegotiator(Interface):
     observer = Attribute(
         "An L{IHandshakeObserver} that listens for events from this " \
         "negotiator")
-
     server = Attribute(
         "The server handshake token. Can be L{ServerToken} or C{None}")
     client = Attribute(
