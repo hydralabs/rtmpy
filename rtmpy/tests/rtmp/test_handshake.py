@@ -241,7 +241,9 @@ class ServerTokenClassTestCase(TokenClassTestCase):
         c.version = versions.H264_MIN_FLASH
 
         c.payload = util.BufferedByteStream('\x00' * 8 + \
-            '\x01\x01\x01\x01' + '\x02' * 32 + '\x00' * (1536 - 44))
+            '\x01\x01\x01\x01' + '\x03' * 4 + '\x02' * 32 + '\x00' * (1536 - 48))
+
+        self.assertEquals(len(c.payload), 1536)
 
         t.generatePayload()
 
@@ -255,8 +257,8 @@ class ServerTokenClassTestCase(TokenClassTestCase):
         self.assertEquals(p[:4], '\x00\x00\x00\x00')
         self.assertEquals(p[4:8], '\x03\x00\x01\x01')
         self.assertEquals(p[4:8], '\x03\x00\x01\x01')
-        self.assertEquals(p[1536 - 64:1536], t.getDigest())
-        print repr(p)
+        self.assertEquals(p[1536 - 64:1536],
+            handshake._digest(t.getDigest(), c.payload.getvalue()))
 
     def test_str(self):
         t = self._generateToken(payload='hi', generate=True)
@@ -329,8 +331,8 @@ class ServerTokenDigestTestCase(BaseTokenTestCase):
             '\x01\x01\x01\x01' + ('\x02' * 4) + '\x00' * 32)
         t.payload = util.BufferedByteStream('a')
 
-        self.assertEquals(t.getDigest(),
-            '4c534ca31628492d0782afd323faf96a5d16d34e450f635d75280e8c9309a647')
+        self.assertEquals(t.getDigest(), 'LSL\xa3\x16(I-\x07\x82\xaf\xd3#' \
+            '\xfa\xf9j]\x16\xd3NE\x0fc]u(\x0e\x8c\x93\t\xa6G')
 
 
 class ByteGeneratingTestCase(unittest.TestCase):

@@ -185,7 +185,7 @@ class ClientToken(Token):
         pos = b.tell()
         b.seek(8)
 
-        s = sum([b.read_uchar() for x in xrange(0, 4)])
+        s = sum([b.read_char() for x in xrange(0, 4)])
         b.seek(s % 728 + 12)
 
         self._digest = b.read(32)
@@ -551,7 +551,7 @@ def _digest(key, payload):
     @return: A hexdigest representation of the digested message.
     @rtype: C{str}
     """
-    return hmac.new(key, msg=payload, digestmod=hashlib.sha256).hexdigest()
+    return hmac.new(key, msg=payload, digestmod=hashlib.sha256).digest()
 
 
 def getHeader(token):
