@@ -5,6 +5,7 @@
 Interface documentation for RTMP primitives.
 """
 
+from twisted.internet.interfaces import IProtocol, ITransport
 from zope.interface import Interface, Attribute, implements
 
 
@@ -199,4 +200,17 @@ class IChannelScheduler(Interface):
         Returns the next active channel. The definition of 'next' is up to the
         implementing class. If there are no more active channels then C{None}
         should be returned.
+        """
+
+
+class IRTMPProtocol(IProtocol):
+    """
+    """
+
+    def handshakeSuccess():
+        """
+        """
+
+    def handshakeFailure():
+        """
         """

@@ -1,5 +1,4 @@
 # -*- test-case-name: rtmpy.tests.test_codec -*-
-#
 # Copyright (c) 2007-2009 The RTMPy Project.
 # See LICENSE for details.
 
@@ -57,9 +56,6 @@ class BaseCodec(object):
         self.job = task.LoopingCall(self.getJob())
 
     def __del__(self):
-        if not hasattr(self, 'job'):
-            return
-
         if self.job.running:
             self.job.stop()
 

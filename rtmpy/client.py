@@ -11,32 +11,25 @@ RTMP client implementation.
 
 from twisted.internet import reactor, protocol
 
-from rtmpy import rtmp, util
-import pyamf
+from rtmpy import rtmp, util, versions
+from rtmpy
 
 class ClientProtocol(rtmp.BaseProtocol):
     """
     Client RTMP Protocol.
     """
+    version = versions.Version('10,0,12,36')
 
     def connectionMade(self):
         """
         Called when a connection has been made to this protocol instance. Used
         to do general setup and protocol initialisation.
         """
-        self.debug = True
         rtmp.BaseProtocol.connectionMade(self)
 
         # generate and send initial handshake
-        self.my_handshake = rtmp.generate_handshake()
-
-        if self.debug:
-            rtmp._debug(self, "My handshake:")
-
-            from pyamf.util import hexdump
-            rtmp._debug(self, hexdump(self.my_handshake))
-
-        self.transport.write(rtmp.HEADER_BYTE + self.my_handshake)
+        self.writeHeader()
+        self.transport.write(self.handshake.generate())
 
     def _decodeHandshake(self):
         """
@@ -95,27 +88,10 @@ class ClientProtocol(rtmp.BaseProtocol):
         """
         Successful handshake between client and server.
         """
-        if self.debug:
-            rtmp._debug(self, "handshake success")
-
         rtmp.BaseProtocol.onHandshakeSuccess(self)
 
         # send invoke->connect here
 
-    def invoke(self, stream, *args, **kwargs):
-        if stream is None:
-            stream = self.stream_manager.getStream(0)
-
-        data = pyamf.encode(args[0], 1, kwargs).getvalue()
-        channel = self.channel_manager.createChannel()
-        channel.body.write(data)
-        channel.body.seek(0)
-        channel.type = rtmp.ChannelTypes.INVOKE
-        channel.stream_id = self.stream_manager.getStreamId(stream)
-        channel.timer = 0
-        channel.length = len(data)
-
-        self.registerProducingChannel(channel)
 
 class ClientFactory(protocol.ClientFactory):
     """

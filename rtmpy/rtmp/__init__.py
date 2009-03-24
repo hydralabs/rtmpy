@@ -1,5 +1,4 @@
 # -*- test-case-name: rtmpy.tests.test_rtmp -*-
-
 # Copyright (c) 2007-2009 The RTMPy Project.
 # See LICENSE for details.
 
@@ -20,17 +19,20 @@ packets are split up into fixed size body chunks.
 """
 
 from twisted.internet import reactor, protocol, defer, task
+from twisted.internet.interfaces import ITransport
 from zope.interface import implements
 from pyamf.util import IndexedCollection, BufferedByteStream
 
 from rtmpy.rtmp import interfaces
-from rtmpy.dispatcher import EventDispatcher
+from rtmpy.rtmp import handshake
 
 
 #: The default RTMP port is a registered at U{IANA<http://iana.org>}.
 RTMP_PORT = 1935
 
-DEFAULT_FRAME_SIZE = 128
+RTMP_HEADER_BYTE = '\x03'
+RTMPE_HEADER_BYTE = '\x06'
+
 MAX_CHANNELS = 64
 MAX_STREAMS = 0xffff
 
@@ -419,62 +421,32 @@ class ChannelManager(object):
             channel.frameRemaining = size
 
 
-class BaseProtocol(protocol.Protocol, EventDispatcher):
+class BaseProtocol(protocol.Protocol):
     """
-    Provides the basis for the initial handshaking phase and decoding RTMP
-    packets as they arrive.
+    Provides basic handshaking and RTMP protocol support.
 
-    @ivar buffer: Contains any remaining unparsed data from the C{transport}.
-    @type buffer: L{BufferedByteStream}
     @ivar state: The state of the protocol. Can be either C{HANDSHAKE} or
         C{STREAM}.
     @type state: C{str}
+    @ivar encrypted: The connection is encrypted (or requested to be
+        encrypted)
+    @type encrypted: C{bool}
     """
 
     HANDSHAKE = 'handshake'
     STREAM = 'stream'
 
+    def __init__(self):
+        self.encrypted = False
+
     def connectionMade(self):
         if DEBUG:
-            log('protocol', self, "Connection made")
+            log(self, "Connection made")
 
         protocol.Protocol.connectionMade(self)
 
         self.state = BaseProtocol.HANDSHAKE
-        self.buffer = BufferedByteStream()
-        self.my_handshake = None
-        self.received_handshake = None
-
-        # setup event observers
-        self.addEventListener(HANDSHAKE_SUCCESS, self.onHandshakeSuccess)
-        self.addEventListener(HANDSHAKE_FAILURE, self.onHandshakeFailure)
-
-        self.setTimeout(self.handshakeTimeout,
-            lambda: self.dispatchEvent(HANDSHAKE_TIMEOUT))
-
-    def setTimeout(self, timeout, func):
-        if self.debug:
-            _debug(self, "Setting timeout: %s seconds" % timeout)
-
-        if hasattr(self, '_timeout'):
-            if not self._timeout.cancelled:
-                self._timeout.cancel()
-
-        self._timeout = reactor.callLater(timeout, func)
-
-    def clearTimeout(self):
-        if self.debug:
-            _debug(self, "Clearing timeout")
-
-        if not hasattr(self, '_timeout'):
-            return
-
-        if not self._timeout.cancelled and not self._timeout.called:
-            if self.debug:
-                _debug(self, "Cancelling timeout")
-            self._timeout.cancel()
-
-        del self._timeout
+        self.handshake = handshake.Handshake()
 
     def connectionLost(self, reason):
         """
@@ -482,25 +454,20 @@ class BaseProtocol(protocol.Protocol, EventDispatcher):
 
         Cleans up any timeouts/buffer etc.
         """
-        if self.debug:
-            _debug(self, "Lost connection (reason:%s)" % reason)
-
-        self.clearTimeout()
-        self.channel_manager = None
-        self.stream_manager = None
+        if DEBUG:
+            log(self, "Lost connection (reason:%s)" % str(reason))
 
         if hasattr(self, 'decoder'):
             self.decoder.stop()
-            self.decoder = None
 
         if hasattr(self, 'encoder'):
             self.encoder.stop()
-            self.encoder = None
 
     def decodeHandshake(self, data):
         """
-        Negotiates the handshake phase of the protocol. Needs to be implemented
-        by the subclass.
+        Negotiates the handshake phase of the protocol. Needs to be
+        implemented by the subclass. Must call either L{onHandshakeSuccess} or
+        L{onHandshakeFailure} or noop if not enough data received.
 
         @see: U{RTMP handshake on OSFlash (external)
         <http://osflash.org/documentation/rtmp#handshake>} for more info.
@@ -509,79 +476,47 @@ class BaseProtocol(protocol.Protocol, EventDispatcher):
 
     def decodeStream(self, data):
         self.decoder.dataReceived(data)
-        self.decoder.start()
+
+        if self.decoder.deferred is None:
+            self.decoder.start().addErrback(self.logAndDisconnect)
 
     def logAndDisconnect(self, failure=None):
-        if self.debug:
-            log.err()
-            _debug(self, "error")
+        if DEBUG:
+            log(self, 'error %r' % (failure,))
 
         self.transport.loseConnection()
 
-        if self.debug:
-            raise
-
-    def decodeData(self, data):
-        """
-        Decodes data from the stream. This is not decoding RTMP but used to
-        preprocess the data before it is passed to the stream decoding api.
-
-        This function mainly exists so that protocols like RTMPE can be
-        handled gracefully.
-
-        @param data: The string of bytes received from the underlying
-            connection.
-        @return: The decoded data.
-        @rtype: C{str}
-        """
-        return data
-
     def dataReceived(self, data):
         """
-        Called when data is received from the underlying transport. Splits the
-        data stream into chunks and delivers them to each channel.
+        Called when data is received from the underlying transport.
         """
-        data = self.decodeData(data)
-
-        if self.debug:
-            _debug(self, "Receive data: state=%s, len=%d, stream.len=%d, stream.pos=%d" % (
-                self.state, len(data), len(self.buffer), self.buffer.tell()))
-
-        try:
-            if self.state is BaseProtocol.HANDSHAKE:
-                self.decodeHandshake(data)
-            elif self.state is BaseProtocol.STREAM:
-                self.decodeStream(data)
-        except:
-            self.logAndDisconnect()
+        if self.state is BaseProtocol.HANDSHAKE:
+            self.decodeHandshake(data)
+        elif self.state is BaseProtocol.STREAM:
+            self.decodeStream(data)
 
     def onHandshakeSuccess(self):
         """
         Called when the RTMP handshake was successful. Once this is called,
         packet streaming can commence.
         """
+        if DEBUG:
+            log(self, "Successful handshake")
+
         self.state = BaseProtocol.STREAM
-        self.removeEventListener(HANDSHAKE_SUCCESS, self.onHandshakeSuccess)
-        self.removeEventListener(HANDSHAKE_FAILURE, self.onHandshakeFailure)
-        self.my_handshake = None
-        self.received_handshake = None
-        self.clearTimeout()
 
-        self.channel_manager = ChannelManager(self)
-        self.stream_manager = StreamManager(self)
+        self.decoder = codec.Decoder(self)
+        self.encoder = codec.Encoder(self)
 
-        self.decoder = ProtocolDecoder(self)
-        self.encoder = ProtocolEncoder(self)
-
-        self.core_stream = self.stream_manager.createStream(0, immutable=True)
+        # TODO slot in support for RTMPE
 
     def onHandshakeFailure(self, reason):
         """
         Called when the RTMP handshake failed for some reason. Drops the
         connection immediately.
         """
-        if self.debug:
-            _debug(self, "Failed handshake (reason:%s)" % reason)
+        if DEBUG:
+            log(self, "Failed handshake (reason:%s)" % str(reason))
 
         self.transport.loseConnection()
 
@@ -590,7 +525,15 @@ class BaseProtocol(protocol.Protocol, EventDispatcher):
         Called if the handshake was not successful within
         C{self.handshakeTimeout} seconds. Disconnects the peer.
         """
-        if self.debug:
-            _debug(self, "Handshake timedout")
+        if DEBUG:
+            log(self, "Handshake timeout")
 
         self.transport.loseConnection()
+
+    def writeHeader(self):
+        """
+        """
+        if self.encrypted:
+            self.transport.write(RTMPE_HEADER_BYTE)
+        else:
+            self.transport.write(RTMP_HEADER_BYTE)

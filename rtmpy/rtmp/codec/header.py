@@ -1,5 +1,5 @@
 # -*- test-case-name: rtmpy.tests.codec.test_header -*-
-#
+
 # Copyright (c) 2007-2009 The RTMPy Project.
 # See LICENSE for details.
 
