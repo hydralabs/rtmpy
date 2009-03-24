@@ -6,6 +6,7 @@ Tests for L{rtmpy.rtmp.handshake}.
 """
 
 from twisted.trial import unittest
+from zope.interface import implements
 
 from rtmpy.rtmp import handshake
 from rtmpy import util, versions
@@ -421,3 +422,80 @@ class ClientHandshakeDecodingTestCase(unittest.TestCase):
         self.assertEquals(t.uptime, 0x1020304)
 
         self.assertEquals(t.payload.getvalue(), 'a' * (1536 - 8))
+
+
+class ServerHandshakeDecodingTestCase(unittest.TestCase):
+    """
+    Tests for L{handshake.decodeServerHandshake}.
+    """
+
+    def setUp(self):
+        self.client = object()
+
+    def test_types(self):
+        self.assertRaises(TypeError, handshake.decodeServerHandshake,
+            self.client, 123)
+
+    def test_no_data(self):
+        f = handshake.decodeServerHandshake
+
+        self.assertRaises(EOFError, f, self.client, '')
+        self.assertRaises(EOFError, f, self.client, 'a' * 5)
+        self.assertRaises(EOFError, f, self.client, 'a' * 11)
+        self.assertRaises(EOFError, f, self.client, 'a' * (1536 - 1))
+
+    def test_decode(self):
+        d = '\x01\x02\x03\x04\x09\x08\x07\x06' + ('a' * (1536 - 8))
+
+        t = handshake.decodeServerHandshake(self.client, d)
+
+        self.assertEquals(t.__class__, handshake.ServerToken)
+        self.assertIdentical(t.client, self.client)
+        v = t.version
+
+        self.assertEquals(v.__class__, versions.Version)
+        self.assertEquals(t.version, 0x09080706)
+        self.assertEquals(t.uptime, 0x1020304)
+
+        self.assertEquals(t.payload.getvalue(), 'a' * (1536 - 8))
+
+
+class MockHandshakeObserver(object):
+    """
+    """
+
+    implements(handshake.IHandshakeObserver)
+
+    def handshakeSuccess(self):
+        """
+        """
+
+    def handshakeFailure(self, reason):
+        """
+        """
+
+    def write(self, data):
+        """
+        """
+
+
+class BaseNegotiatorTestCase(unittest.TestCase):
+    """
+    Tests for L{handshake.BaseNegotiator}.
+    """
+
+    def test_interface(self):
+        handshake.IHandshakeNegotiator.implementedBy(handshake.BaseNegotiator)
+
+    def test_init(self):
+        x = object()
+
+        e = self.assertRaises(TypeError, handshake.BaseNegotiator, x)
+        self.assertEquals(str(e),
+            "IHandshakeObserver interface expected (got:<type 'object'>)")
+
+        x = MockHandshakeObserver()
+        self.assertTrue(handshake.IHandshakeObserver.providedBy(x)
+        n = handshake.BaseNegotiator(x)
+
+        self.assertTrue(handshake.IHandshakeNegotiator.providedBy(n))

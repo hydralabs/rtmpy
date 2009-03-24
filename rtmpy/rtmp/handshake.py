@@ -522,7 +522,7 @@ def decodeServerHandshake(client, data):
     except IOError, e:
         raise EOFError(str(e))
 
-    return ServerToken(uptime=uptime, version=version, payload=payload)
+    return ServerToken(client, uptime=uptime, version=version, payload=payload)
 
 
 def generateBytes(length):
