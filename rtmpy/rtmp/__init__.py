@@ -336,7 +336,7 @@ class ChannelManager(object):
 
     def __init__(self):
         self.channels = {}
-        self.frameSize = DEFAULT_FRAME_SIZE
+        self.frameSize = 128
 
     def getChannel(self, channelId):
         """

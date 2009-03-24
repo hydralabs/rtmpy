@@ -44,7 +44,7 @@ class Token(object):
         """
         Called to encode the token to a byte string.
         """
-        if self.bytes is None:
+        if self.payload is None:
             self.generatePayload()
 
         s = util.BufferedByteStream()
@@ -84,7 +84,7 @@ class ClientToken(Token):
     def getDigest(self):
         """
         """
-        if self.bytes is None:
+        if self.payload is None:
             raise HandshakeError('No digest available for an empty handshake')
 
         if self.version < versions.H264_MIN_VERSION:
@@ -112,10 +112,9 @@ class ServerToken(Token):
         Token.__init__(self, uptime, version, payload)
 
         self.client = client
-        self.client_digest = client.getDigest()
 
     def generatePayload(self):
-        if self.client_digest is None:
+        if self.client.getDigest() is None:
             self.payload = util.BufferedByteStream(
                 generateBytes(HANDSHAKE_LENGTH - 8))
 
@@ -126,23 +125,20 @@ class ServerToken(Token):
 
         self.payload.seek(0, 2)
         self.payload.write(self.getDigest())
+        self.payload.seek(0)
 
     def getDigest(self):
         """
         """
-        if hasattr(self, 'digest'):
-            return self.digest
+        if self.payload is None:
+            raise HandshakeError('No digest available for an empty handshake')
 
-        if self.client_digest is None:
-            self.digest = None
+        client_digest = self.client.getDigest()
 
+        if client_digest is None:
             return None
 
-        a = _digest(SECRET_SERVER_KEY, self.client_digest)
-
-        self.digest = _digest(a, self.bytes)
-
-        return self.digest
+        return _digest(client_digest, self.payload.getvalue())
 
 
 class Handshake(object):
@@ -220,7 +216,7 @@ def generateClient(uptime=None, version=None):
     if version < versions.H264_MIN_VERSION:
         version = 0
 
-    return Client(uptime, version)
+    return ClientToken(uptime, version)
 
 
 def decodeClientHandshake(data):
@@ -255,6 +251,9 @@ def generateBytes(length):
     filling in the gaps in unknown sections of the handshake.
     """
     # FIXME: sloooow
+    if type(length) not in [int, long]:
+        raise TypeError('int expected for length (got:%s)' % (type(length),))
+
     bytes = ''
 
     for x in xrange(0, length):
@@ -264,4 +263,4 @@ def generateBytes(length):
 
 
 def _digest(key, payload):
-    return hmac.new(key, msg=payload, digestmod=hashlib.sha256)
+    return hmac.new(key, msg=payload, digestmod=hashlib.sha256).hexdigest()
