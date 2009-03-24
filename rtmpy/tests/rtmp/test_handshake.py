@@ -495,7 +495,7 @@ class BaseNegotiatorTestCase(unittest.TestCase):
             "IHandshakeObserver interface expected (got:<type 'object'>)")
 
         x = MockHandshakeObserver()
-        self.assertTrue(handshake.IHandshakeObserver.providedBy(x)
+        self.assertTrue(handshake.IHandshakeObserver.providedBy(x))
         n = handshake.BaseNegotiator(x)
 
         self.assertTrue(handshake.IHandshakeNegotiator.providedBy(n))
