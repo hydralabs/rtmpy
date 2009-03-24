@@ -321,6 +321,7 @@ class ClientNegotiator(BaseNegotiator):
             See L{Token.uptime}.
         @param version: The version of the connecting client.
         """
+        self.started = True
         self.uptime = uptime
         self.version = version
 
@@ -336,6 +337,10 @@ class ClientNegotiator(BaseNegotiator):
         """
         An internal method that generates a client token.
         """
+        if not self.started:
+            raise HandshakeError('`start` must be called before generating ' \
+                'server token')
+
         uptime, version = self.uptime, self.version
 
         if uptime is None:
@@ -397,6 +402,9 @@ class ClientNegotiator(BaseNegotiator):
         called.
         """
         try:
+            if not self.started:
+                raise HandshakeError('Data received, but not started')
+
             self._dataReceived(data)
         except:
             self.observer.handshakeFailure(Failure())

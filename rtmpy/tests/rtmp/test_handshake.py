@@ -795,3 +795,142 @@ class ServerHandshakeNegotiationTestCase(unittest.TestCase):
         self.assertEquals(d[0], n.header, n.received_header)
         self.assertEquals(d[1:], n.server_payload)
         self.assertTrue(o.success)
+
+
+class ClientNegotiatorTestCase(BaseNegotiatorTestCase):
+    """
+    Tests for L{handshake.ClientNegotiator}
+    """
+
+    klass = handshake.ClientNegotiator
+
+    def setUp(self):
+        self.observer = mocks.HandshakeObserver()
+        self.negotiator = self.klass(self.observer)
+
+    def test_start(self):
+        n = self.negotiator
+
+        self.assertFalse(hasattr(n, 'header'))
+        self.assertFalse(hasattr(n, 'received_header'))
+        self.assertEquals(n.server, None)
+        self.assertEquals(n.client, None)
+        self.assertFalse(n.started)
+
+        self.negotiator.start()
+
+        self.assertEquals(n.server, None)
+        self.assertNotEquals(n.client, None)
+        self.assertEquals(n.uptime, None)
+        self.assertEquals(n.version, None)
+        self.assertEquals(n.header, '\x03')
+        self.assertEquals(n.received_header, None)
+        self.assertEquals(n.buffer, '')
+        self.assertTrue(n.started)
+
+    def test_start_args(self):
+        n = self.negotiator
+        o = self.observer
+
+        self.assertFalse(hasattr(n, 'header'))
+        self.assertFalse(hasattr(n, 'received_header'))
+        self.assertEquals(n.server, None)
+        self.assertEquals(n.client, None)
+        self.assertFalse(n.started)
+
+        self.negotiator.start(4321, 1234)
+
+        self.assertEquals(n.server, None)
+        self.assertNotEquals(n.client, None)
+        self.assertEquals(n.uptime, 4321)
+        self.assertEquals(n.version, 1234)
+        self.assertEquals(n.header, '\x03')
+        self.assertEquals(n.received_header, None)
+        self.assertEquals(n.buffer, '')
+        self.assertTrue(n.started)
+
+        self.assertEquals(len(o.buffer), 1)
+        d = o.buffer[0]
+
+        self.assertEquals(d[0], n.header)
+        self.assertEquals(d[1:], n.client_payload)
+
+    def test_generateToken(self):
+        e = self.assertRaises(
+            handshake.HandshakeError, self.negotiator.generateToken)
+        self.assertEquals(str(e), '`start` must be called before ' \
+            'generating server token')
+
+        # now test correct token generation with defaults
+        self.negotiator = self.klass(self.observer)
+        self.negotiator.started = True
+        self.negotiator.uptime = self.negotiator.version = None
+
+        self.negotiator.generateToken()
+
+        c = self.negotiator.client
+
+        self.assertEquals(c.__class__, handshake.ClientToken)
+        # h.264 compatible
+        self.assertEquals(c.version, versions.H264_MIN_FLASH)
+        self.assertEquals(c.uptime, 0)
+        self.assertEquals(c.payload, None)
+        self.assertEquals(c.context, None)
+
+        # test version < h264 (should be 0)
+        self.negotiator = self.klass(self.observer)
+        self.negotiator.started = True
+        self.negotiator.uptime = None
+        self.negotiator.version = 0x020102
+
+        self.assertTrue(self.negotiator.version < versions.H264_MIN_FLASH)
+        self.assertEquals(self.negotiator.client, None)
+
+        self.negotiator.generateToken()
+
+        c = self.negotiator.client
+
+        self.assertEquals(c.__class__, handshake.ClientToken)
+        self.assertEquals(c.version, 0)
+        self.assertEquals(c.uptime, 0)
+        self.assertEquals(c.payload, None)
+
+        # test uptime
+        self.negotiator = self.klass(self.observer)
+        self.negotiator.started = True
+        self.negotiator.uptime = 12345
+        self.negotiator.version = None
+
+        self.negotiator.generateToken()
+
+        c = self.negotiator.client
+
+        self.assertEquals(c.__class__, handshake.ClientToken)
+        self.assertEquals(c.version, versions.H264_MIN_FLASH)
+        self.assertEquals(c.uptime, 12345)
+        self.assertEquals(c.payload, None)
+
+    def test_data(self):
+        """
+        Check to make sure that if an exception occurs when receiving data,
+        it is propagated to the observer correctly.
+
+        @see: L{handshake.IHandshakeObserver.handshakeFailure}
+        """
+        class CustomError(Exception):
+            pass
+
+        def err(data):
+            raise CustomError
+
+        self.negotiator.start()
+        self.negotiator._dataReceived = err
+
+        self.assertRaises(CustomError, self.negotiator._dataReceived, '')
+        self.negotiator.dataReceived('')
+
+        self.assertFalse(self.observer.success)
+        r = self.observer.reason
+
+        self.assertTrue(isinstance(r, failure.Failure))
+        self.assertEquals(r.type, CustomError)
