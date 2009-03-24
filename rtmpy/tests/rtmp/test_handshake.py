@@ -11,15 +11,18 @@ from rtmpy.rtmp import handshake
 from rtmpy import util, versions
 
 
-class TokenClassTestCase(unittest.TestCase):
+class BaseTokenTestCase(unittest.TestCase):
     """
-    Tests for L{handshake.Token}
+    Base class for generating tokens
     """
-
-    token_class = handshake.Token
 
     def _generatePayload(self, t, payload):
-        t.payload = util.BufferedByteStream(payload)
+        t.__class__.generatePayload(t)
+
+        p = t.payload.tell()
+        t.payload.seek(2, 0)
+        t.payload.write(payload)
+        t.payload.seek(p)
 
     def _generateToken(self, *args, **kwargs):
         payload = None
@@ -36,6 +39,14 @@ class TokenClassTestCase(unittest.TestCase):
             t.generatePayload = lambda: self._generatePayload(t, payload)
 
         return t
+
+
+class TokenClassTestCase(BaseTokenTestCase):
+    """
+    Tests for L{handshake.Token}
+    """
+
+    token_class = handshake.Token
 
     def test_init(self):
         t = self._generateToken()
@@ -63,36 +74,11 @@ class TokenClassTestCase(unittest.TestCase):
     def test_encode(self):
         t = self._generateToken(payload='hi')
 
-        self.assertEquals(t.encode(), '\x00\x00\x00\x00\x00\x00\x00\x00hi')
-
-        t.uptime = 20000
-        self.assertEquals(t.encode(), '\x00\x00N \x00\x00\x00\x00hi')
-        t.uptime = 2000000
-        self.assertEquals(t.encode(), '\x00\x1e\x84\x80\x00\x00\x00\x00hi')
-
-        t = self._generateToken(payload='hi')
-
-        t.version = 10
-        self.assertEquals(t.encode(), '\x00\x00\x00\x00\x00\x00\x00\x0ahi')
-
-        t.version = 0x09007300
-        self.assertEquals(t.encode(), '\x00\x00\x00\x00\t\x00s\x00hi')
+        self.assertEquals(t.encode(), 'hi')
 
     def test_str(self):
         t = self._generateToken(payload='hi', generate=True)
-
-        self.assertFalse(hasattr(t, '_bytes'))
-        self.assertEquals(t.payload, None)
-
-        x = str(t)
-
-        self.assertTrue(hasattr(t, '_bytes'))
-        self.assertNotEquals(t.payload, None)
-        self.assertEquals(x, '\x00\x00\x00\x00\x00\x00\x00\x00hi')
-
-        t.payload = None
-        self.assertEquals(str(x), '\x00\x00\x00\x00\x00\x00\x00\x00hi')
-        self.assertEquals(t.payload, None)
+        self.assertEquals(str(t), t.encode())
 
     def test_cmp(self):
         ta = self._generateToken(payload='hi')
@@ -103,7 +89,7 @@ class TokenClassTestCase(unittest.TestCase):
         self.failUnless(ta >= tb)
         self.failUnless(tb <= ta)
         self.failUnless(ta != tb)
-        self.failUnless(tb == '\x00\x00\x00\x00\x00\x00\x00\x00as')
+        self.failUnless(tb == 'as')
         self.failUnless(tb == tb)
 
         self.failIf(ta < tb)
@@ -111,7 +97,7 @@ class TokenClassTestCase(unittest.TestCase):
         self.failIf(ta <= tb)
         self.failIf(tb >= ta)
         self.failIf(ta == tb)
-        self.failIf(tb != '\x00\x00\x00\x00\x00\x00\x00\x00as')
+        self.failIf(tb != 'as')
         self.failIf(tb != tb)
 
 
@@ -132,7 +118,7 @@ class ClientTokenClassTestCase(TokenClassTestCase):
 
         self.assertTrue(isinstance(p, util.BufferedByteStream))
         self.assertEquals(p.tell(), 0)
-        self.assertEquals(len(p), 1528)
+        self.assertEquals(len(p), 1536)
 
     def test_getDigest(self):
         t = self._generateToken()
@@ -142,7 +128,7 @@ class ClientTokenClassTestCase(TokenClassTestCase):
         self.assertEquals(str(e),
             'No digest available for an empty handshake')
 
-        t = self.token_class(version=versions.H264_MIN_VERSION)
+        t = self.token_class(version=versions.H264_FLASH_MIN_VERSION)
         # magic offset = 4
         t.payload = util.BufferedByteStream('\x01\x01\x01\x01' + '\x00' * 32)
 
@@ -154,6 +140,44 @@ class ClientTokenClassTestCase(TokenClassTestCase):
 
         self.assertEquals(t.getDigest(),
             ''.join([chr(x) for x in xrange(11, 43)]))
+
+
+class ClientTokenEncodingTestCase(BaseTokenTestCase):
+    """
+    Tests for L{handshake.ClientToken.encode}
+    """
+
+    token_class = handshake.ClientToken
+
+    def basicChecks(self, t, payload, check):
+        self.assertTrue(isinstance(t.payload, util.BufferedByteStream))
+
+        self.assertEquals(t.payload.getvalue(), payload)
+        self.assertEquals(len(payload), 1536)
+        self.assertTrue(payload[:8], check)
+
+    def test_defaults(self):
+        t = self._generateToken()
+
+        self.assertEquals(t.payload, None)
+        self.assertEquals(t.version, 0)
+        self.assertEquals(t.uptime, 0)
+
+        self.basicChecks(t, t.encode(), '\x00' * 8)
+
+    def test_uptime(self):
+        t = self._generateToken(uptime=20000)
+        self.basicChecks(t, t.encode(), '\x00\x00N \x00\x00\x00\x00')
+
+        t = self._generateToken(uptime=2000000)
+        self.basicChecks(t, t.encode(), '\x00\x1e\x84\x80\x00\x00\x00\x00')
+
+    def test_version(self):
+        t = self._generateToken(version=10)
+        self.basicChecks(t, t.encode(), '\x00\x00\x00\x00\x00\x00\x00\x0a')
+
+        t = self._generateToken(version=0x09007300)
+        self.basicChecks(t, t.encode(), '\x00\x00\x00\x00\t\x00s\x00')
 
 
 class ServerTokenClassTestCase(TokenClassTestCase):

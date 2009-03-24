@@ -430,7 +430,7 @@ class BaseProtocol(protocol.Protocol):
     @type encrypted: C{bool}
     """
 
-    implements(interfaces.IHandshakeObserver)
+    implements(handshake.IHandshakeObserver)
 
     HANDSHAKE = 'handshake'
     STREAM = 'stream'

@@ -1,4 +1,4 @@
-# -*- test-case-name: rtmpy.tests.test_codec -*-
+# -*- test-case-name: rtmpy.tests.rtmp.test_handshake -*-
 # Copyright (c) 2007-2009 The RTMPy Project.
 # See LICENSE for details.
 
@@ -157,7 +157,7 @@ class ClientToken(Token):
 
         self.payload.write_ulong(self.uptime)
         self.payload.write_ulong(self.version)
-        self.payload.write(generateBytes(HANDSHAKE_LENGTH - 8)))
+        self.payload.write(generateBytes(HANDSHAKE_LENGTH - 8))
         self.payload.seek(0)
 
     def getDigest(self):
@@ -219,6 +219,8 @@ class ServerToken(Token):
 
         self.payload.write(generateBytes(
             HANDSHAKE_LENGTH - 8 - SHA256_DIGEST_LENGTH))
+
+        # this is incomplete
 
         self.payload.seek(0, 2)
         self.payload.write(self.getDigest())
@@ -356,7 +358,7 @@ class ClientNegotiator(BaseNegotiator):
 
             return
 
-        if self.client_payload != data[:HANDSHAKE_LENGTH])
+        if self.client_payload != data[:HANDSHAKE_LENGTH]:
             raise HandshakeVerificationError
 
         # if we get here then a successful handshake has been negotiated.
@@ -375,7 +377,7 @@ class ClientNegotiator(BaseNegotiator):
             self.observer.handshakeFailure(Failure())
 
 
-class ServerHandshakeNegotiator(BaseHandshakeNegotiator):
+class ServerNegotiator(BaseNegotiator):
     """
     Negotiator for server handshakes.
     """
@@ -508,7 +510,7 @@ def generateBytes(length):
     @rtype: C{str}
     """
     # FIXME: sloooow
-    if isinstance(length, (int, long)):
+    if not isinstance(length, (int, long)):
         raise TypeError('int expected for length (got:%s)' % (type(length),))
 
     bytes = ''
