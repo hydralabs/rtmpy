@@ -488,13 +488,17 @@ def decodeClientHandshake(data):
     @type data: C{str}
     @return: The decoded client token.
     @rtype: L{ClientToken}
+    @raise EOFError: Not enough data supplied to fully decode token.
     """
     s = util.BufferedByteStream(data)
 
     uptime = s.read_ulong()
     version = versions.Version(s.read_ulong())
 
-    payload = s.read(HANDSHAKE_LENGTH - 8)
+    try:
+        payload = s.read(HANDSHAKE_LENGTH - 8)
+    except IOError, e:
+        raise EOFError(str(e))
 
     return ClientToken(uptime=uptime, version=version, payload=payload)
 
@@ -506,13 +510,17 @@ def decodeServerHandshake(client, data):
     @type data: C{str}
     @return: The decoded server token.
     @rtype: L{ServerToken}
+    @raise EOFError: Not enough data supplied to fully decode token.
     """
     s = util.BufferedByteStream(data)
 
     uptime = s.read_ulong()
     version = versions.Version(s.read_ulong())
 
-    payload = s.read(HANDSHAKE_LENGTH - 8)
+    try:
+        payload = s.read(HANDSHAKE_LENGTH - 8)
+    except IOError, e:
+        raise EOFError(str(e))
 
     return ServerToken(uptime=uptime, version=version, payload=payload)
 

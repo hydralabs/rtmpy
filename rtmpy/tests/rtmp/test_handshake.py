@@ -401,14 +401,22 @@ class ClientHandshakeDecodingTestCase(unittest.TestCase):
         # more here
 
     def test_no_data(self):
-        self.assertRaises(EOFError, handshake.decodeClientHandshake, '')
+        f = handshake.decodeClientHandshake
+
+        self.assertRaises(EOFError, f, '')
+        self.assertRaises(EOFError, f, 'a' * 5)
+        self.assertRaises(EOFError, f, 'a' * 11)
+        self.assertRaises(EOFError, f, 'a' * (1536 - 1))
 
     def test_decode(self):
         d = '\x01\x02\x03\x04\x09\x08\x07\x06' + ('a' * (1536 - 8))
 
         t = handshake.decodeClientHandshake(d)
 
-        self.assertTrue(t.__class__, handshake.ClientToken)
+        self.assertEquals(t.__class__, handshake.ClientToken)
+        v = t.version
+
+        self.assertEquals(v.__class__, versions.Version)
         self.assertEquals(t.version, 0x09080706)
         self.assertEquals(t.uptime, 0x1020304)
 
