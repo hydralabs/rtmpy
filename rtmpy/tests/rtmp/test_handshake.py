@@ -268,6 +268,19 @@ class ServerTokenClassTestCase(TokenClassTestCase):
         t.client.generatePayload()
         self.assertEquals(str(t), t.encode())
 
+    def test_h264_client_no_server(self):
+        t = self._generateToken()
+        c = t.client
+        c.version = versions.H264_MIN_FLASH
+
+        c.payload = util.BufferedByteStream('\x00' * 8 + \
+            '\x01\x01\x01\x01' + '\x03' * 4 + '\x02' * 32 + '\x00' * (1536 - 48))
+
+        self.assertEquals(len(c.payload), 1536)
+
+        e = self.assertRaises(handshake.HandshakeError, t.generatePayload)
+        self.assertEquals(str(e), 'Client not H.264 compatible')
+
 
 class ServerTokenDigestTestCase(BaseTokenTestCase):
     """
@@ -810,6 +823,7 @@ class ClientNegotiatorTestCase(BaseNegotiatorTestCase):
 
     def test_start(self):
         n = self.negotiator
+        o = self.observer
 
         self.assertFalse(hasattr(n, 'header'))
         self.assertFalse(hasattr(n, 'received_header'))
@@ -960,7 +974,7 @@ class ClientHandshakeNegotiationTestCase(unittest.TestCase):
 
     def test_not_started(self):
         o = mocks.HandshakeObserver()
-        n = handshake.ServerNegotiator(o)
+        n = handshake.ClientNegotiator(o)
 
         self.assertFalse(n.started)
         n.dataReceived('')
