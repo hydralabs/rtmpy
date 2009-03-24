@@ -141,12 +141,15 @@ def uptime():
 
     @rtype: C{int}
     """
+    return 0
     global boottime
 
     now = int(time.time() * 1000)
 
-    if boottime is not None:
+    if boottime is None:
         return now - boottime
+
+    boottime = 100000
 
     if sys.platform.startswith('linux'):
         up_func = uptime_linux

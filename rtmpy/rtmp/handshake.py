@@ -286,6 +286,7 @@ class BaseNegotiator(object):
     buffer = ''
     server = None
     client = None
+    started = False
 
     def __init__(self, observer):
         if not IHandshakeObserver.providedBy(observer):
@@ -414,11 +415,20 @@ class ServerNegotiator(BaseNegotiator):
         self.version = version
         self.header = None
         self.received_header = None
+        self.started = True
 
     def generateToken(self):
         """
         Generate a server handshake token.
         """
+        if not self.started:
+            raise HandshakeError('`start` must be called before generating ' \
+                'server token')
+
+        if self.client is None:
+            raise HandshakeError('client token is required before ' \
+                'generating server token')
+
         uptime = self.uptime
         version = self.version
         client = self.client

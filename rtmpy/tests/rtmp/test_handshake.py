@@ -466,27 +466,160 @@ class BaseNegotiatorTestCase(unittest.TestCase):
     Tests for L{handshake.BaseNegotiator}.
     """
 
+    klass = handshake.BaseNegotiator
+
     def test_interface(self):
-        handshake.IHandshakeNegotiator.implementedBy(handshake.BaseNegotiator)
+        handshake.IHandshakeNegotiator.implementedBy(self.klass)
 
     def test_init(self):
         x = object()
 
-        e = self.assertRaises(TypeError, handshake.BaseNegotiator, x)
+        e = self.assertRaises(TypeError, self.klass, x)
         self.assertEquals(str(e),
             "IHandshakeObserver interface expected (got:<type 'object'>)")
 
         x = mocks.HandshakeObserver()
         self.assertTrue(handshake.IHandshakeObserver.providedBy(x))
-        n = handshake.BaseNegotiator(x)
+        n = self.klass(x)
 
         self.assertTrue(handshake.IHandshakeNegotiator.providedBy(n))
         self.assertIdentical(n.observer, x)
         self.assertEquals(n.server, None)
+        self.assertEquals(n.started, False)
         self.assertEquals(n.client, None)
+        self.assertEquals(n.buffer, '')
 
     def test_data(self):
         x = mocks.HandshakeObserver()
-        n = handshake.BaseNegotiator(x)
+        n = self.klass(x)
 
         self.assertRaises(NotImplementedError, n.dataReceived, '')
+
+
+class ServerNegotiatorTestCase(BaseNegotiatorTestCase):
+    """
+    Tests for L{handshake.ServerNegotiator}
+    """
+
+    klass = handshake.ServerNegotiator
+
+    def setUp(self):
+        self.observer = mocks.HandshakeObserver()
+        self.negotiator = self.klass(self.observer)
+
+    def test_start_defaults(self):
+        self.assertFalse(hasattr(self.negotiator, 'header'))
+        self.assertFalse(hasattr(self.negotiator, 'received_header'))
+        self.assertEquals(self.negotiator.server, None)
+        self.assertEquals(self.negotiator.client, None)
+        self.assertFalse(self.negotiator.started)
+
+        self.negotiator.start()
+
+        self.assertEquals(self.negotiator.server, None)
+        self.assertEquals(self.negotiator.client, None)
+        self.assertEquals(self.negotiator.uptime, None)
+        self.assertEquals(self.negotiator.version, None)
+        self.assertEquals(self.negotiator.header, None)
+        self.assertEquals(self.negotiator.received_header, None)
+        self.assertEquals(self.negotiator.buffer, '')
+        self.assertTrue(self.negotiator.started)
+
+    def test_start_args(self):
+        self.assertFalse(hasattr(self.negotiator, 'header'))
+        self.assertFalse(hasattr(self.negotiator, 'received_header'))
+        self.assertEquals(self.negotiator.server, None)
+        self.assertEquals(self.negotiator.client, None)
+        self.assertFalse(self.negotiator.started)
+
+        self.negotiator.start('foo', 'bar')
+
+        self.assertEquals(self.negotiator.server, None)
+        self.assertEquals(self.negotiator.client, None)
+        self.assertEquals(self.negotiator.uptime, 'foo')
+        self.assertEquals(self.negotiator.version, 'bar')
+        self.assertEquals(self.negotiator.header, None)
+        self.assertEquals(self.negotiator.received_header, None)
+        self.assertEquals(self.negotiator.buffer, '')
+        self.assertTrue(self.negotiator.started)
+
+    def test_generateToken(self):
+        e = self.assertRaises(
+            handshake.HandshakeError, self.negotiator.generateToken)
+        self.assertEquals(str(e), '`start` must be called before ' \
+            'generating server token')
+
+        # test negotiator.client = None
+        self.negotiator = self.klass(self.observer)
+        self.negotiator.start()
+
+        self.assertTrue(self.negotiator.started)
+        self.assertEquals(self.negotiator.client, None)
+
+        e = self.assertRaises(
+            handshake.HandshakeError, self.negotiator.generateToken)
+        self.assertEquals(str(e), 'client token is required before ' \
+            'generating server token')
+
+        # now test correct token generation with defaults
+        self.negotiator = self.klass(self.observer)
+        self.negotiator.start()
+
+        x = self.negotiator.client = object()
+
+        self.assertEquals(self.negotiator.uptime, None)
+        self.assertEquals(self.negotiator.version, None)
+        self.assertEquals(self.negotiator.server, None)
+        self.assertTrue(self.negotiator.started)
+
+        self.negotiator.generateToken()
+
+        s = self.negotiator.server
+
+        self.assertEquals(s.__class__, handshake.ServerToken)
+        self.assertIdentical(s.client, x)
+        # h.264 compatible
+        self.assertEquals(s.version, versions.H264_MIN_FMS)
+        self.assertEquals(s.uptime, 0)
+        self.assertEquals(s.payload, None)
+
+        # test version < h264 (should be 0)
+        self.negotiator = self.klass(self.observer)
+        self.negotiator.start(version=0x020102)
+
+        x = self.negotiator.client = object()
+
+        self.assertTrue(self.negotiator.version < versions.H264_MIN_FMS)
+        self.assertEquals(self.negotiator.uptime, None)
+        self.assertEquals(self.negotiator.server, None)
+        self.assertTrue(self.negotiator.started)
+
+        self.negotiator.generateToken()
+
+        s = self.negotiator.server
+
+        self.assertEquals(s.__class__, handshake.ServerToken)
+        self.assertIdentical(s.client, x)
+        self.assertEquals(s.version, 0)
+        self.assertEquals(s.uptime, 0)
+        self.assertEquals(s.payload, None)
+
+        # test uptime
+        self.negotiator = self.klass(self.observer)
+        self.negotiator.start(uptime=12345)
+
+        x = self.negotiator.client = object()
+
+        self.assertEquals(self.negotiator.uptime, 12345)
+        self.assertEquals(self.negotiator.server, None)
+        self.assertTrue(self.negotiator.started)
+
+        self.negotiator.generateToken()
+
+        s = self.negotiator.server
+
+        self.assertEquals(s.__class__, handshake.ServerToken)
+        self.assertIdentical(s.client, x)
+        self.assertEquals(s.version, versions.H264_MIN_FMS)
+        self.assertEquals(s.uptime, 12345)
+        self.assertEquals(s.payload, None)
