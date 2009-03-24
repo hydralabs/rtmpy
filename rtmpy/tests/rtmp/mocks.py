@@ -213,9 +213,10 @@ class HandshakeObserver(object):
 
     implements(handshake.IHandshakeObserver)
 
-    success = None
-    reason = None
-    buffer = []
+    def __init__(self):
+        self.success = None
+        self.reason = None
+        self.buffer = []
 
     def handshakeSuccess(self):
         """

@@ -33,7 +33,12 @@ class HandshakeError(Exception):
     """
 
 
-class HeaderMismatch(HandshakeError):
+class HeaderError(HandshakeError):
+    """
+    Raised if there is an error with the handshake header.
+    """
+
+class HeaderMismatch(HeaderError):
     """
     Raised if the RTMP header bytes mismatch.
     """
@@ -449,11 +454,13 @@ class ServerNegotiator(BaseNegotiator):
 
         if self.received_header is None:
             if len(data) < 1:
-                self.buffer = data
-
                 return
 
             self.received_header = data[0]
+
+            if self.received_header not in [RTMP_HEADER_BYTE, RTMPE_HEADER_BYTE]:
+                raise HeaderError('Unknown header byte %r' % (
+                    self.received_header,))
 
             data = data[1:]
 
@@ -483,9 +490,12 @@ class ServerNegotiator(BaseNegotiator):
         """
         Called when handshake data has been received. If an error occurs
         whilst negotiating the handshake then C{handshakeFailure} will be
-        called.
+        called, citing the reason.
         """
         try:
+            if not self.started:
+                raise HandshakeError('Data received, but not started')
+
             self._dataReceived(data)
         except:
             self.observer.handshakeFailure(Failure())
