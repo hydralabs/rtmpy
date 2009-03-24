@@ -4,9 +4,13 @@
 
 """
 RTMP handshake support.
+
+@see: L{http://rtmpy.org/wiki/RTMP#a3.Handshake}
 """
 
 import random, hmac, hashlib
+from zope.interface import Interface, implements, Attribute
+from twisted.python.failure import Failure
 
 from rtmpy import versions, util
 
@@ -19,6 +23,9 @@ SECRET_SERVER_KEY = \
 HANDSHAKE_LENGTH = 1536
 SHA256_DIGEST_LENGTH = 64
 
+RTMP_HEADER_BYTE = '\x03'
+RTMPE_HEADER_BYTE = '\x06'
+
 
 class HandshakeError(Exception):
     """
@@ -26,15 +33,91 @@ class HandshakeError(Exception):
     """
 
 
+class HeaderMismatch(HandshakeError):
+    """
+    Raised if the RTMP header bytes mismatch.
+    """
+
+
+class HandshakeVerificationError(HandshakeError):
+    """
+    Raised if the handshake verification failed.
+    """
+
+
+class IHandshakeObserver(Interface):
+    """
+    Observes handshake events.
+    """
+
+    def handshakeSuccess():
+        """
+        Handshaking was successful.
+        """
+
+    def handshakeFailure(reason):
+        """
+        Handshaking failed.
+
+        @param reason: Why the handshake failed.
+        @type reason: Exception wrapped L{Failure}
+        """
+
+    def write(data):
+        """
+        Called when the handshake negotiator writes some data.
+        """
+
+
+class IHandshakeNegotiator(Interface):
+    """
+    Negotiates handshakes.
+    """
+
+    observer = Attribute(
+        "An L{IHandshakeObserver} that listens for events from this " \
+        "negotiator")
+
+    server = Attribute(
+        "The server handshake token. Can be L{ServerToken} or C{None}")
+    client = Attribute(
+        "The client handshake token. Can be L{ServerToken} or C{None}")
+
+    def start(uptime=None, version=None):
+        """
+        Called to start the handshaking process. You can supply the uptime and
+        version, otherwise they will be worked out automatically. The version
+        specifically will be set to enable H.264 streaming.
+        """
+
+    def dataReceived(self, data):
+        """
+        Called when handshaking data has been received.
+        """
+
+
 class Token(object):
     """
     Base functionality for handshake tokens.
+
+    @ivar uptime: The number of milliseconds since the last reboot.
+    @type uptime: C{int}
+    @ivar version: The api version for the handshake. This is used for check
+        for H.264 support.
+    @type version: C{int} or L{versions.Version}
+    @ivar context: The context for this handshake. This is used for RTMPE
+        support. A value C{None} means that normal RTMP streaming should
+        commence. Defaults to C{None}.
+    @note: L{context} is not used at the moment (until we get RTMPE support).
+    @ivar payload: A place to dump unknown bytes to complete the handshake. If
+        this is C{None} then the payload will be generated.
+    @type payload: C{None} or L{util.BufferedByteStream}
     """
 
-    def __init__(self, uptime=0, version=0, payload=None):
+    def __init__(self, uptime=0, version=0, context=None, payload=None):
         self.uptime = uptime
         self.version = version
-
+        self.context = context
         self.payload = None
 
         if payload is not None:
@@ -47,26 +130,18 @@ class Token(object):
         if self.payload is None:
             self.generatePayload()
 
-        s = util.BufferedByteStream()
-
-        s.write_ulong(self.uptime)
-        s.write_ulong(int(self.version))
-        s.write(self.payload.getvalue())
-
-        return s.getvalue()
+        return self.payload.getvalue()
 
     def generatePayload(self):
         """
+        Generates the payload for the handshake token. Must be implemented by
+        sub classes. The implementor must set the internal pointer of the
+        payload to the beginning.
         """
         raise NotImplementedError
 
     def __str__(self):
-        if hasattr(self, '_bytes'):
-            return self._bytes
-
-        self._bytes = self.encode()
-
-        return self._bytes
+        return self.encode()
 
     def __cmp__(self, other):
         return cmp(str(self), str(other))
@@ -78,16 +153,26 @@ class ClientToken(Token):
     """
 
     def generatePayload(self):
-        self.payload = util.BufferedByteStream(
-            generateBytes(HANDSHAKE_LENGTH - 8))
+        self.payload = util.BufferedByteStream()
+
+        self.payload.write_ulong(self.uptime)
+        self.payload.write_ulong(self.version)
+        self.payload.write(generateBytes(HANDSHAKE_LENGTH - 8)))
+        self.payload.seek(0)
 
     def getDigest(self):
         """
+        Returns an SHA-256 HMAC based on the payload. If the L{version} of
+        this token is less than L{versions.H264_FLASH_MIN_VERSION} then
+        C{None} will be returned.
+
+        @rtype: C{str} or C{None}
+        @raise HandshakeError: No payload exists
         """
         if self.payload is None:
             raise HandshakeError('No digest available for an empty handshake')
 
-        if self.version < versions.H264_MIN_VERSION:
+        if self.version < versions.H264_FLASH_MIN_VERSION:
             return None
 
         b = self.payload
@@ -106,22 +191,34 @@ class ClientToken(Token):
 class ServerToken(Token):
     """
     Represents a decoded server handshake.
+
+    @ivar client: The client handshake token.
+    @type client: L{ClientToken}
     """
 
-    def __init__(self, client, uptime=0, version=0, payload=None):
-        Token.__init__(self, uptime, version, payload)
+    def __init__(self, client, *args, **kwargs):
+        Token.__init__(self, *args, **kwargs)
 
         self.client = client
 
     def generatePayload(self):
+        """
+        Generates a payload that is sensitive to the client payload. If the
+        client does not have a valid digest (read:C{None}) then some random
+        bytes will be generated.
+        """
+        self.payload = util.BufferedByteStream()
+
+        self.payload.write_ulong(self.uptime)
+        self.payload.write_ulong(self.version)
+
         if self.client.getDigest() is None:
-            self.payload = util.BufferedByteStream(
-                generateBytes(HANDSHAKE_LENGTH - 8))
+            self.payload.write(generateBytes(HANDSHAKE_LENGTH - 8))
 
             return
 
-        self.payload = util.BufferedByteStream(
-            generateBytes(HANDSHAKE_LENGTH - 8 - SHA256_DIGEST_LENGTH))
+        self.payload.write(generateBytes(
+            HANDSHAKE_LENGTH - 8 - SHA256_DIGEST_LENGTH))
 
         self.payload.seek(0, 2)
         self.payload.write(self.getDigest())
@@ -129,9 +226,18 @@ class ServerToken(Token):
 
     def getDigest(self):
         """
+        Returns an SHA-256 HMAC based on the payload. If the L{version} of
+        this token is less than L{versions.H264_FMS_MIN_VERSION} then
+        C{None} will be returned.
+
+        @rtype: C{str} or C{None}
+        @raise HandshakeError: No payload exists.
         """
         if self.payload is None:
             raise HandshakeError('No digest available for an empty handshake')
+
+        if self.version < versions.H264_FMS_MIN_VERSION:
+            return None
 
         client_digest = self.client.getDigest()
 
@@ -141,86 +247,227 @@ class ServerToken(Token):
         return _digest(client_digest, self.payload.getvalue())
 
 
-class Handshake(object):
+class BaseNegotiator(object):
     """
-    Represents a handshake in all of its three phases.
+    Abstract functionality for negotiating an RTMP handshake.
 
-    @see: L{http://rtmpy.org/wiki/RTMP#a3.Handshake} for more info
+    @ivar observer: An observer for handshake negotiations.
+    @type observer: L{IHandshakeObserver}
+    @ivar server: The server token.
+    @type server: L{ServerToken}
+    @ivar client: The client token.
+    @type client: L{ClientToken}
+    @ivar buffer: Any data that has not yet been consumed.
     """
 
-    def __init__(self):
-        self.server = None
-        self.client = None
+    implements(IHandshakeNegotiator)
 
-    def getClient(self):
-        """
-        Returns the client handshake. Will generate one if none exists.
-        """
-        if self.client is None:
-            self.client = generateClient()
+    buffer = ''
+    server = None
+    client = None
 
-        return self.client
+    def __init__(self, observer):
+        if not IHandshakeObserver.providedBy(observer):
+            raise TypeError('IHandshakeObserver interface ' \
+                'expected (got:%s)' % (type(observer),))
 
-    def setClient(self, data):
+        self.observer = observer
+
+    def dataReceived(self, data):
         """
-        Set the client handshake.
+        Called when Implemented by concrete subclasses.
         """
-        if isinstance(data, ClientToken):
-            self.client = data
+        raise NotImplementedError
+
+
+class ClientNegotiator(BaseNegotiator):
+    """
+    Negotiator for client initiating handshakes.
+    """
+
+    def start(self, uptime=None, version=None):
+        """
+        Called to start the handshaking negotiations. Writes the header byte
+        and client payload to the observer.
+
+        @param uptime: The number of milliseconds since the system booted.
+            See L{Token.uptime}.
+        @param version: The version of the connecting client.
+        """
+        self.uptime = uptime
+        self.version = version
+
+        self.generateToken()
+
+        self.client_payload = self.client.encode()
+        self.header = getHeader(self.client)
+        self.received_header = None
+
+        self.observer.write(self.header + self.client_payload)
+
+    def generateToken(self):
+        """
+        An internal method that generates a client token.
+        """
+        uptime, version = self.uptime, self.version
+
+        if uptime is None:
+            uptime = util.uptime()
+
+        if version is None:
+            version = versions.H264_FLASH_MIN_VERSION
+
+        if version < versions.H264_FLASH_MIN_VERSION:
+            version = 0
+
+        self.client = ClientToken(uptime, version)
+
+    def _dataReceived(self, data):
+        data = self.buffer + data
+
+        if self.received_header is None:
+            if len(data) < 1:
+                self.buffer = data
+
+                return
+
+            self.received_header = data[0]
+
+            if self.header != self.received_header:
+                raise HeaderMismatch('My header = %r, received header = ' \
+                    '%r' % (self.header, self.received_header))
+
+            data = data[1:]
+
+        if self.server is None:
+            if len(data) < HANDSHAKE_LENGTH:
+                self.buffer = data
+
+                return
+
+            self.server = decodeServerHandshake(self.client, data)
+            data = data[HANDSHAKE_LENGTH:]
+
+        # we now have a valid server token, we are now expecting to have our
+        # original client token
+
+        if len(data) < HANDSHAKE_LENGTH:
+            self.buffer = data
 
             return
+
+        if self.client_payload != data[:HANDSHAKE_LENGTH])
+            raise HandshakeVerificationError
+
+        # if we get here then a successful handshake has been negotiated.
+        # inform the observer accordingly
+        self.observer.handshakeSuccess()
+
+    def dataReceived(self, data):
+        """
+        Called when handshake data has been received. If an error occurs
+        whilst negotiating the handshake then C{handshakeFailure} will be
+        called.
+        """
+        try:
+            self._dataReceived(data)
+        except:
+            self.observer.handshakeFailure(Failure())
+
+
+class ServerHandshakeNegotiator(BaseHandshakeNegotiator):
+    """
+    Negotiator for server handshakes.
+    """
+
+    def start(self, uptime=None, version=None):
+        """
+        Called to start the handshaking negotiations. Writes the header byte
+        and client payload to the observer.
+
+        @param uptime: The number of milliseconds since the system booted.
+            See L{Token.uptime}.
+        @param version: The version of the connecting client.
+        """
+        self.uptime = uptime
+        self.version = version
+        self.header = None
+        self.received_header = None
+
+    def generateToken(self):
+        """
+        Generate a server handshake token.
+        """
+        uptime = self.uptime
+        version = self.version
+        client = self.client
+
+        if uptime is None:
+            uptime = util.uptime()
+
+        if version is None:
+            version = versions.H264_FMS_MIN_VERSION
+
+        if version < versions.H264_FMS_MIN_VERSION:
+            version = 0
+
+        self.server = ServerToken(client, uptime, version)
+
+    def _dataReceived(self, data):
+        data = self.buffer + data
+
+        if self.received_header is None:
+            if len(data) < 1:
+                self.buffer = data
+
+                return
+
+            self.received_header = data[0]
+
+            data = data[1:]
+
+        if len(data) < HANDSHAKE_LENGTH:
+            self.buffer = data
+
+            return
+
+        if len(data) > HANDSHAKE_LENGTH:
+            raise HandshakeError('Unexpected trailing data in client ' \
+                'handshake')
 
         self.client = decodeClientHandshake(data)
+        self.client_payload = data
 
-    def getServer(self):
+        self.generateToken()
+        self.header = getHeader(self.client)
+        self.server_payload = self.server.encode()
+
+        self.observer.write(
+            self.header + self.server_payload + self.client_payload)
+
+        # at this point, as far as the server is concerned, handshaking has
+        # been successful
+        self.observer.handshakeSuccess()
+
+    def dataReceived(self, data):
         """
-        Returns the server handshake. Will generate one if none exists.
+        Called when handshake data has been received. If an error occurs
+        whilst negotiating the handshake then C{handshakeFailure} will be
+        called.
         """
-        if self.server is not None:
-            return self.server
-
-        self.server = generateServer(self.getClient())
-
-    def setServer(self, data):
-        """
-        Set the server handshake.
-        """
-        if isinstance(data, ServerToken):
-            self.server = data
-
-            return
-
-        if self.client is None:
-            raise 
-
-        self.server = decodeServerHandshake(self.getClient(), data)
-
-
-def generateClient(uptime=None, version=None):
-    """
-    Generate a client handshake. The version is important if you want to
-    enable H.264 support (the default).
-
-    @param uptime: System uptime in milliseconds. If not supplied, then
-        this will be figured out automagically.
-    @type uptime: C{int} or C{None}
-    @param version: The 4 part version of the client.
-    @type version: L{Version} or C{int}
-    """
-    if uptime is None:
-        uptime = util.uptime()
-
-    if version is None:
-        version = versions.H264_MIN_VERSION
-
-    if version < versions.H264_MIN_VERSION:
-        version = 0
-
-    return ClientToken(uptime, version)
+        try:
+            self._dataReceived(data)
+        except:
+            self.observer.handshakeFailure(Failure())
 
 
 def decodeClientHandshake(data):
     """
+    Builds a L{ClientToken} based on the supplied C{data}.
+
+    @type data: C{str}
+    @return: The decoded client token.
+    @rtype: L{ClientToken}
     """
     s = util.BufferedByteStream(data)
 
@@ -229,29 +476,39 @@ def decodeClientHandshake(data):
 
     payload = s.read(HANDSHAKE_LENGTH - 8)
 
-    return ClientToken(uptime, version, payload)
+    return ClientToken(uptime=uptime, version=version, payload=payload)
 
 
 def decodeServerHandshake(client, data):
     """
+    Builds a L{ServerToken} based on the supplied C{data}.
+
+    @type data: C{str}
+    @return: The decoded server token.
+    @rtype: L{ClientToken}
     """
     s = util.BufferedByteStream(data)
 
     uptime = s.read_ulong()
     version = versions.Version(s.read_ulong())
 
-    if client.version < versions.H264_MIN_VERSION:
-        pass
-        # we look for a digest
+    payload = s.read(HANDSHAKE_LENGTH - 8)
+
+    return ServerToken(uptime=uptime, version=version, payload=payload)
 
 
 def generateBytes(length):
     """
     Generates a string of C{length} bytes of pseudo-random data. Used for 
     filling in the gaps in unknown sections of the handshake.
+
+    @param length: The number of bytes to generate.
+    @type length: C{int}
+    @return: A random string of bytes, length C{length}.
+    @rtype: C{str}
     """
     # FIXME: sloooow
-    if type(length) not in [int, long]:
+    if isinstance(length, (int, long)):
         raise TypeError('int expected for length (got:%s)' % (type(length),))
 
     bytes = ''
@@ -263,4 +520,29 @@ def generateBytes(length):
 
 
 def _digest(key, payload):
+    """
+    A helper method that wraps generating a SHA-256 HMAC digest.
+
+    @param key: The key to use in generating the digest.
+    @type key: C{str}
+    @param payload: The message to digest.
+    @type payload: C{str}
+    @return: A hexdigest representation of the digested message.
+    @rtype: C{str}
+    """
     return hmac.new(key, msg=payload, digestmod=hashlib.sha256).hexdigest()
+
+
+def getHeader(token):
+    """
+    Returns an RTMP header byte based on the supplied token.
+
+    @param token: The handshake token.
+    @type token: L{Token}
+    @return: The relevant header byte.
+    @rtype: C{str}
+    """
+    if token.context is not None:
+        return RTMPE_HEADER_BYTE
+
+    return RTMP_HEADER_BYTE

@@ -433,11 +433,18 @@ class BaseProtocol(protocol.Protocol):
     @type encrypted: C{bool}
     """
 
+    implements(interfaces.IHandshakeObserver)
+
     HANDSHAKE = 'handshake'
     STREAM = 'stream'
 
     def __init__(self):
         self.encrypted = False
+
+    def getHandshaker(self):
+        """
+        """
+        raise NotImplementedError
 
     def connectionMade(self):
         if DEBUG:
@@ -446,7 +453,7 @@ class BaseProtocol(protocol.Protocol):
         protocol.Protocol.connectionMade(self)
 
         self.state = BaseProtocol.HANDSHAKE
-        self.handshake = handshake.Handshake()
+        self.handshaker = self.getHandshaker()
 
     def connectionLost(self, reason):
         """
@@ -465,14 +472,10 @@ class BaseProtocol(protocol.Protocol):
 
     def decodeHandshake(self, data):
         """
-        Negotiates the handshake phase of the protocol. Needs to be
-        implemented by the subclass. Must call either L{onHandshakeSuccess} or
-        L{onHandshakeFailure} or noop if not enough data received.
-
         @see: U{RTMP handshake on OSFlash (external)
         <http://osflash.org/documentation/rtmp#handshake>} for more info.
         """
-        raise NotImplementedError
+        self.handshaker.dataReceived(data)
 
     def decodeStream(self, data):
         self.decoder.dataReceived(data)
@@ -495,7 +498,9 @@ class BaseProtocol(protocol.Protocol):
         elif self.state is BaseProtocol.STREAM:
             self.decodeStream(data)
 
-    def onHandshakeSuccess(self):
+    # interfaces.IHandshakeObserver
+
+    def handshakeSuccess(self):
         """
         Called when the RTMP handshake was successful. Once this is called,
         packet streaming can commence.
@@ -510,7 +515,7 @@ class BaseProtocol(protocol.Protocol):
 
         # TODO slot in support for RTMPE
 
-    def onHandshakeFailure(self, reason):
+    def handshakeFailure(self, reason):
         """
         Called when the RTMP handshake failed for some reason. Drops the
         connection immediately.
@@ -519,6 +524,11 @@ class BaseProtocol(protocol.Protocol):
             log(self, "Failed handshake (reason:%s)" % str(reason))
 
         self.transport.loseConnection()
+
+    def write(self, data):
+        """
+        """
+        self.transport.write(data)
 
     def onHandshakeTimeout(self):
         """
@@ -529,11 +539,3 @@ class BaseProtocol(protocol.Protocol):
             log(self, "Handshake timeout")
 
         self.transport.loseConnection()
-
-    def writeHeader(self):
-        """
-        """
-        if self.encrypted:
-            self.transport.write(RTMPE_HEADER_BYTE)
-        else:
-            self.transport.write(RTMP_HEADER_BYTE)

@@ -201,16 +201,3 @@ class IChannelScheduler(Interface):
         implementing class. If there are no more active channels then C{None}
         should be returned.
         """
-
-
-class IRTMPProtocol(IProtocol):
-    """
-    """
-
-    def handshakeSuccess():
-        """
-        """
-
-    def handshakeFailure():
-        """
-        """
