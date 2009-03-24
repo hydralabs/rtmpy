@@ -505,7 +505,7 @@ def decodeServerHandshake(client, data):
 
     @type data: C{str}
     @return: The decoded server token.
-    @rtype: L{ClientToken}
+    @rtype: L{ServerToken}
     """
     s = util.BufferedByteStream(data)
 
@@ -521,6 +521,8 @@ def generateBytes(length):
     """
     Generates a string of C{length} bytes of pseudo-random data. Used for 
     filling in the gaps in unknown sections of the handshake.
+
+    This function is going to to called a lot and is ripe for moving into C.
 
     @param length: The number of bytes to generate.
     @type length: C{int}

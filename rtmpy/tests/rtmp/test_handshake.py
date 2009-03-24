@@ -389,4 +389,27 @@ class HelperTestCase(unittest.TestCase):
 
         t.context = object()
         self.assertEquals(handshake.getHeader(t), '\x06')
-        
+
+
+class ClientHandshakeDecodingTestCase(unittest.TestCase):
+    """
+    Tests for L{handshake.decodeClientHandshake}.
+    """
+
+    def test_types(self):
+        self.assertRaises(TypeError, handshake.decodeClientHandshake, 123)
+        # more here
+
+    def test_no_data(self):
+        self.assertRaises(EOFError, handshake.decodeClientHandshake, '')
+
+    def test_decode(self):
+        d = '\x01\x02\x03\x04\x09\x08\x07\x06' + ('a' * (1536 - 8))
+
+        t = handshake.decodeClientHandshake(d)
+
+        self.assertTrue(t.__class__, handshake.ClientToken)
+        self.assertEquals(t.version, 0x09080706)
+        self.assertEquals(t.uptime, 0x1020304)
+
+        self.assertEquals(t.payload.getvalue(), 'a' * (1536 - 8))
