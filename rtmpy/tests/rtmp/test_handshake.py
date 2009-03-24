@@ -828,6 +828,12 @@ class ClientNegotiatorTestCase(BaseNegotiatorTestCase):
         self.assertEquals(n.buffer, '')
         self.assertTrue(n.started)
 
+        self.assertEquals(len(o.buffer), 1)
+        d = o.buffer[0]
+
+        self.assertEquals(d[0], n.header)
+        self.assertEquals(d[1:], n.client_payload)
+
     def test_start_args(self):
         n = self.negotiator
         o = self.observer
@@ -934,3 +940,174 @@ class ClientNegotiatorTestCase(BaseNegotiatorTestCase):
 
         self.assertTrue(isinstance(r, failure.Failure))
         self.assertEquals(r.type, CustomError)
+
+
+class ClientHandshakeNegotiationTestCase(unittest.TestCase):
+    """
+    Actually checks the handshake negotiation from the client pov.
+    """
+
+    def setUp(self):
+        self.observer = mocks.HandshakeObserver()
+        self.negotiator = handshake.ClientNegotiator(self.observer)
+
+        self.negotiator.start()
+
+        self.assertEquals(len(self.observer.buffer), 1)
+        # we reset the buffere because there are other tests that handle
+        # the data in there - see ClientNegotiatorTestCase.test_start_args
+        self.observer.buffer = []
+
+    def test_not_started(self):
+        o = mocks.HandshakeObserver()
+        n = handshake.ServerNegotiator(o)
+
+        self.assertFalse(n.started)
+        n.dataReceived('')
+
+        self.assertFalse(o.success)
+
+        try:
+            r = o.reason.raiseException()
+        except handshake.HandshakeError, e:
+            self.assertEquals(str(e), 'Data received, but not started')
+        except:
+            self.fail('Unexpected error')
+
+    def test_nothing(self):
+        n = self.negotiator
+        o = self.observer
+
+        self.assertEquals(n.received_header, None)
+        self.assertEquals(n.buffer, '')
+
+        n.dataReceived('')
+
+        self.assertEquals(o.success, None)
+        self.assertEquals(n.received_header, None)
+        self.assertEquals(n.buffer, '')
+
+        self.assertNotEquals(n.client, None)
+        self.assertEquals(n.server, None)
+        self.assertEquals(o.buffer, [])
+
+    def test_unknown_header(self):
+        n = self.negotiator
+        o = self.observer
+
+        self.assertEquals(n.received_header, None)
+        self.assertEquals(n.buffer, '')
+
+        n.dataReceived('f')
+
+        self.assertFalse(o.success)
+
+        try:
+            r = o.reason.raiseException()
+        except handshake.HeaderError, e:
+            self.assertEquals(str(e),
+                "My header = '\\x03', received header = 'f'")
+        except:
+            self.fail('Unexpected error')
+
+    def test_just_header(self):
+        n = self.negotiator
+        o = self.observer
+
+        self.assertEquals(n.received_header, None)
+        self.assertEquals(n.buffer, '')
+
+        n.dataReceived('\x03')
+
+        self.assertEquals(o.success, None)
+        self.assertEquals(n.received_header, '\x03')
+        self.assertEquals(n.buffer, '')
+
+        self.assertNotEquals(n.client, None)
+        self.assertEquals(n.server, None)
+        self.assertEquals(o.buffer, [])
+
+    def test_header_plus_trailing(self):
+        n = self.negotiator
+        o = self.observer
+
+        self.assertEquals(n.received_header, None)
+        self.assertEquals(n.buffer, '')
+
+        n.dataReceived('\x03' + 'a' * (handshake.HANDSHAKE_LENGTH - 1))
+
+        self.assertEquals(o.success, None)
+        self.assertEquals(n.received_header, '\x03')
+        self.assertEquals(n.buffer, 'a' * (handshake.HANDSHAKE_LENGTH - 1))
+
+        self.assertNotEquals(n.client, None)
+        self.assertEquals(n.server, None)
+        self.assertEquals(o.buffer, [])
+
+    def test_server(self):
+        """
+        Send enough data to build a complete server token
+        """
+        n = self.negotiator
+        o = self.observer
+
+        n.received_header = '\x03'
+
+        self.assertEquals(n.buffer, '')
+
+        n.dataReceived('a' * (handshake.HANDSHAKE_LENGTH))
+
+        self.assertEquals(o.success, None)
+        self.assertNotEquals(n.client, None)
+        self.assertNotEquals(n.server, None)
+        self.assertEquals(n.buffer, '')
+        self.assertEquals(o.buffer, [])
+
+        n.dataReceived('b')
+
+        self.assertEquals(o.success, None)
+        self.assertNotEquals(n.client, None)
+        self.assertNotEquals(n.server, None)
+        self.assertEquals(n.buffer, 'b')
+        self.assertEquals(o.buffer, [])
+
+    def test_handshake(self):
+        n = self.negotiator
+        o = self.observer
+
+        n.received_header = '\x03'
+        n.server = handshake.ServerToken(n.client, version=versions.H264_MIN_FMS)
+
+        self.assertEquals(n.buffer, '')
+
+        n.dataReceived(n.client.encode())
+
+        self.assertTrue(o.success)
+        self.assertNotEquals(n.client, None)
+        self.assertNotEquals(n.server, None)
+        self.assertEquals(n.buffer, '')
+        self.assertEquals(o.buffer, [])
+
+    def test_bad_handshake(self):
+        n = self.negotiator
+        o = self.observer
+
+        n.received_header = '\x03'
+        n.server = handshake.ServerToken(n.client)
+
+        d = 'a' * 1536
+
+        self.assertNotEquals(d, n.client.encode())
+
+        self.assertEquals(n.buffer, '')
+
+        n.dataReceived(d)
+
+        self.assertFalse(o.success)
+
+        try:
+            r = o.reason.raiseException()
+        except handshake.HandshakeVerificationError, e:
+            self.assertEquals(str(e), '')
+        except:
+            self.fail('Unexpected error')
