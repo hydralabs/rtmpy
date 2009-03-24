@@ -213,14 +213,22 @@ class HandshakeObserver(object):
 
     implements(handshake.IHandshakeObserver)
 
+    success = None
+    reason = None
+    buffer = []
+
     def handshakeSuccess(self):
         """
         """
+        self.success = True
 
     def handshakeFailure(self, reason):
         """
         """
+        self.success = False
+        self.reason = reason
 
     def write(self, data):
         """
         """
+        self.buffer.append(data)

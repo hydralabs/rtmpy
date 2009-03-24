@@ -6,6 +6,7 @@ Tests for L{rtmpy.rtmp.handshake}.
 """
 
 from twisted.trial import unittest
+from twisted.python import failure
 from zope.interface import implements
 
 from rtmpy.rtmp import handshake
@@ -623,3 +624,38 @@ class ServerNegotiatorTestCase(BaseNegotiatorTestCase):
         self.assertEquals(s.version, versions.H264_MIN_FMS)
         self.assertEquals(s.uptime, 12345)
         self.assertEquals(s.payload, None)
+
+    def test_data(self):
+        """
+        Check to make sure that if an exception occurs when receiving data,
+        it is propagated to the observer correctly.
+
+        @see: L{handshake.IHandshakeObserver.handshakeFailure}
+        """
+        class CustomError(Exception):
+            pass
+
+        def err(data):
+            raise CustomError
+
+        self.negotiator._dataReceived = err
+
+        self.assertRaises(CustomError, self.negotiator._dataReceived, '')
+        self.negotiator.dataReceived('')
+
+        self.assertFalse(self.observer.success)
+        r = self.observer.reason
+
+        self.assertTrue(isinstance(r, failure.Failure))
+        self.assertEquals(r.type, CustomError)
+
+
+class ServerHandshakeNegotiationTestCase(unitttest.TestCase):
+    """
+    Actually checks the handshake negotiation from the server pov.
+    """
+
+    def setUp(self):
+        self.observer = mocks.HandshakeObserver()
+        self.negotiator = handshake.ServerNegotiator(self.observer)
+
