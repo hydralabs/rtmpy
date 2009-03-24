@@ -8,6 +8,7 @@ Mock classes for testing sections of L{rtmpy.rtmp}
 from zope.interface import implements
 
 from rtmpy.rtmp import interfaces
+from rtmpy.rtmp import handshake
 
 class ChannelManager(object):
     """
@@ -204,3 +205,22 @@ class ChannelObserver(object):
 
     def bodyComplete(self):
         self.events.append(('body-complete',))
+
+
+class HandshakeObserver(object):
+    """
+    """
+
+    implements(handshake.IHandshakeObserver)
+
+    def handshakeSuccess(self):
+        """
+        """
+
+    def handshakeFailure(self, reason):
+        """
+        """
+
+    def write(self, data):
+        """
+        """

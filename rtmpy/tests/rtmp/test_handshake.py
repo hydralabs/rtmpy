@@ -10,6 +10,7 @@ from zope.interface import implements
 
 from rtmpy.rtmp import handshake
 from rtmpy import util, versions
+from rtmpy.tests.rtmp import mocks
 
 
 class BaseTokenTestCase(unittest.TestCase):
@@ -460,25 +461,6 @@ class ServerHandshakeDecodingTestCase(unittest.TestCase):
         self.assertEquals(t.payload.getvalue(), 'a' * (1536 - 8))
 
 
-class MockHandshakeObserver(object):
-    """
-    """
-
-    implements(handshake.IHandshakeObserver)
-
-    def handshakeSuccess(self):
-        """
-        """
-
-    def handshakeFailure(self, reason):
-        """
-        """
-
-    def write(self, data):
-        """
-        """
-
-
 class BaseNegotiatorTestCase(unittest.TestCase):
     """
     Tests for L{handshake.BaseNegotiator}.
@@ -494,8 +476,17 @@ class BaseNegotiatorTestCase(unittest.TestCase):
         self.assertEquals(str(e),
             "IHandshakeObserver interface expected (got:<type 'object'>)")
 
-        x = MockHandshakeObserver()
+        x = mocks.HandshakeObserver()
         self.assertTrue(handshake.IHandshakeObserver.providedBy(x))
         n = handshake.BaseNegotiator(x)
 
         self.assertTrue(handshake.IHandshakeNegotiator.providedBy(n))
+        self.assertIdentical(n.observer, x)
+        self.assertEquals(n.server, None)
+        self.assertEquals(n.client, None)
+
+    def test_data(self):
+        x = mocks.HandshakeObserver()
+        n = handshake.BaseNegotiator(x)
+
+        self.assertRaises(NotImplementedError, n.dataReceived, '')
