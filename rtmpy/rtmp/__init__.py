@@ -30,9 +30,6 @@ from rtmpy.rtmp import handshake
 #: The default RTMP port is a registered at U{IANA<http://iana.org>}.
 RTMP_PORT = 1935
 
-RTMP_HEADER_BYTE = '\x03'
-RTMPE_HEADER_BYTE = '\x06'
-
 MAX_CHANNELS = 64
 MAX_STREAMS = 0xffff
 
