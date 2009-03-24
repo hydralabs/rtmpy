@@ -7,7 +7,7 @@ Tests for L{rtmpy.versions}
 
 from twisted.trial import unittest
 
-from rtmpy.versions import Version
+from rtmpy.versions import Version, H264_MIN_VERSION
 
 
 class VersionTestCase(unittest.TestCase):
@@ -140,3 +140,7 @@ class VersionTestCase(unittest.TestCase):
         self.failIf(vb != '0,0,1,0')
         self.failIf(vb < '0,0,1,0')
         self.failIf(vb > '0,0,1,0')
+
+    def test_h264_version(self):
+        self.assertTrue(isinstance(H264_MIN_VERSION, Version))
+        self.assertEquals(H264_MIN_VERSION, '9,0,115,0')
