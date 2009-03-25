@@ -5,7 +5,8 @@
 """
 RTMP handshake support.
 
-@see: L{http://rtmpy.org/wiki/RTMP#a3.Handshake}
+@see: U{RTMP Handshake on RTMPy wiki (external)
+      <http://rtmpy.org/wiki/RTMP#a3.Handshake>}
 """
 
 import random, hmac, hashlib

@@ -6,13 +6,13 @@
 """
 Versions for products.
 
-@see L{Version}
+@see: L{Version}
 """
 
 
 class Version(object):
     """
-    Represents a version number, e.g. 10,0,12,36
+    Represents a version number, e.g. C{10,0,12,36}.
     """
 
     def __init__(self, *args):
@@ -61,7 +61,7 @@ class Version(object):
 
     def __int__(self):
         """
-        Returns a 4 byte integer representing the version
+        Returns a 4 byte integer representing the version.
         """
         if hasattr(self, '_int'):
             return self._int

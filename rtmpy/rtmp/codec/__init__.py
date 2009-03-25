@@ -441,7 +441,7 @@ class Encoder(BaseCodec):
 
     def getJob(self):
         """
-        @see L{BaseCodec.getJob}
+        @see: L{BaseCodec.getJob}
         """
         return self.encode
 
