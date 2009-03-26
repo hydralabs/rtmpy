@@ -10,10 +10,11 @@ RTMP handshake support.
 """
 
 import random, hmac, hashlib
-from zope.interface import Interface, implements, Attribute
+from zope.interface import implements
 from twisted.python.failure import Failure
 
-from rtmpy import versions, util
+from rtmpy import versions, util, rtmp
+from rtmpy.rtmp import interfaces
 
 SECRET_SERVER_KEY = \
     '\x47\x65\x6e\x75\x69\x6e\x65\x20\x41\x64\x6f\x62\x65\x20\x46\x6c\x61' \
@@ -49,56 +50,6 @@ class HandshakeVerificationError(HandshakeError):
     """
     Raised if the handshake verification failed.
     """
-
-
-class IHandshakeObserver(Interface):
-    """
-    Observes handshake events.
-    """
-
-    def handshakeSuccess():
-        """
-        Handshaking was successful.
-        """
-
-    def handshakeFailure(reason):
-        """
-        Handshaking failed.
-
-        @param reason: Why the handshake failed.
-        @type reason: Exception wrapped L{Failure}
-        """
-
-    def write(data):
-        """
-        Called when the handshake negotiator writes some data.
-        """
-
-
-class IHandshakeNegotiator(Interface):
-    """
-    Negotiates handshakes.
-    """
-
-    observer = Attribute(
-        "An L{IHandshakeObserver} that listens for events from this " \
-        "negotiator")
-    server = Attribute(
-        "The server handshake token. Can be L{ServerToken} or C{None}")
-    client = Attribute(
-        "The client handshake token. Can be L{ServerToken} or C{None}")
-
-    def start(uptime=None, version=None):
-        """
-        Called to start the handshaking process. You can supply the uptime and
-        version, otherwise they will be worked out automatically. The version
-        specifically will be set to enable H.264 streaming.
-        """
-
-    def dataReceived(self, data):
-        """
-        Called when handshaking data has been received.
-        """
 
 
 class Token(object):
@@ -150,6 +101,17 @@ class Token(object):
 
     def __cmp__(self, other):
         return cmp(str(self), str(other))
+
+    def __repr__(self):
+        attrs = ['uptime', 'version', 'context']
+
+        s = ['%s=%r' % (k, getattr(self, k)) for k in attrs]
+
+        return '<%s.%s %s at 0x%x>' % (
+            self.__class__.__module__,
+            self.__class__.__name__,
+            ' '.join(s),
+            id(self))
 
 
 class ClientToken(Token):
@@ -287,7 +249,7 @@ class BaseNegotiator(object):
     @ivar buffer: Any data that has not yet been consumed.
     """
 
-    implements(IHandshakeNegotiator)
+    implements(interfaces.IHandshakeNegotiator)
 
     buffer = ''
     server = None
@@ -295,7 +257,7 @@ class BaseNegotiator(object):
     started = False
 
     def __init__(self, observer):
-        if not IHandshakeObserver.providedBy(observer):
+        if not interfaces.IHandshakeObserver.providedBy(observer):
             raise TypeError('IHandshakeObserver interface ' \
                 'expected (got:%s)' % (type(observer),))
 
@@ -327,6 +289,9 @@ class ClientNegotiator(BaseNegotiator):
         self.version = version
 
         self.generateToken()
+
+        if rtmp.DEBUG:
+            rtmp.log(self, 'client token = %r' % (self.client,))
 
         self.client_payload = self.client.encode()
         self.header = getHeader(self.client)
@@ -366,6 +331,13 @@ class ClientNegotiator(BaseNegotiator):
 
             self.received_header = data[0]
 
+            if rtmp.DEBUG:
+                rtmp.log(self, 'Received header = %r' % (self.received_header,))
+
+            if self.received_header not in [RTMP_HEADER_BYTE, RTMPE_HEADER_BYTE]:
+                raise HeaderError('Unknown header byte %r' % (
+                    self.received_header,))
+
             if self.header != self.received_header:
                 raise HeaderMismatch('My header = %r, received header = ' \
                     '%r' % (self.header, self.received_header))
@@ -378,8 +350,11 @@ class ClientNegotiator(BaseNegotiator):
 
                 return
 
-            self.server = decodeServerHandshake(self.client, data)
+            self.server = decodeServerHandshake(self.client, data[:HANDSHAKE_LENGTH])
             data = data[HANDSHAKE_LENGTH:]
+
+            if rtmp.DEBUG:
+                rtmp.log(self, 'Decoded server token = %r' % (self.server,))
 
         # we now have a valid server token, we are now expecting to have our
         # original client token
@@ -390,6 +365,12 @@ class ClientNegotiator(BaseNegotiator):
             return
 
         if self.client_payload != data[:HANDSHAKE_LENGTH]:
+            if rtmp.DEBUG:
+                rtmp.log(self, 'Client payload = (len:%d) %r' % (
+                    len(self.client_payload), self.client_payload,))
+                rtmp.log(self, 'Received data = (len:%d) %r' % (
+                    len(data[:HANDSHAKE_LENGTH]), data[:HANDSHAKE_LENGTH],))
+
             raise HandshakeVerificationError
 
         # if we get here then a successful handshake has been negotiated.
@@ -467,6 +448,9 @@ class ServerNegotiator(BaseNegotiator):
 
             self.received_header = data[0]
 
+            if rtmp.DEBUG:
+                rtmp.log(self, 'Received header = %r' % (self.received_header,))
+
             if self.received_header not in [RTMP_HEADER_BYTE, RTMPE_HEADER_BYTE]:
                 raise HeaderError('Unknown header byte %r' % (
                     self.received_header,))
@@ -484,9 +468,15 @@ class ServerNegotiator(BaseNegotiator):
 
         self.client = decodeClientHandshake(data)
 
+        if rtmp.DEBUG:
+            rtmp.log(self, 'Decoded client token = %r' % (self.client,))
+
         self.generateToken()
         self.header = getHeader(self.client)
         self.server_payload = self.server.encode()
+
+        if rtmp.DEBUG:
+            rtmp.log(self, 'Server token = %r' % (self.server,))
 
         self.observer.write(
             self.header + self.server_payload)
@@ -523,9 +513,10 @@ def decodeClientHandshake(data):
 
     uptime = s.read_ulong()
     version = versions.Version(s.read_ulong())
+    s.seek(0)
 
     try:
-        payload = s.read(HANDSHAKE_LENGTH - 8)
+        payload = s.read(HANDSHAKE_LENGTH)
     except IOError, e:
         raise EOFError(str(e))
 
@@ -545,9 +536,10 @@ def decodeServerHandshake(client, data):
 
     uptime = s.read_ulong()
     version = versions.Version(s.read_ulong())
+    s.seek(0)
 
     try:
-        payload = s.read(HANDSHAKE_LENGTH - 8)
+        payload = s.read(HANDSHAKE_LENGTH)
     except IOError, e:
         raise EOFError(str(e))
 

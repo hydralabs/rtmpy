@@ -56,7 +56,7 @@ class BaseCodec(object):
         self.job = task.LoopingCall(self.getJob())
 
     def __del__(self):
-        if self.job.running:
+        if hasattr(self, 'job') and self.job.running:
             self.job.stop()
 
     def getJob(self):

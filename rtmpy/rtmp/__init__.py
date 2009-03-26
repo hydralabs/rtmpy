@@ -24,7 +24,6 @@ from zope.interface import implements
 from pyamf.util import IndexedCollection, BufferedByteStream
 
 from rtmpy.rtmp import interfaces
-from rtmpy.rtmp import handshake
 
 
 #: The default RTMP port is a registered at U{IANA<http://iana.org>}.
@@ -331,9 +330,10 @@ class ChannelManager(object):
 
     implements(interfaces.IChannelManager)
 
+    channels = {}
+
     def __init__(self):
         self.channels = {}
-        self.frameSize = 128
 
     def getChannel(self, channelId):
         """
@@ -418,7 +418,7 @@ class ChannelManager(object):
             channel.frameRemaining = size
 
 
-class BaseProtocol(protocol.Protocol):
+class BaseProtocol(protocol.Protocol, ChannelManager):
     """
     Provides basic handshaking and RTMP protocol support.
 
@@ -430,7 +430,7 @@ class BaseProtocol(protocol.Protocol):
     @type encrypted: C{bool}
     """
 
-    implements(handshake.IHandshakeObserver)
+    implements(interfaces.IHandshakeObserver)
 
     HANDSHAKE = 'handshake'
     STREAM = 'stream'
@@ -438,7 +438,7 @@ class BaseProtocol(protocol.Protocol):
     def __init__(self):
         self.encrypted = False
 
-    def getHandshaker(self):
+    def buildHandshakeNegotiator(self):
         """
         """
         raise NotImplementedError
@@ -450,7 +450,7 @@ class BaseProtocol(protocol.Protocol):
         protocol.Protocol.connectionMade(self)
 
         self.state = BaseProtocol.HANDSHAKE
-        self.handshaker = self.getHandshaker()
+        self.handshaker = self.buildHandshakeNegotiator()
 
     def connectionLost(self, reason):
         """
@@ -462,10 +462,10 @@ class BaseProtocol(protocol.Protocol):
             log(self, "Lost connection (reason:%s)" % str(reason))
 
         if hasattr(self, 'decoder'):
-            self.decoder.stop()
+            self.decoder.pause()
 
         if hasattr(self, 'encoder'):
-            self.encoder.stop()
+            self.encoder.pause()
 
     def decodeHandshake(self, data):
         """
@@ -490,10 +490,10 @@ class BaseProtocol(protocol.Protocol):
         """
         Called when data is received from the underlying transport.
         """
-        if self.state is BaseProtocol.HANDSHAKE:
-            self.decodeHandshake(data)
-        elif self.state is BaseProtocol.STREAM:
+        if self.state is BaseProtocol.STREAM:
             self.decodeStream(data)
+        elif self.state is BaseProtocol.HANDSHAKE:
+            self.decodeHandshake(data)
 
     # interfaces.IHandshakeObserver
 
@@ -502,10 +502,11 @@ class BaseProtocol(protocol.Protocol):
         Called when the RTMP handshake was successful. Once this is called,
         packet streaming can commence.
         """
+        from rtmpy.rtmp import codec
         if DEBUG:
             log(self, "Successful handshake")
 
-        self.state = BaseProtocol.STREAM
+        self.state = self.STREAM
 
         self.decoder = codec.Decoder(self)
         self.encoder = codec.Encoder(self)
@@ -527,12 +528,56 @@ class BaseProtocol(protocol.Protocol):
         """
         self.transport.write(data)
 
-    def onHandshakeTimeout(self):
-        """
-        Called if the handshake was not successful within
-        C{self.handshakeTimeout} seconds. Disconnects the peer.
-        """
-        if DEBUG:
-            log(self, "Handshake timeout")
 
-        self.transport.loseConnection()
+class ClientProtocol(BaseProtocol):
+    """
+    A client woot!
+    """
+
+    def buildHandshakeNegotiator(self):
+        """
+        """
+        from rtmpy.rtmp import handshake
+
+        return handshake.ClientNegotiator(self)
+
+    def connectionMade(self):
+        """
+        """
+        BaseProtocol.connectionMade(self)
+
+        self.handshaker.start(version=0)
+
+
+class ClientFactory(protocol.ClientFactory):
+    """
+    """
+
+    protocol = ClientProtocol
+
+
+class ServerProtocol(BaseProtocol):
+    """
+    A server woot!
+    """
+
+    def buildHandshakeNegotiator(self):
+        """
+        """
+        from rtmpy.rtmp import handshake
+
+        return handshake.ServerNegotiator(self)
+
+    def connectionMade(self):
+        """
+        """
+        BaseProtocol.connectionMade(self)
+
+        self.handshaker.start(version=0)
+
+
+class ServerFactory(protocol.Factory):
+    """
+    """
+
+    protocol = ServerProtocol

@@ -201,3 +201,53 @@ class IChannelScheduler(Interface):
         implementing class. If there are no more active channels then C{None}
         should be returned.
         """
+
+
+class IHandshakeObserver(Interface):
+    """
+    Observes handshake events.
+    """
+
+    def handshakeSuccess():
+        """
+        Handshaking was successful.
+        """
+
+    def handshakeFailure(reason):
+        """
+        Handshaking failed.
+
+        @param reason: Why the handshake failed.
+        @type reason: Exception wrapped L{Failure}
+        """
+
+    def write(data):
+        """
+        Called when the handshake negotiator writes some data.
+        """
+
+
+class IHandshakeNegotiator(Interface):
+    """
+    Negotiates handshakes.
+    """
+
+    observer = Attribute(
+        "An L{IHandshakeObserver} that listens for events from this "
+        "negotiator")
+    server = Attribute(
+        "The server handshake token. Can be L{ServerToken} or C{None}")
+    client = Attribute(
+        "The client handshake token. Can be L{ServerToken} or C{None}")
+
+    def start(uptime=None, version=None):
+        """
+        Called to start the handshaking process. You can supply the uptime and
+        version, otherwise they will be worked out automatically. The version
+        specifically will be set to enable H.264 streaming.
+        """
+
+    def dataReceived(self, data):
+        """
+        Called when handshaking data has been received.
+        """
