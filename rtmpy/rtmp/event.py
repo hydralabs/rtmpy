@@ -17,8 +17,8 @@ FRAME_SIZE = 0x01
 # 0x02 is unknown
 #: Send every x bytes read by both sides
 BYTES_READ = 0x03
-#: Ping is a stream control message, has subtypes
-PING = 0x04
+#: A stream control message, has subtypes
+CONTROL = 0x04
 #: The servers downstream bandwidth
 SERVER_BANDWIDTH = 0x05
 #: The clients upstream bandwidth
@@ -100,11 +100,73 @@ class FrameSize(BaseEvent):
         """
         Encode a frame size event.
         """
-        buf.write_ulong(self.size)
+        if self.size is None:
+            raise EncodeError('Frame size not set')
+
+        try:
+            buf.write_ulong(self.size)
+        except TypeError:
+            raise EncodeError('Frame size wrong type '
+                '(expected int, got %r)' % (type(self.size),))
+
+
+class ControlEvent(BaseEvent):
+    """
+    A control event. Akin to Red5's Ping Event.
+    """
+
+    UNDEFINED = -1
+
+    def __init__(self, type=None, value1=0, value2=UNDEFINED, value3=UNDEFINED):
+        self.type = type
+        self.value1 = value1
+        self.value2 = value2
+        self.value3 = value3
+
+    def __repr__(self):
+        return '<%s type=%r value1=%r value2=%r value3=%r at 0x%x>' % (
+            self.__class__.__name__, self.type, self.value1, self.value2,
+            self.value3, id(self))
+
+    def encode(self, buf):
+        if self.type is None:
+            raise EncodeError('Unknown control event type (type:%r)' % (
+                self.type,))
+
+        try:
+            buf.write_short(self.type)
+        except TypeError:
+            raise EncodeError('TypeError encoding type '
+                '(expected int, got %r)' % (type(self.type),))
+
+        try:
+            buf.write_long(self.value1)
+        except TypeError:
+            raise EncodeError('TypeError encoding value1 '
+                '(expected int, got %r)' % (type(self.value1),))
+
+        try:
+            buf.write_long(self.value2)
+        except TypeError:
+            raise EncodeError('TypeError encoding value2 '
+                '(expected int, got %r)' % (type(self.value2),))
+
+        try:
+            buf.write_long(self.value3)
+        except TypeError:
+            raise EncodeError('TypeError encoding value3 '
+                '(expected int, got %r)' % (type(self.value3),))
+
+    def decode(self, buf):
+        self.type = buf.read_short()
+        self.value1 = buf.read_long()
+        self.value2 = buf.read_long()
+        self.value3 = buf.read_long()
 
 
 TYPE_MAP = {
     FRAME_SIZE: FrameSize,
+    CONTROL: ControlEvent
 }
 
 

@@ -200,8 +200,21 @@ class FrameSizeTestCase(BaseTestCase):
         self.assertEquals(x.__dict__, {'size': 20})
 
     def test_raw_encode(self):
+        # test default encode
+        x = event.FrameSize()
+        e = self.assertRaises(event.EncodeError, x.encode, self.buffer)
+        self.assertEquals(str(e), 'Frame size not set')
+
+        # test non-int encode
+        x = event.FrameSize(size='foo.bar')
+        e = self.assertRaises(event.EncodeError, x.encode, self.buffer)
+        self.assertEquals(str(e), 'Frame size wrong type '
+            '(expected int, got <type \'str\'>)')
+
         x = event.FrameSize(size=50)
         e = x.encode(self.buffer)
+
+        self.assertEquals(e, None)
 
         self.assertEquals(self.buffer.getvalue(), '\x00\x00\x00\x32')
 
@@ -244,3 +257,135 @@ class FrameSizeTestCase(BaseTestCase):
         d.addErrback(self._fail)
 
         return d
+
+
+class ControlEventTestCase(BaseTestCase):
+    """
+    Tests for L{event.ControlEvent}
+    """
+
+    def test_create(self):
+        x = event.ControlEvent()
+        self.assertEquals(x.__dict__, {
+            'type': None,
+            'value1': 0,
+            'value2': -1,
+            'value3': -1
+        })
+
+        x = event.ControlEvent(9, 123, 456, 789)
+        self.assertEquals(x.__dict__, {
+            'type': 9,
+            'value1': 123,
+            'value2': 456,
+            'value3': 789
+        })
+
+        x = event.ControlEvent(type=0, value1=123, value3=789, value2=456)
+        self.assertEquals(x.__dict__, {
+            'type': 0,
+            'value1': 123,
+            'value2': 456,
+            'value3': 789
+        })
+
+    def test_raw_encode(self):
+        x = event.ControlEvent()
+        e = self.assertRaises(event.EncodeError, x.encode, self.buffer)
+        self.assertEquals(str(e), 'Unknown control event type (type:None)')
+
+        # test types ..
+        x = event.ControlEvent(type='3')
+        e = self.assertRaises(event.EncodeError, x.encode, self.buffer)
+        self.assertEquals(str(e), "TypeError encoding type "
+            "(expected int, got <type 'str'>)")
+
+        x = event.ControlEvent(type=3, value1=None)
+        e = self.assertRaises(event.EncodeError, x.encode, self.buffer)
+        self.assertEquals(str(e), "TypeError encoding value1 "
+            "(expected int, got <type 'NoneType'>)")
+
+        x = event.ControlEvent(type=3, value1=10, value2=object())
+        e = self.assertRaises(event.EncodeError, x.encode, self.buffer)
+        self.assertEquals(str(e), "TypeError encoding value2 "
+            "(expected int, got <type 'object'>)")
+
+        x = event.ControlEvent(type=3, value1=10, value2=7, value3='foo')
+        e = self.assertRaises(event.EncodeError, x.encode, self.buffer)
+        self.assertEquals(str(e), "TypeError encoding value3 "
+            "(expected int, got <type 'str'>)")
+
+        self.buffer.truncate(0)
+        x = event.ControlEvent(2)
+        e = x.encode(self.buffer)
+        self.assertEquals(self.buffer.getvalue(),
+            '\x00\x02\x00\x00\x00\x00\xff\xff\xff\xff\xff\xff\xff\xff')
+
+        self.buffer.truncate(0)
+        x = event.ControlEvent(type=0, value1=123, value3=789, value2=456)
+        e = x.encode(self.buffer)
+        self.assertEquals(self.buffer.getvalue(),
+            '\x00\x00\x00\x00\x00{\x00\x00\x01\xc8\x00\x00\x03\x15')
+
+    def test_raw_decode(self):
+        x = event.ControlEvent()
+
+        self.assertEquals(x.__dict__, {
+            'type': None,
+            'value1': 0,
+            'value2': -1,
+            'value3': -1
+        })
+
+        self.buffer.write('\x00\x00\x00\x00\x00{\x00\x00\x01\xc8\x00\x00\x03\x15')
+        self.buffer.seek(0)
+
+        e = x.decode(self.buffer)
+
+        self.assertEquals(e, None)
+        self.assertEquals(x.type, 0)
+        self.assertEquals(x.value1, 123)
+        self.assertEquals(x.value2, 456)
+        self.assertEquals(x.value3, 789)
+
+    def test_encode(self):
+        e = event.ControlEvent(9, 123, 456, 789)
+        self.executed = False
+
+        def cb(r):
+            self.assertEquals(r, (4, '\x00\t\x00\x00\x00{\x00\x00\x01\xc8\x00'
+                '\x00\x03\x15'))
+            self.executed = True
+
+        d = event.encode(e).addCallback(cb)
+        d.addCallback(lambda x: self.assertTrue(self.executed))
+        d.addErrback(self._fail)
+
+        return d
+
+    def test_decode(self):
+        bytes = '\x00\t\x00\x00\x00{\x00\x00\x01\xc8\x00\x00\x03\x15'
+        self.executed = False
+
+        def cb(r):
+            self.assertTrue(isinstance(r, event.ControlEvent))
+            self.assertEquals(r.__dict__, {
+                'type': 9,
+                'value1': 123,
+                'value2': 456,
+                'value3': 789})
+
+            self.executed = True
+
+        d = event.decode(4, bytes).addCallback(cb)
+        d.addCallback(lambda x: self.assertTrue(self.executed))
+        d.addErrback(self._fail)
+
+        return d
+
+    def test_repr(self):
+        e = event.ControlEvent(9, 13, 45, 23)
+
+        self.assertEquals(repr(e),
+            '<ControlEvent type=9 value1=13 value2=45 value3=23 at 0x%x>' % (
+                id(e)))
