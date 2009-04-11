@@ -13,58 +13,11 @@ from twisted.trial import unittest
 
 from rtmpy import util
 
-class BufferedByteStreamTestCase(unittest.TestCase):
-    def setUp(self):
-        self.stream = util.BufferedByteStream()
-
-    def _write(self, bytes):
-        pos = self.stream.tell()
-        self.stream.write(bytes)
-        self.stream.seek(pos)
-
-    def test_consume(self):
-        self.stream.write('abcdefg')
-        self.stream.seek(2)
-        self.stream.consume()
-        self.assertEquals(self.stream.getvalue(), 'cdefg')
-        self.assertEquals(self.stream.tell(), 5)
-
-        self.stream.seek(2)
-        self.stream.consume()
-        self.assertEquals(self.stream.getvalue(), 'efg')
-        self.assertEquals(self.stream.tell(), 3)
-
-        self.stream.seek(0, 2)
-        self.stream.consume()
-        self.assertEquals(self.stream.getvalue(), '')
-        self.assertEquals(self.stream.tell(), 0)
-
-    def test_read3byte_uint(self):
-        self._write('\xff\xff\xff')
-        self.assertEquals(self.stream.read_3byte_uint(), 0xffffff)
-
-        self._write('\x00\x00\x00')
-        self.assertEquals(self.stream.read_3byte_uint(), 0)
-
-        self._write('\x00\x00')
-        self.assertRaises(EOFError, self.stream.read_3byte_uint)
-
-    def test_write3byte_uint(self):
-        self.stream.write_3byte_uint(0)
-        self.assertEquals(self.stream.getvalue(), '\x00\x00\x00')
-        self.stream.truncate()
-
-        self.stream.write_3byte_uint(16777215)
-        self.assertEquals(self.stream.getvalue(), '\xff\xff\xff')
-        self.stream.truncate()
-
-        self.assertRaises(ValueError, self.stream.write_3byte_uint, 16777216)
-        self.assertRaises(ValueError, self.stream.write_3byte_uint, -1)
-
 
 class UptimeTestCase(unittest.TestCase):
     def setUp(self):
         util.boottime = None
+
 
 class LinuxUptimeTestCase(UptimeTestCase):
     def setUp(self):
