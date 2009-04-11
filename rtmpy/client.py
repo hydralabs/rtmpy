@@ -13,6 +13,7 @@ from twisted.internet import reactor, protocol
 
 from rtmpy import rtmp, util, versions
 
+
 class ClientProtocol(rtmp.BaseProtocol):
     """
     Client RTMP Protocol.

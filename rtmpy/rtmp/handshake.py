@@ -16,6 +16,7 @@ from twisted.python.failure import Failure
 from rtmpy import versions, util, rtmp
 from rtmpy.rtmp import interfaces
 
+
 SECRET_SERVER_KEY = \
     '\x47\x65\x6e\x75\x69\x6e\x65\x20\x41\x64\x6f\x62\x65\x20\x46\x6c\x61' \
     '\x73\x68\x20\x4d\x65\x64\x69\x61\x20\x53\x65\x72\x76\x65\x72\x20\x30' \
@@ -39,6 +40,7 @@ class HeaderError(HandshakeError):
     """
     Raised if there is an error with the handshake header.
     """
+
 
 class HeaderMismatch(HeaderError):
     """
