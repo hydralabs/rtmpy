@@ -11,6 +11,7 @@ from twisted.python.failure import Failure
 from zope.interface import implements
 
 from rtmpy.rtmp import interfaces, event
+from rtmpy.util import BufferedByteStream
 
 
 class MockEvent(object):
@@ -44,6 +45,8 @@ class BaseTestCase(unittest.TestCase):
     def setUp(self):
         self._type_map = event.TYPE_MAP.copy()
         self._mock_dict = MockEvent.__dict__.copy()
+
+        self.buffer = BufferedByteStream()
 
     def tearDown(self):
         event.TYPE_MAP = self._type_map
@@ -179,3 +182,65 @@ class BaseEventTestCase(unittest.TestCase):
 
         self.assertRaises(NotImplementedError, x.encode, None)
         self.assertRaises(NotImplementedError, x.decode, None)
+
+
+class FrameSizeTestCase(BaseTestCase):
+    """
+    Tests for L{event.FrameSize}
+    """
+
+    def test_create(self):
+        x = event.FrameSize()
+        self.assertEquals(x.__dict__, {'size': None})
+
+        x = event.FrameSize(10)
+        self.assertEquals(x.__dict__, {'size': 10})
+
+        x = event.FrameSize(size=20)
+        self.assertEquals(x.__dict__, {'size': 20})
+
+    def test_raw_encode(self):
+        x = event.FrameSize(size=50)
+        e = x.encode(self.buffer)
+
+        self.assertEquals(self.buffer.getvalue(), '\x00\x00\x00\x32')
+
+    def test_raw_decode(self):
+        x = event.FrameSize()
+
+        self.assertEquals(x.size, None)
+        self.buffer.write('\x00\x00\x00\x32')
+        self.buffer.seek(0)
+
+        e = x.decode(self.buffer)
+
+        self.assertEquals(e, None)
+        self.assertEquals(x.size, 50)
+
+    def test_encode(self):
+        e = event.FrameSize(size=2342)
+        self.executed = False
+
+        def cb(r):
+            self.assertEquals(r, (1, '\x00\x00\t&'))
+            self.executed = True
+
+        d = event.encode(e).addCallback(cb)
+        d.addCallback(lambda x: self.assertTrue(self.executed))
+        d.addErrback(self._fail)
+
+        return d
+
+    def test_decode(self):
+        self.executed = False
+
+        def cb(r):
+            self.assertTrue(isinstance(r, event.FrameSize))
+            self.assertEquals(r.__dict__, {'size': 2342})
+            self.executed = True
+
+        d = event.decode(1, '\x00\x00\t&').addCallback(cb)
+        d.addCallback(lambda x: self.assertTrue(self.executed))
+        d.addErrback(self._fail)
+
+        return d
