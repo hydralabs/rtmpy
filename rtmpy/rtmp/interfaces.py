@@ -251,3 +251,27 @@ class IHandshakeNegotiator(Interface):
         """
         Called when handshaking data has been received.
         """
+
+
+class IEvent(Interface):
+    """
+    An RTMP Event.
+
+    @see: L{http://osflash.org/documentation/rtmp#rtmp_datatypes}
+    """
+
+    def encode(bbs):
+        """
+        Encodes the event instance to C{bbs}. Can return a deferred.
+
+        @param bbs: A stream object to write to.
+        @type bbs: L{rtmpy.util.BufferedByteStream}
+        """
+
+    def decode(bbs):
+        """
+        Decodes the event instance from C{bbs}. Can return a deferred.
+
+        @param bbs: A stream object to read from.
+        @type bbs: L{rtmpy.util.BufferedByteStream}
+        """

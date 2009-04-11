@@ -386,7 +386,7 @@ class ChannelManager(object):
 
     def channelComplete(self, channel):
         """
-        Called when the body of the channel has been satified.
+        Called when the body of the channel has been satisfied.
         """
         if channel.observer:
             channel.observer.bodyComplete()

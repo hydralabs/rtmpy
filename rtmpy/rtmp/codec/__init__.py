@@ -361,14 +361,12 @@ class ChannelContext(object):
 
         try:
             data = self.buffer.read(length)
-        except (EOFError, IOError):
-            data = None
-
-        if data is None:
+        except IOError:
             self._deactivate()
-        else:
-            self.buffer.consume()
 
+            return None
+
+        self.buffer.consume()
         self.bytes += length
 
         return data
