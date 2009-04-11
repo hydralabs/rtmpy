@@ -7,6 +7,7 @@ RTMP Channel type declarations.
 
 from twisted.internet import defer
 from zope.interface import implements
+import pyamf
 
 from rtmpy.util import BufferedByteStream
 from rtmpy.rtmp import interfaces
@@ -170,7 +171,7 @@ TYPE_MAP = {
 }
 
 
-def decode(datatype, body):
+def decode(datatype, body, *args, **kwargs):
     """
     A helper method that decodes a byte stream to an L{interfaces.IEvent}
     instance.
@@ -201,12 +202,14 @@ def decode(datatype, body):
 
             return event
 
-        return defer.maybeDeferred(event.decode, buf).addCallback(cb)
+        d = defer.maybeDeferred(event.decode, buf, *args, **kwargs)
+
+        return d.addCallback(cb)
 
     return defer.maybeDeferred(_decode)
 
 
-def encode(event):
+def encode(event, *args, **kwargs):
     """
     A helper method that encodes an event.
 
@@ -243,6 +246,8 @@ def encode(event):
         def cb(res):
             return datatype, body.getvalue()
 
-        return defer.maybeDeferred(event.encode, body).addCallback(cb)
+        d = defer.maybeDeferred(event.encode, body, *args, **kwargs)
+
+        return d.addCallback(cb)
 
     return defer.maybeDeferred(_encode)

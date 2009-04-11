@@ -26,13 +26,13 @@ class MockEvent(object):
     encode_func = lambda bbs: None
     decode_func = lambda bbs: None
 
-    def encode(self, bbs):
-        self.encode_func(bbs)
+    def encode(self, bbs, *args, **kwargs):
+        self.encode_func(bbs, *args, **kwargs)
 
         return self.expected_encode
 
-    def decode(self, bbs):
-        self.decode_func(bbs)
+    def decode(self, bbs, *args, **kwargs):
+        self.decode_func(bbs, *args, **kwargs)
 
         return self.expected_decode
 
@@ -118,6 +118,27 @@ class DecodeTestCase(BaseTestCase):
 
         return event.decode(0, body).addCallback(cb).addErrback(self._fail)
 
+    def test_args(self):
+        args = ('foo', 'bar')
+        kwargs = {'baz': 'gak', 'spam': 'eggs'}
+        self.executed = False
+
+        def decode(event, bbs, *a, **kw):
+            self.assertEquals(args, a)
+            self.assertEquals(kwargs, kw)
+
+            self.executed = True
+
+        MockEvent.decode_func = decode
+
+        event.TYPE_MAP[0] = MockEvent
+
+        d = event.decode(0, '', *args, **kwargs)
+        d.addCallback(lambda r: self.assertTrue(self.executed))
+        d.addErrback(self._fail)
+
+        return d
+
 
 class EncodeTestCase(BaseTestCase):
     """
@@ -169,6 +190,27 @@ class EncodeTestCase(BaseTestCase):
 
         return event.encode(x).addErrback(self._fail).addCallback(cb)
 
+    def test_args(self):
+        args = ('foo', 'bar')
+        kwargs = {'baz': 'gak', 'spam': 'eggs'}
+        self.executed = False
+
+        def encode(event, bbs, *a, **kw):
+            self.assertEquals(args, a)
+            self.assertEquals(kwargs, kw)
+
+            self.executed = True
+
+        MockEvent.encode_func = encode
+        event.TYPE_MAP[0] = MockEvent
+
+        x = MockEvent()
+
+        d = event.encode(x, *args, **kwargs)
+        d.addCallback(lambda r: self.assertTrue(self.executed))
+        d.addErrback(self._fail)
+
+        return d
 
 class BaseEventTestCase(unittest.TestCase):
     """
