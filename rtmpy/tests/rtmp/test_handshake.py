@@ -8,8 +8,9 @@ Tests for L{rtmpy.rtmp.handshake}.
 from twisted.trial import unittest
 from twisted.python import failure
 from zope.interface import implements
+from pyamf import EOStream
 
-from rtmpy.rtmp import handshake
+from rtmpy.rtmp import handshake, interfaces
 from rtmpy import util, versions
 from rtmpy.tests.rtmp import mocks
 
@@ -419,10 +420,10 @@ class ClientHandshakeDecodingTestCase(unittest.TestCase):
     def test_no_data(self):
         f = handshake.decodeClientHandshake
 
-        self.assertRaises(EOFError, f, '')
-        self.assertRaises(EOFError, f, 'a' * 5)
-        self.assertRaises(EOFError, f, 'a' * 11)
-        self.assertRaises(EOFError, f, 'a' * (1536 - 1))
+        self.assertRaises(EOStream, f, '')
+        self.assertRaises(IOError, f, 'a' * 5)
+        self.assertRaises(IOError, f, 'a' * 11)
+        self.assertRaises(IOError, f, 'a' * (1536 - 1))
 
     def test_decode(self):
         d = '\x01\x02\x03\x04\x09\x08\x07\x06' + ('a' * (1536 - 8))
@@ -436,7 +437,8 @@ class ClientHandshakeDecodingTestCase(unittest.TestCase):
         self.assertEquals(t.version, 0x09080706)
         self.assertEquals(t.uptime, 0x1020304)
 
-        self.assertEquals(t.payload.getvalue(), 'a' * (1536 - 8))
+        self.assertEquals(t.payload.getvalue(),
+            '\x01\x02\x03\x04\x09\x08\x07\x06' + ('a' * (1536 - 8)))
 
 
 class ServerHandshakeDecodingTestCase(unittest.TestCase):
@@ -454,10 +456,10 @@ class ServerHandshakeDecodingTestCase(unittest.TestCase):
     def test_no_data(self):
         f = handshake.decodeServerHandshake
 
-        self.assertRaises(EOFError, f, self.client, '')
-        self.assertRaises(EOFError, f, self.client, 'a' * 5)
-        self.assertRaises(EOFError, f, self.client, 'a' * 11)
-        self.assertRaises(EOFError, f, self.client, 'a' * (1536 - 1))
+        self.assertRaises(EOStream, f, self.client, '')
+        self.assertRaises(IOError, f, self.client, 'a' * 5)
+        self.assertRaises(IOError, f, self.client, 'a' * 11)
+        self.assertRaises(IOError, f, self.client, 'a' * (1536 - 1))
 
     def test_decode(self):
         d = '\x01\x02\x03\x04\x09\x08\x07\x06' + ('a' * (1536 - 8))
@@ -472,7 +474,8 @@ class ServerHandshakeDecodingTestCase(unittest.TestCase):
         self.assertEquals(t.version, 0x09080706)
         self.assertEquals(t.uptime, 0x1020304)
 
-        self.assertEquals(t.payload.getvalue(), 'a' * (1536 - 8))
+        self.assertEquals(t.payload.getvalue(),
+            '\x01\x02\x03\x04\x09\x08\x07\x06' + ('a' * (1536 - 8)))
 
 
 class BaseNegotiatorTestCase(unittest.TestCase):
@@ -483,7 +486,7 @@ class BaseNegotiatorTestCase(unittest.TestCase):
     klass = handshake.BaseNegotiator
 
     def test_interface(self):
-        handshake.IHandshakeNegotiator.implementedBy(self.klass)
+        interfaces.IHandshakeNegotiator.implementedBy(self.klass)
 
     def test_init(self):
         x = object()
@@ -493,10 +496,10 @@ class BaseNegotiatorTestCase(unittest.TestCase):
             "IHandshakeObserver interface expected (got:<type 'object'>)")
 
         x = mocks.HandshakeObserver()
-        self.assertTrue(handshake.IHandshakeObserver.providedBy(x))
+        self.assertTrue(interfaces.IHandshakeObserver.providedBy(x))
         n = self.klass(x)
 
-        self.assertTrue(handshake.IHandshakeNegotiator.providedBy(n))
+        self.assertTrue(interfaces.IHandshakeNegotiator.providedBy(n))
         self.assertIdentical(n.observer, x)
         self.assertEquals(n.server, None)
         self.assertEquals(n.started, False)
@@ -643,7 +646,7 @@ class ServerNegotiatorTestCase(BaseNegotiatorTestCase):
         Check to make sure that if an exception occurs when receiving data,
         it is propagated to the observer correctly.
 
-        @see: L{handshake.IHandshakeObserver.handshakeFailure}
+        @see: L{interfaces.IHandshakeObserver.handshakeFailure}
         """
         class CustomError(Exception):
             pass
@@ -935,7 +938,7 @@ class ClientNegotiatorTestCase(BaseNegotiatorTestCase):
         Check to make sure that if an exception occurs when receiving data,
         it is propagated to the observer correctly.
 
-        @see: L{handshake.IHandshakeObserver.handshakeFailure}
+        @see: L{interfaces.IHandshakeObserver.handshakeFailure}
         """
         class CustomError(Exception):
             pass
@@ -1020,7 +1023,7 @@ class ClientHandshakeNegotiationTestCase(unittest.TestCase):
             r = o.reason.raiseException()
         except handshake.HeaderError, e:
             self.assertEquals(str(e),
-                "My header = '\\x03', received header = 'f'")
+                "Unknown header byte 'f'")
         except:
             self.fail('Unexpected error')
 

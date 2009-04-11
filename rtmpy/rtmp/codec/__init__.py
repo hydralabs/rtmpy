@@ -10,6 +10,7 @@ RTMP codecs. Encoders and decoders for rtmp streams.
 """
 
 from twisted.internet import task
+import pyamf
 
 from rtmpy import rtmp
 from rtmpy import util
@@ -127,7 +128,7 @@ class Decoder(BaseCodec):
 
         try:
             return header.decodeHeader(self.buffer)
-        except EOFError:
+        except (IOError, pyamf.EOStream):
             self.buffer.seek(headerPosition)
 
             if rtmp.DEBUG:

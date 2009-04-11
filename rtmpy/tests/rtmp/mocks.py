@@ -211,7 +211,7 @@ class HandshakeObserver(object):
     """
     """
 
-    implements(handshake.IHandshakeObserver)
+    implements(interfaces.IHandshakeObserver)
 
     def __init__(self):
         self.success = None

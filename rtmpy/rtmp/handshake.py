@@ -517,10 +517,7 @@ def decodeClientHandshake(data):
     version = versions.Version(s.read_ulong())
     s.seek(0)
 
-    try:
-        payload = s.read(HANDSHAKE_LENGTH)
-    except IOError, e:
-        raise EOFError(str(e))
+    payload = s.read(HANDSHAKE_LENGTH)
 
     return ClientToken(uptime=uptime, version=version, payload=payload)
 
@@ -540,10 +537,7 @@ def decodeServerHandshake(client, data):
     version = versions.Version(s.read_ulong())
     s.seek(0)
 
-    try:
-        payload = s.read(HANDSHAKE_LENGTH)
-    except IOError, e:
-        raise EOFError(str(e))
+    payload = s.read(HANDSHAKE_LENGTH)
 
     return ServerToken(client, uptime=uptime, version=version, payload=payload)
 

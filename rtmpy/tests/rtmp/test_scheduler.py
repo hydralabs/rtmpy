@@ -41,13 +41,13 @@ class BaseChannelSchedulerTestCase(unittest.TestCase):
         s = self._generateScheduler()
 
         self.assertTrue(interfaces.IChannelScheduler.providedBy(s))
-        self.assertEquals(s.activeChannels, {})
+        self.assertEquals(s.activeChannels, [])
 
     def test_activateChannel(self):
         s = self._generateScheduler()
         c = self._generateChannel()
 
-        self.assertEquals(s.activeChannels, {})
+        self.assertEquals(s.activeChannels, [])
 
         s.activateChannel(c)
         self.assertTrue(c in s.activeChannels)
@@ -91,7 +91,7 @@ class LoopingChannelSchedulerTestCase(BaseChannelSchedulerTestCase):
         # test no channels
         s = self._generateScheduler()
 
-        self.assertEquals(s.activeChannels, {})
+        self.assertEquals(s.activeChannels, [])
         self.assertEquals(s.getNextChannel(), None)
         self.assertEquals(s.index, None)
 

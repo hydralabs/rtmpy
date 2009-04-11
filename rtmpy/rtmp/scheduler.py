@@ -8,8 +8,6 @@ Contains various implementations for scheduling RTMP channels for encoding.
 """
 
 from zope.interface import implements
-import pyamf
-from pyamf.util import IndexedCollection
 
 from rtmpy.rtmp import interfaces
 
@@ -26,7 +24,7 @@ class BaseChannelScheduler(object):
     implements(interfaces.IChannelScheduler)
 
     def __init__(self):
-        self.activeChannels = IndexedCollection()
+        self.activeChannels = []
 
     def activateChannel(self, channel):
         """
@@ -47,13 +45,12 @@ class BaseChannelScheduler(object):
         @param channel: The channel to activate.
         @type channel: L{implements.IChannel}
         """
-        # hack it until IndexedCollection.replace is implemented.
-        if channel not in self.activeChannels:
+        try:
+            idx = self.activeChannels.index(channel)
+        except ValueError:
             raise IndexError('channel not activated')
 
-        idx = self.activeChannels.getReferenceTo(channel)
-        self.activeChannels.list[idx] = None
-        self.activeChannels.dict[id(channel)] = None
+        self.activeChannels[idx] = None
 
     def getNextChannel(self):
         """
@@ -105,7 +102,7 @@ class LoopingChannelScheduler(BaseChannelScheduler):
 
         self._incrementIndex()
 
-        channel = self.activeChannels.list[self.index]
+        channel = self.activeChannels[self.index]
         i = self.index
 
         while channel is None:
@@ -114,7 +111,7 @@ class LoopingChannelScheduler(BaseChannelScheduler):
             if self.index == i:
                 break
 
-            channel = self.activeChannels.list[self.index]
+            channel = self.activeChannels[self.index]
 
         if channel is None:
             self.activeChannels = {}
