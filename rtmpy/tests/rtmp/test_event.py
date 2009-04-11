@@ -165,3 +165,17 @@ class EncodeTestCase(BaseTestCase):
         x = MockEvent()
 
         return event.encode(x).addErrback(self._fail).addCallback(cb)
+
+
+class BaseEventTestCase(unittest.TestCase):
+    """
+    Tests for L{event.BaseEvent}
+    """
+
+    def test_interface(self):
+        x = event.BaseEvent()
+
+        self.assertTrue(interfaces.IEvent.providedBy(x))
+
+        self.assertRaises(NotImplementedError, x.encode, None)
+        self.assertRaises(NotImplementedError, x.decode, None)
