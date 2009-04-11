@@ -86,6 +86,9 @@ class FrameSize(BaseEvent):
     """
     A frame size event. This determines the number of bytes for the frame body
     in the RTMP stream.
+
+    @ivar size: Number of bytes for RTMP frame bodies.
+    @type size: C{int}
     """
 
     def __init__(self, size=None):
@@ -163,6 +166,31 @@ class ControlEvent(BaseEvent):
         self.value1 = buf.read_long()
         self.value2 = buf.read_long()
         self.value3 = buf.read_long()
+
+
+class Notify(BaseEvent):
+    """
+    Stream notification event.
+    """
+
+    def __init__(self, name=None, id=None, **kwargs):
+        self.name = name
+        self.id = id
+        self.argv = kwargs
+
+    def __repr__(self):
+        return '<%s name=%r id=%r argv=%r at 0x%x>' % (
+            self.__class__.__name__, self.name, self.id, self.argv, id(self))
+
+    def encode(self, buf, encoding=pyamf.AMF0):
+        def _encode():
+            encoder = pyamf.get_encoder(encoding)
+            encoder.stream = buf
+
+            for e in [self.name, self.id, self.argv]:
+                encoder.writeElement(e)
+
+        return defer.deferToThread(_encode)
 
 
 TYPE_MAP = {

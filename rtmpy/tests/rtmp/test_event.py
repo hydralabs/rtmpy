@@ -366,6 +366,8 @@ class ControlEventTestCase(BaseTestCase):
         self.buffer.truncate(0)
         x = event.ControlEvent(type=0, value1=123, value3=789, value2=456)
         e = x.encode(self.buffer)
+
+        self.assertEquals(e, None)
         self.assertEquals(self.buffer.getvalue(),
             '\x00\x00\x00\x00\x00{\x00\x00\x01\xc8\x00\x00\x03\x15')
 
@@ -431,3 +433,27 @@ class ControlEventTestCase(BaseTestCase):
         self.assertEquals(repr(e),
             '<ControlEvent type=9 value1=13 value2=45 value3=23 at 0x%x>' % (
                 id(e)))
+
+
+class NotifyTestCase(BaseTestCase):
+    """
+    Tests for L{event.Notify}
+    """
+
+    def test_create(self):
+        e = event.Notify()
+        self.assertEquals(e.__dict__, {'name': None, 'id': None, 'argv': {}})
+
+        e = event.Notify('foo', 'bar', baz='gak', spam='eggs')
+        self.assertEquals(e.__dict__, {'name': 'foo', 'id': 'bar',
+            'argv': {'baz': 'gak', 'spam': 'eggs'}})
+
+    def test_repr(self):
+        e = event.Notify()
+        self.assertEquals(repr(e),
+            '<Notify name=None id=None argv={} at 0x%x>' % (id(e),))
+
+        e = event.Notify('foo', 'bar', baz='gak', spam='eggs')
+        self.assertEquals(repr(e),
+            "<Notify name='foo' id='bar' argv={'baz': 'gak', 'spam': 'eggs'} "
+            "at 0x%x>" % (id(e),))
