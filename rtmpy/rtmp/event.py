@@ -114,6 +114,34 @@ class FrameSize(BaseEvent):
                 '(expected int, got %r)' % (type(self.size),))
 
 
+class BytesRead(BaseEvent):
+    """
+    Number of bytes read?
+    """
+
+    def __init__(self, size=None):
+        self.size = size
+
+    def decode(self, buf):
+        """
+        Decode a bytes read event.
+        """
+        self.size = buf.read_ulong()
+
+    def encode(self, buf):
+        """
+        Encode a bytes read event.
+        """
+        if self.size is None:
+            raise EncodeError('Bytes read not set')
+
+        try:
+            buf.write_ulong(self.size)
+        except TypeError:
+            raise EncodeError('Bytes read wrong type '
+                '(expected int, got %r)' % (type(self.size),))
+
+
 class ControlEvent(BaseEvent):
     """
     A control event. Akin to Red5's Ping Event.
@@ -211,6 +239,7 @@ class Invoke(Notify):
 
 TYPE_MAP = {
     FRAME_SIZE: FrameSize,
+    BYTES_READ: BytesRead,
     CONTROL: ControlEvent,
     NOTIFY: Notify,
     INVOKE: Invoke,

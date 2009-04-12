@@ -680,3 +680,78 @@ class InvokeTestCase(BaseTestCase):
         d.addErrback(self._fail)
 
         return d
+
+
+class BytesReadTestCase(BaseTestCase):
+    """
+    Tests for L{event.BytesRead}
+    """
+
+    def test_create(self):
+        x = event.BytesRead()
+        self.assertEquals(x.__dict__, {'size': None})
+
+        x = event.BytesRead(10)
+        self.assertEquals(x.__dict__, {'size': 10})
+
+        x = event.BytesRead(size=20)
+        self.assertEquals(x.__dict__, {'size': 20})
+
+    def test_raw_encode(self):
+        # test default encode
+        x = event.BytesRead()
+        e = self.assertRaises(event.EncodeError, x.encode, self.buffer)
+        self.assertEquals(str(e), 'Bytes read not set')
+
+        # test non-int encode
+        x = event.BytesRead(size='foo.bar')
+        e = self.assertRaises(event.EncodeError, x.encode, self.buffer)
+        self.assertEquals(str(e), 'Bytes read wrong type '
+            '(expected int, got <type \'str\'>)')
+
+        x = event.BytesRead(size=50)
+        e = x.encode(self.buffer)
+
+        self.assertEquals(e, None)
+
+        self.assertEquals(self.buffer.getvalue(), '\x00\x00\x00\x32')
+
+    def test_raw_decode(self):
+        x = event.BytesRead()
+
+        self.assertEquals(x.size, None)
+        self.buffer.write('\x00\x00\x00\x32')
+        self.buffer.seek(0)
+
+        e = x.decode(self.buffer)
+
+        self.assertEquals(e, None)
+        self.assertEquals(x.size, 50)
+
+    def test_encode(self):
+        e = event.BytesRead(size=2342)
+        self.executed = False
+
+        def cb(r):
+            self.assertEquals(r, (3, '\x00\x00\t&'))
+            self.executed = True
+
+        d = event.encode(e).addCallback(cb)
+        d.addCallback(lambda x: self.assertTrue(self.executed))
+        d.addErrback(self._fail)
+
+        return d
+
+    def test_decode(self):
+        self.executed = False
+
+        def cb(r):
+            self.assertTrue(isinstance(r, event.BytesRead))
+            self.assertEquals(r.__dict__, {'size': 2342})
+            self.executed = True
+
+        d = event.decode(3, '\x00\x00\t&').addCallback(cb)
+        d.addCallback(lambda x: self.assertTrue(self.executed))
+        d.addErrback(self._fail)
+
+        return d
