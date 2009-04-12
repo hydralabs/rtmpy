@@ -196,6 +196,73 @@ class ControlEvent(BaseEvent):
         self.value3 = buf.read_long()
 
 
+class ServerBandwidth(BaseEvent):
+    """
+    A server bandwidth event.
+    """
+
+    def __init__(self, bandwidth=None):
+        self.bandwidth = bandwidth
+
+    def decode(self, buf):
+        """
+        Decode a server bandwidth event.
+        """
+        self.bandwidth = buf.read_ulong()
+
+    def encode(self, buf):
+        """
+        Encode a server bandwidth event.
+        """
+        if self.bandwidth is None:
+            raise EncodeError('Server bandwidth not set')
+
+        try:
+            buf.write_ulong(self.bandwidth)
+        except TypeError:
+            raise EncodeError('Server bandwidth wrong type '
+                '(expected int, got %r)' % (type(self.bandwidth),))
+
+
+class ClientBandwidth(BaseEvent):
+    """
+    A server bandwidth event.
+    """
+
+    def __init__(self, bandwidth=None, extra=None):
+        self.bandwidth = bandwidth
+        self.extra = extra
+
+    def decode(self, buf):
+        """
+        Decode a client bandwidth event.
+        """
+        self.bandwidth = buf.read_ulong()
+        self.extra = buf.read_uchar()
+
+    def encode(self, buf):
+        """
+        Encode a client bandwidth event.
+        """
+        if self.bandwidth is None:
+            raise EncodeError('Client bandwidth not set')
+
+        if self.extra is None:
+            raise EncodeError('Client extra not set')
+
+        try:
+            buf.write_ulong(self.bandwidth)
+        except TypeError:
+            raise EncodeError('Client bandwidth wrong type '
+                '(expected int, got %r)' % (type(self.bandwidth),))
+
+        try:
+            buf.write_uchar(self.extra)
+        except TypeError:
+            raise EncodeError('Client extra wrong type '
+                '(expected int, got %r)' % (type(self.extra),))
+
+
 class Notify(BaseEvent):
     """
     Stream notification event.
@@ -241,6 +308,8 @@ TYPE_MAP = {
     FRAME_SIZE: FrameSize,
     BYTES_READ: BytesRead,
     CONTROL: ControlEvent,
+    SERVER_BANDWIDTH: ServerBandwidth,
+    CLIENT_BANDWIDTH: ClientBandwidth,
     NOTIFY: Notify,
     INVOKE: Invoke,
 }

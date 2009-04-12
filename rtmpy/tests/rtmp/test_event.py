@@ -755,3 +755,168 @@ class BytesReadTestCase(BaseTestCase):
         d.addErrback(self._fail)
 
         return d
+
+
+class ServerBandwidthTestCase(BaseTestCase):
+    """
+    Tests for L{event.ServerBandwidth}
+    """
+
+    def test_create(self):
+        x = event.ServerBandwidth()
+        self.assertEquals(x.__dict__, {'bandwidth': None})
+
+        x = event.ServerBandwidth(10)
+        self.assertEquals(x.__dict__, {'bandwidth': 10})
+
+        x = event.ServerBandwidth(bandwidth=20)
+        self.assertEquals(x.__dict__, {'bandwidth': 20})
+
+    def test_raw_encode(self):
+        # test default encode
+        x = event.ServerBandwidth()
+        e = self.assertRaises(event.EncodeError, x.encode, self.buffer)
+        self.assertEquals(str(e), 'Server bandwidth not set')
+
+        # test non-int encode
+        x = event.ServerBandwidth(bandwidth='foo.bar')
+        e = self.assertRaises(event.EncodeError, x.encode, self.buffer)
+        self.assertEquals(str(e), 'Server bandwidth wrong type '
+            '(expected int, got <type \'str\'>)')
+
+        x = event.ServerBandwidth(bandwidth=50)
+        e = x.encode(self.buffer)
+
+        self.assertEquals(e, None)
+
+        self.assertEquals(self.buffer.getvalue(), '\x00\x00\x00\x32')
+
+    def test_raw_decode(self):
+        x = event.ServerBandwidth()
+
+        self.assertEquals(x.bandwidth, None)
+        self.buffer.write('\x00\x00\x00\x32')
+        self.buffer.seek(0)
+
+        e = x.decode(self.buffer)
+
+        self.assertEquals(e, None)
+        self.assertEquals(x.bandwidth, 50)
+
+    def test_encode(self):
+        e = event.ServerBandwidth(bandwidth=2342)
+        self.executed = False
+
+        def cb(r):
+            self.assertEquals(r, (5, '\x00\x00\t&'))
+            self.executed = True
+
+        d = event.encode(e).addCallback(cb)
+        d.addCallback(lambda x: self.assertTrue(self.executed))
+        d.addErrback(self._fail)
+
+        return d
+
+    def test_decode(self):
+        self.executed = False
+
+        def cb(r):
+            self.assertTrue(isinstance(r, event.ServerBandwidth))
+            self.assertEquals(r.__dict__, {'bandwidth': 2342})
+            self.executed = True
+
+        d = event.decode(5, '\x00\x00\t&').addCallback(cb)
+        d.addCallback(lambda x: self.assertTrue(self.executed))
+        d.addErrback(self._fail)
+
+        return d
+
+
+class ClientBandwidthTestCase(BaseTestCase):
+    """
+    Tests for L{event.ClientBandwidth}
+    """
+
+    def test_create(self):
+        x = event.ClientBandwidth()
+        self.assertEquals(x.__dict__, {'bandwidth': None, 'extra': None})
+
+        x = event.ClientBandwidth(10, 32)
+        self.assertEquals(x.__dict__, {'bandwidth': 10, 'extra': 32})
+
+        x = event.ClientBandwidth(bandwidth=20, extra=233)
+        self.assertEquals(x.__dict__, {'bandwidth': 20, 'extra': 233})
+
+    def test_raw_encode(self):
+        # test default encode
+        x = event.ClientBandwidth()
+        e = self.assertRaises(event.EncodeError, x.encode, self.buffer)
+        self.assertEquals(str(e), 'Client bandwidth not set')
+        self.buffer.truncate(0)
+
+        x = event.ClientBandwidth(bandwidth='234')
+        e = self.assertRaises(event.EncodeError, x.encode, self.buffer)
+        self.assertEquals(str(e), 'Client extra not set')
+        self.buffer.truncate(0)
+
+        # test non-int encode
+        x = event.ClientBandwidth(bandwidth='foo.bar', extra=234)
+        e = self.assertRaises(event.EncodeError, x.encode, self.buffer)
+        self.assertEquals(str(e), 'Client bandwidth wrong type '
+            '(expected int, got <type \'str\'>)')
+        self.buffer.truncate(0)
+
+        # test non-int encode
+        x = event.ClientBandwidth(bandwidth=1200, extra='asdfas')
+        e = self.assertRaises(event.EncodeError, x.encode, self.buffer)
+        self.assertEquals(str(e), 'Client extra wrong type '
+            '(expected int, got <type \'str\'>)')
+        self.buffer.truncate(0)
+
+        x = event.ClientBandwidth(bandwidth=50, extra=12)
+        e = x.encode(self.buffer)
+
+        self.assertEquals(e, None)
+
+        self.assertEquals(self.buffer.getvalue(), '\x00\x00\x00\x32\x0C')
+
+    def test_raw_decode(self):
+        x = event.ClientBandwidth()
+
+        self.assertEquals(x.bandwidth, None)
+        self.buffer.write('\x00\x00\x00\x32\x0C')
+        self.buffer.seek(0)
+
+        e = x.decode(self.buffer)
+
+        self.assertEquals(e, None)
+        self.assertEquals(x.bandwidth, 50)
+        self.assertEquals(x.extra, 12)
+
+    def test_encode(self):
+        e = event.ClientBandwidth(bandwidth=2342, extra=65)
+        self.executed = False
+
+        def cb(r):
+            self.assertEquals(r, (6, '\x00\x00\t&A'))
+            self.executed = True
+
+        d = event.encode(e).addCallback(cb)
+        d.addCallback(lambda x: self.assertTrue(self.executed))
+        d.addErrback(self._fail)
+
+        return d
+
+    def test_decode(self):
+        self.executed = False
+
+        def cb(r):
+            self.assertTrue(isinstance(r, event.ClientBandwidth))
+            self.assertEquals(r.__dict__, {'bandwidth': 2342, 'extra': 65})
+            self.executed = True
+
+        d = event.decode(6, '\x00\x00\t&A').addCallback(cb)
+        d.addCallback(lambda x: self.assertTrue(self.executed))
+        d.addErrback(self._fail)
+
+        return d
