@@ -203,10 +203,17 @@ class Notify(BaseEvent):
         return threads.deferToThread(_decode)
 
 
+class Invoke(Notify):
+    """
+    Similar to L{Notify} but a reply is expected.
+    """
+
+
 TYPE_MAP = {
     FRAME_SIZE: FrameSize,
     CONTROL: ControlEvent,
     NOTIFY: Notify,
+    INVOKE: Invoke,
 }
 
 

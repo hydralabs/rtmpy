@@ -557,3 +557,126 @@ class NotifyTestCase(BaseTestCase):
         d.addErrback(self._fail)
 
         return d
+
+
+class InvokeTestCase(BaseTestCase):
+    """
+    Tests for L{event.Invoke}
+    """
+
+    def test_create(self):
+        e = event.Invoke()
+        self.assertEquals(e.__dict__, {'name': None, 'id': None, 'argv': {}})
+
+        e = event.Invoke('foo', 'bar', baz='gak', spam='eggs')
+        self.assertEquals(e.__dict__, {'name': 'foo', 'id': 'bar',
+            'argv': {'baz': 'gak', 'spam': 'eggs'}})
+
+    def test_repr(self):
+        e = event.Invoke()
+        self.assertEquals(repr(e),
+            '<Invoke name=None id=None argv={} at 0x%x>' % (id(e),))
+
+        e = event.Invoke('foo', 'bar', baz='gak', spam='eggs')
+        self.assertEquals(repr(e),
+            "<Invoke name='foo' id='bar' argv={'baz': 'gak', 'spam': 'eggs'} "
+            "at 0x%x>" % (id(e),))
+
+    def test_raw_encode(self):
+        l = []
+        e = event.Invoke()
+
+        b1 = BufferedByteStream()
+        d = e.encode(b1)
+        self.assertTrue(isinstance(d, defer.Deferred))
+
+        def cb(buf):
+            self.assertEquals(buf, None)
+            self.assertEquals(b1.getvalue(), '\x05\x05\x03\x00\x00\t')
+
+        d.addCallback(cb)
+
+        l.append(d)
+
+        b2 = BufferedByteStream()
+        d = e.encode(b2, encoding=pyamf.AMF3)
+        self.assertTrue(isinstance(d, defer.Deferred))
+
+        def cb2(buf):
+            self.assertEquals(buf, None)
+            self.assertEquals(b2.getvalue(), '\x01\x01\n\x0b\x01\x01')
+
+        d.addCallback(cb2)
+
+        l.append(d)
+
+        return defer.DeferredList(l)
+
+    def test_raw_decode(self):
+        l = []
+        e = event.Invoke()
+
+        b1 = BufferedByteStream('\x05\x05\x03\x00\x00\t')
+        d = e.decode(b1)
+        self.assertTrue(isinstance(d, defer.Deferred))
+
+        def cb(res):
+            self.assertEquals(res, None)
+            self.assertEquals(e.name, None)
+            self.assertEquals(e.id, None)
+            self.assertEquals(e.argv, {})
+
+        d.addCallback(cb)
+
+        l.append(d)
+
+        b2 = BufferedByteStream('\x01\x01\n\x0b\x01\x01')
+        d = e.decode(b2, encoding=pyamf.AMF3)
+        self.assertTrue(isinstance(d, defer.Deferred))
+
+        def cb2(res):
+            self.assertEquals(res, None)
+            self.assertEquals(e.name, None)
+            self.assertEquals(e.id, None)
+            self.assertEquals(e.argv, {})
+
+        d.addCallback(cb2)
+
+        l.append(d)
+
+        return defer.DeferredList(l)
+
+    def test_encode(self):
+        e = event.Invoke('_result', 2, foo='bar', baz='gak')
+        self.executed = False
+
+        def cb(r):
+            self.assertEquals(r, (20, '\x02\x00\x07_result\x00@\x00\x00\x00'
+                '\x00\x00\x00\x00\x03\x00\x03foo\x02\x00\x03bar\x00\x03baz'
+                '\x02\x00\x03gak\x00\x00\t'))
+            self.executed = True
+
+        d = event.encode(e).addCallback(cb)
+        d.addCallback(lambda x: self.assertTrue(self.executed))
+        d.addErrback(self._fail)
+
+        return d
+
+    def test_decode(self):
+        bytes = '\x02\x00\x07_result\x00@\x00\x00\x00\x00\x00\x00\x00\x03' + \
+            '\x00\x03foo\x02\x00\x03bar\x00\x03baz\x02\x00\x03gak\x00\x00\t'
+        self.executed = False
+
+        def cb(r):
+            self.assertTrue(isinstance(r, event.Invoke))
+            self.assertEquals(r.name, '_result')
+            self.assertEquals(r.id, 2)
+            self.assertEquals(r.argv, {'foo': 'bar', 'baz': 'gak'})
+
+            self.executed = True
+
+        d = event.decode(20, bytes).addCallback(cb)
+        d.addCallback(lambda x: self.assertTrue(self.executed))
+        d.addErrback(self._fail)
+
+        return d
