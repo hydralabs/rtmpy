@@ -5,7 +5,7 @@
 RTMP Channel type declarations.
 """
 
-from twisted.internet import defer
+from twisted.internet import defer, threads
 from zope.interface import implements
 import pyamf
 
@@ -190,12 +190,23 @@ class Notify(BaseEvent):
             for e in [self.name, self.id, self.argv]:
                 encoder.writeElement(e)
 
-        return defer.deferToThread(_encode)
+        return threads.deferToThread(_encode)
+
+    def decode(self, buf, encoding=pyamf.AMF0):
+        def _decode():
+            decoder = pyamf.get_decoder(encoding)
+            decoder.stream = buf
+
+            for a in ['name', 'id', 'argv']:
+                setattr(self, a, decoder.readElement())
+
+        return threads.deferToThread(_decode)
 
 
 TYPE_MAP = {
     FRAME_SIZE: FrameSize,
-    CONTROL: ControlEvent
+    CONTROL: ControlEvent,
+    NOTIFY: Notify,
 }
 
 
