@@ -104,7 +104,7 @@ class ChannelContextTestCase(BaseEncoderTestCase):
         self.executed = False
 
         class ReadErroringBuffer(object):
-            error_class = EOFError
+            error_class = IOError
 
             def read(self, *args, **kwargs):
                 raise ReadErroringBuffer.error_class
@@ -120,7 +120,7 @@ class ChannelContextTestCase(BaseEncoderTestCase):
 
         self.encoder.deactivateChannel = deactivateChannel
 
-        self.assertRaises(EOFError, self.context.buffer.read, 0)
+        self.assertRaises(IOError, self.context.buffer.read, 0)
 
         self.context.getFrame()
         self.assertTrue(self.executed)

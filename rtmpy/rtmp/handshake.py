@@ -128,7 +128,7 @@ class ClientToken(Token):
         self.payload = util.BufferedByteStream()
 
         self.payload.write_ulong(self.uptime)
-        self.payload.write_ulong(self.version)
+        self.payload.write_ulong(int(self.version))
         self.payload.write(generateBytes(HANDSHAKE_LENGTH - 8))
         self.payload.seek(0)
 
@@ -188,7 +188,7 @@ class ServerToken(Token):
         self.payload = util.BufferedByteStream()
 
         self.payload.write_ulong(self.uptime)
-        self.payload.write_ulong(self.version)
+        self.payload.write_ulong(int(self.version))
 
         if self.client.getDigest() is None:
             self.payload.write(generateBytes(HANDSHAKE_LENGTH - 8))
