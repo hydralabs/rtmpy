@@ -264,6 +264,7 @@ class BaseNegotiator(object):
                 'expected (got:%s)' % (type(observer),))
 
         self.observer = observer
+        self.debug = self.debug
 
     def dataReceived(self, data):
         """
@@ -292,7 +293,7 @@ class ClientNegotiator(BaseNegotiator):
 
         self.generateToken()
 
-        if rtmp.DEBUG:
+        if self.debug:
             rtmp.log(self, 'client token = %r' % (self.client,))
 
         self.client_payload = self.client.encode()
@@ -333,7 +334,7 @@ class ClientNegotiator(BaseNegotiator):
 
             self.received_header = data[0]
 
-            if rtmp.DEBUG:
+            if self.debug:
                 rtmp.log(self, 'Received header = %r' % (self.received_header,))
 
             if self.received_header not in [RTMP_HEADER_BYTE, RTMPE_HEADER_BYTE]:
@@ -355,7 +356,7 @@ class ClientNegotiator(BaseNegotiator):
             self.server = decodeServerHandshake(self.client, data[:HANDSHAKE_LENGTH])
             data = data[HANDSHAKE_LENGTH:]
 
-            if rtmp.DEBUG:
+            if self.debug:
                 rtmp.log(self, 'Decoded server token = %r' % (self.server,))
 
         # we now have a valid server token, we are now expecting to have our
@@ -367,7 +368,7 @@ class ClientNegotiator(BaseNegotiator):
             return
 
         if self.client_payload != data[:HANDSHAKE_LENGTH]:
-            if rtmp.DEBUG:
+            if self.debug:
                 rtmp.log(self, 'Client payload = (len:%d) %r' % (
                     len(self.client_payload), self.client_payload,))
                 rtmp.log(self, 'Received data = (len:%d) %r' % (
@@ -450,7 +451,7 @@ class ServerNegotiator(BaseNegotiator):
 
             self.received_header = data[0]
 
-            if rtmp.DEBUG:
+            if self.debug:
                 rtmp.log(self, 'Received header = %r' % (self.received_header,))
 
             if self.received_header not in [RTMP_HEADER_BYTE, RTMPE_HEADER_BYTE]:
@@ -470,14 +471,14 @@ class ServerNegotiator(BaseNegotiator):
 
         self.client = decodeClientHandshake(data)
 
-        if rtmp.DEBUG:
+        if self.debug:
             rtmp.log(self, 'Decoded client token = %r' % (self.client,))
 
         self.generateToken()
         self.header = getHeader(self.client)
         self.server_payload = self.server.encode()
 
-        if rtmp.DEBUG:
+        if self.debug:
             rtmp.log(self, 'Server token = %r' % (self.server,))
 
         self.observer.write(
