@@ -5,8 +5,7 @@
 Interface documentation for RTMP primitives.
 """
 
-from twisted.internet.interfaces import IProtocol, ITransport
-from zope.interface import Interface, Attribute, implements
+from zope.interface import Interface, Attribute
 
 
 class IHeader(Interface):
@@ -162,14 +161,21 @@ class IChannelManager(Interface):
 
 class IChannelObserver(Interface):
     """
+    Observes L{IChannel} events.
     """
 
     def dataReceived(data):
         """
+        Called when the channel receives some data.
+
+        @param data: The data received by the channel.
+        @type data: C{str}
         """
 
     def bodyComplete():
         """
+        Called when the amount of data received by the channel matches that
+        of its header.
         """
 
 

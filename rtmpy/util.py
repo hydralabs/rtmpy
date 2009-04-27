@@ -23,6 +23,7 @@ class BufferedByteStream(BBS):
         self.seek(0, 2)
         self.write(data)
 
+
 #: The number of milliseconds since the epoch.
 boottime = None
 

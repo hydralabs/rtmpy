@@ -11,76 +11,33 @@ RTMP codecs. Encoders and decoders for rtmp streams.
 
 from twisted.internet import task
 from zope.interface import implements
-import pyamf
 
-from rtmpy import rtmp
-from rtmpy import util
+from rtmpy import rtmp, util
 from rtmpy.rtmp import interfaces
-from rtmpy.rtmp.codec import header
+from rtmpy.rtmp.codec import header as _header
 
 
 MAX_CHANNELS = 64
 FRAME_SIZE = 128
 
 
-class BaseError(Exception):
-    """
-    Base class for codec errors.
-    """
-
-
-class HeaderError(BaseError):
-    """
-    Raised if a header related operation failed.
-    """
-
-
-class NoManagerError(BaseError):
-    """
-    Raised if an operation performed on a channel requires a registered
-    manager.
-    """
-
-
-class DecodeError(BaseError):
+class DecodeError(rtmp.BaseError):
     """
     Raised if there is an error decoding an RTMP bytestream.
     """
 
 
-class EncodeError(BaseError):
+class EncodeError(rtmp.BaseError):
     """
     Raised if there is an error encoding an RTMP bytestream.
     """
 
 
-class Header(object):
+class NoManagerError(rtmp.BaseError):
     """
-    An RTMP Header. Holds contextual information for an RTMP Channel.
-
-    @see: L{interfaces.IHeader}
+    Raised if an operation performed on a channel requires a registered
+    manager.
     """
-
-    implements(interfaces.IHeader)
-
-    def __init__(self, **kwargs):
-        self.channelId = kwargs.get('channelId', None)
-        self.timestamp = kwargs.get('timestamp', None)
-        self.datatype = kwargs.get('datatype', None)
-        self.bodyLength = kwargs.get('bodyLength', None)
-        self.streamId = kwargs.get('streamId', None)
-        self.relative = kwargs.get('relative', None)
-
-    def __repr__(self):
-        s = ['%s=%r' % (k, v) for k, v in self.__dict__.iteritems()]
-
-        s = '<%s.%s %s at 0x%x>' % (
-            self.__class__.__module__,
-            self.__class__.__name__,
-            ' '.join(s),
-            id(self))
-
-        return s
 
 
 class Channel(object):
@@ -115,7 +72,8 @@ class Channel(object):
 
     def registerManager(self, manager):
         """
-        Registers a manager to this channel.
+        Registers a manager to this channel. The channel will L{reset} itself
+        when a manager is registered.
 
         @param manager: The manager to register to this channel.
         @type manager: L{interfaces.IChannelManager}
@@ -125,6 +83,7 @@ class Channel(object):
                 '(got %s)' % (type(manager),))
 
         self.manager = manager
+        self.reset()
 
     def registerObserver(self, observer):
         """
@@ -140,7 +99,7 @@ class Channel(object):
 
         self.observer = observer
 
-        if hasattr(self, 'buffer') and self.buffer is not None:
+        if self.buffer is not None:
             self.observer.dataReceived(self.buffer)
             self.buffer = None
 
@@ -185,20 +144,22 @@ class Channel(object):
         if self.debug or rtmp.DEBUG:
             rtmp.log(self, 'setHeader(%s)' % (header,))
 
+        # this method is going to be called a lot - is this strictly
+        # necessary?
         if not interfaces.IHeader.providedBy(header):
             raise TypeError("Expected header to implement IHeader")
 
         if self.manager is None:
-            raise NoManagerError('Setting the header requires a registered ' \
-                'manager')
+            raise NoManagerError(
+                'Setting the header requires a registered manager')
 
         if self.header is None:
             if header.relative is True:
-                raise HeaderError('Tried to set a relative header as ' \
-                    'absolute')
+                raise _header.HeaderError(
+                    'Tried to set a relative header as absolute')
         else:
             if header.channelId != self.header.channelId:
-                raise HeaderError('Tried to assign a header from a ' \
+                raise _header.HeaderError('Tried to assign a header from a '
                     'different channel (original:%d, new:%d)' % (
                         self.header.channelId, header.channelId))
 
@@ -223,11 +184,13 @@ class Channel(object):
         """
         if self.observer is not None:
             self.observer.dataReceived(data)
-        else:
-            if self.buffer is None:
-                self.buffer = ''
 
-            self.buffer += data
+            return
+
+        if self.buffer is None:
+            self.buffer = ''
+
+        self.buffer += data
 
     def _adjustFrameRemaining(self, l):
         """
@@ -256,7 +219,7 @@ class Channel(object):
         @type data: C{str}
         """
         if self.header is None:
-            raise HeaderError("Cannot write to a channel with no header")
+            raise _header.HeaderError("Cannot write to a channel with no header")
 
         l = len(data)
 
@@ -266,12 +229,15 @@ class Channel(object):
                     l, self.bodyRemaining, self.bytes + self.bodyRemaining))
 
         if self.debug or rtmp.DEBUG:
-            log(self, 'Received %d bytes' % (l,))
+            rtmp.log(self, 'Received %d bytes' % (l,))
 
         self._write(data)
 
         self.bytes += l
         self.bodyRemaining -= l
+
+        if self.bodyRemaining == 0:
+            self.onComplete()
 
         self._adjustFrameRemaining(l)
 
@@ -279,8 +245,11 @@ class Channel(object):
         """
         Called when the channel has receieved the correct amount of data.
         """
+        if self.debug or rtmp.DEBUG:
+            rtmp.log(self, 'body completed')
+
         if self.manager is None:
-            raise NoManagerError('A registered manager is required to ' \
+            raise NoManagerError('A registered manager is required to '
                 'complete a channel')
 
         self.manager.channelComplete(self)
@@ -332,6 +301,8 @@ class BaseCodec(object):
     """
 
     implements(interfaces.IChannelManager)
+
+    channel_class = Channel
 
     def __init__(self):
         self.channels = {}
@@ -387,6 +358,28 @@ class BaseCodec(object):
 
     # interfaces.IChannelManager
 
+    def createChannel(self, channelId):
+        """
+        A factory method that builds C{Channel} objects and registers them to
+        this manager.
+
+        @param channelId: The id of the channel
+        @return: The newly instantiated channel.
+        @rtype: L{Channel}
+        """
+        if channelId in self.channels:
+            raise IndexError(
+                'A channel is already registered to id %r' % (channelId,))
+
+        if channelId < 0 or channelId > MAX_CHANNELS:
+            raise IndexError("channelId is out of range (got:%d)" % (
+                channelId,))
+
+        channel = self.channels[channelId] = BaseCodec.channel_class()
+        channel.registerManager(self)
+
+        return channel
+
     def getChannel(self, channelId):
         """
         Returns a channel based on channelId. If the channel doesn't exist,
@@ -396,23 +389,13 @@ class BaseCodec(object):
         @type channelId: C{int}
         @rtype: L{Channel}
         """
-        if MAX_CHANNELS < channelId < 0:
-            raise IndexError("channelId is out of range (got:%d)" % (
-                channelId,))
-
         try:
-            channel = self.channels[channelId]
+            return self.channels[channelId]
         except KeyError:
             if self.debug or rtmp.DEBUG:
                 rtmp.log(self, 'Creating channel %d' % (channelId,))
 
-            channel = self.channels[channelId] = Channel()
-            channel.registerManager(self)
-
-        if self.debug or rtmp.DEBUG:
-            log(self, 'Getting channel %r' % (channel,))
-
-        return channel
+            return self.createChannel(channelId)
 
     def getNextAvailableChannelId(self):
         """
@@ -423,9 +406,7 @@ class BaseCodec(object):
         if len(keys) == MAX_CHANNELS:
             raise OverflowError("No free channel")
 
-        count = 0
-
-        while count < MAX_CHANNELS:
+        for count in xrange(0, MAX_CHANNELS):
             try:
                 if keys[count] != count:
                     return count
@@ -434,33 +415,20 @@ class BaseCodec(object):
 
             count += 1
 
-        return count
-
     def channelComplete(self, channel):
         """
         Called when the body of the channel has been satisfied.
         """
-        if channel.observer:
-            channel.observer.bodyComplete()
-
-        header = channel.getHeader()
-
-        if header.datatype == 1 and header.streamId == 0:
-            # change the frame size
-            d = BufferedByteStream(channel.buffer)
-            size = d.read_ulong()
-
-            if self.debug or rtmp.DEBUG:
-                rtmp.log(self, 'Setting frame size to %d' % (size,))
-
-            self.setFrameSize(int(size))
-
-        channel.reset()
+        # more here
 
     def initialiseChannel(self, channel):
         """
         Called when a header has been applied to an inactive channel.
         """
+        if channel.manager != self:
+            raise ValueError("Cannot initialise a channel that isn\'t "
+                "registered to this manager")
+
         channel.reset()
 
     def setFrameSize(self, size):
@@ -480,8 +448,8 @@ class Decoder(BaseCodec):
     @type currentChannel: L{interfaces.IChannel}
     """
 
-    def __init__(self, manager):
-        BaseCodec.__init__(self, manager)
+    def __init__(self,):
+        BaseCodec.__init__(self)
 
         self.currentChannel = None
 
@@ -498,8 +466,8 @@ class Decoder(BaseCodec):
         headerPosition = self.buffer.tell()
 
         try:
-            return header.decodeHeader(self.buffer)
-        except (IOError, pyamf.EOStream):
+            return _header.decodeHeader(self.buffer)
+        except IOError:
             self.buffer.seek(headerPosition)
 
             if self.debug or rtmp.DEBUG:
@@ -517,9 +485,9 @@ class Decoder(BaseCodec):
         """
         return min(
             channel.frameRemaining,
-            self.buffer.remaining(),
             channel.bodyRemaining,
-            self.manager.frameSize
+            self.buffer.remaining(),
+            self.frameSize
         )
 
     def readFrame(self):
@@ -556,13 +524,6 @@ class Decoder(BaseCodec):
         if self.currentChannel.frames != frames:
             # a complete frame was read from the stream which means a new
             # header and frame body will be next in the stream
-            self.currentChannel = None
-        elif self.currentChannel.bodyRemaining == 0:
-            # the channel is now complete
-            if self.debug or rtmp.DEBUG:
-                rtmp.log(self, '%r completed' % (self.currentChannel,))
-
-            self.manager.channelComplete(self.currentChannel)
             self.currentChannel = None
 
     def canContinue(self, minBytes=1):
@@ -615,7 +576,7 @@ class Decoder(BaseCodec):
         if self.debug or rtmp.DEBUG:
             rtmp.log(self, 'Read header %r' % (h,))
 
-        self.currentChannel = self.manager.getChannel(h.channelId)
+        self.currentChannel = self.getChannel(h.channelId)
 
         if self.debug or rtmp.DEBUG:
             if h.relative is True:
@@ -668,6 +629,13 @@ class Decoder(BaseCodec):
         self.buffer.seek(0, 2)
         self.buffer.write(data)
 
+    def channelComplete(self, channel):
+        """
+        Called when the body of the channel has been satisfied.
+        """
+        BaseCodec.channelComplete(self, channel)
+
+        self.currentChannel = None
 
 class ChannelContext(object):
     """
@@ -753,7 +721,7 @@ class ChannelContext(object):
         if self.header is None:
             return self.channel.getHeader()
 
-        return header.diffHeaders(self.header, self.channel.getHeader())
+        return _header.diffHeaders(self.header, self.channel.getHeader())
 
     def getMinimumFrameSize(self):
         """
@@ -761,7 +729,7 @@ class ChannelContext(object):
         @rtype: C{int}
         """
         bytesLeft = self.channel.bytes - self.bytes
-        frameSize = self.encoder.manager.frameSize
+        frameSize = self.encoder.frameSize
 
         available = min(bytesLeft, frameSize)
 
@@ -789,8 +757,8 @@ class Encoder(BaseCodec):
     @type scheduler: L{interfaces.IChannelScheduler}
     """
 
-    def __init__(self, manager):
-        BaseCodec.__init__(self, manager)
+    def __init__(self):
+        BaseCodec.__init__(self)
 
         self.channelContext = {}
         self.consumer = None
@@ -860,7 +828,7 @@ class Encoder(BaseCodec):
         if bytes is None:
             return
 
-        header.encodeHeader(self.buffer, context.getRelativeHeader())
+        _header.encodeHeader(self.buffer, context.getRelativeHeader())
         self.buffer.write(bytes)
 
         # reset the context to the latest absolute header from the channel

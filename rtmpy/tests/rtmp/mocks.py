@@ -10,50 +10,6 @@ from zope.interface import implements
 from rtmpy.rtmp import interfaces
 from rtmpy.rtmp import handshake
 
-class ChannelManager(object):
-    """
-    Mock for L{interfaces.IChannelManager}
-    """
-
-    implements(interfaces.IChannelManager)
-
-    def __init__(self, channels=None):
-        if channels is not None:
-            self.channels = channels
-        else:
-            self.channels = {}
-
-        self.frameSize = 128
-
-        self.complete = []
-        self.initialised = []
-
-    def getChannel(self, id):
-        try:
-            return self.channels[id]
-        except KeyError:
-            channel = self.channels[id] = Channel()
-            channel.registerManager(self)
-            channel.reset()
-
-        return self.channels[id]
-
-    def channelComplete(self, channel):
-        header = channel.getHeader()
-
-        self.complete.append((header.channelId, channel.buffer))
-
-    def initialiseChannel(self, channel):
-        self.initialised.append(channel)
-
-        channel.reset()
-
-    def setFrameSize(self, size):
-        self.frameSize = size
-
-        for channel in self.channels.values():
-            channel.frameRemaining = size
-
 
 class Channel(object):
     """
@@ -64,11 +20,13 @@ class Channel(object):
 
     def __init__(self):
         self.header = None
+        self.has_reset = False
 
     def registerManager(self, manager):
         self.manager = manager
 
     def reset(self):
+        self.has_reset = True
         self.frameRemaining = self.manager.frameSize
         self.frames = 0
         self.bytes = 0
@@ -93,8 +51,8 @@ class Channel(object):
             self.frames += 1
             l -= self.manager.frameSize
 
-        if self.frameRemaining != self.manager.frameSize and \
-                    l + self.frameRemaining >= self.manager.frameSize:
+        if (self.frameRemaining != self.manager.frameSize and 
+                    l + self.frameRemaining >= self.manager.frameSize):
             self.frames += 1
             l -= self.manager.frameSize
 

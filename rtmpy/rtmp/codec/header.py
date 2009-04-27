@@ -10,12 +10,49 @@ Utility/helper functions for encoding and decoding RTMP headers.
     (external)<http://osflash.org/documentation/rtmp#rtmp_packet_structure>}
 """
 
-from rtmpy.rtmp.interfaces import IHeader
+from zope.interface import implements
+
 from rtmpy import rtmp, util
-from rtmpy.rtmp import codec
+from rtmpy.rtmp import interfaces
+
 
 #: The header can come in one of four sizes: 12, 8, 4, or 1 byte(s).
 HEADER_SIZES = [12, 8, 4, 1]
+
+
+class HeaderError(rtmp.BaseError):
+    """
+    Raised if a header related operation failed.
+    """
+
+
+class Header(object):
+    """
+    An RTMP Header. Holds contextual information for an RTMP Channel.
+
+    @see: L{interfaces.IHeader}
+    """
+
+    implements(interfaces.IHeader)
+
+    def __init__(self, **kwargs):
+        self.channelId = kwargs.get('channelId', None)
+        self.timestamp = kwargs.get('timestamp', None)
+        self.datatype = kwargs.get('datatype', None)
+        self.bodyLength = kwargs.get('bodyLength', None)
+        self.streamId = kwargs.get('streamId', None)
+        self.relative = kwargs.get('relative', None)
+
+    def __repr__(self):
+        s = ['%s=%r' % (k, v) for k, v in self.__dict__.iteritems()]
+
+        s = '<%s.%s %s at 0x%x>' % (
+            self.__class__.__module__,
+            self.__class__.__name__,
+            ' '.join(s),
+            id(self))
+
+        return s
 
 
 def decodeHeaderByte(byte):
@@ -61,11 +98,11 @@ def encodeHeaderByte(headerLength, channelId):
     try:
         index = HEADER_SIZES.index(headerLength)
     except ValueError:
-        raise codec.HeaderError('Unexpected headerLength value (got %d)' % (
+        raise HeaderError('Unexpected headerLength value (got %d)' % (
             headerLength,))
 
     if channelId > 0x3f or channelId < 0:
-        raise codec.HeaderError('Expected channelId between 0x00 and 0x3f')
+        raise HeaderError('Expected channelId between 0x00 and 0x3f')
 
     return (index << 6) | channelId
 
@@ -76,27 +113,27 @@ def getHeaderSizeIndex(header):
     C{channelId} on C{header} needs to exist otherwise and L{ValueError}
     will be raised.
 
-    @param header: An L{IHeader} object.
+    @param header: An L{interfaces.IHeader} object.
     @return: An index relating to L{HEADER_SIZES}.
     @rtype: C{int}
     """
-    if not IHeader.providedBy(header):
+    if not interfaces.IHeader.providedBy(header):
         raise TypeError('IHeader interface expected (got:%s)' % (
             type(header),))
 
     if header.channelId is None:
-        raise codec.HeaderError('Header channelId cannot be None')
+        raise HeaderError('Header channelId cannot be None')
 
     if header.streamId is not None:
         if None in [header.bodyLength, header.datatype, header.timestamp]:
-            raise codec.HeaderError('Dependant values unmet (got:%r)' % (
+            raise HeaderError('Dependant values unmet (got:%r)' % (
                 header,))
 
         return 0
 
     if [header.bodyLength, header.datatype] != [None, None]:
         if header.timestamp is None:
-            raise codec.HeaderError('Dependant values unmet (got:%r)' % (
+            raise HeaderError('Dependant values unmet (got:%r)' % (
                 header,))
 
         return 1
@@ -114,7 +151,7 @@ def getHeaderSize(header):
     """
     Returns the expected number of bytes it will take to encode C{header}.
 
-    @param header: An L{IHeader} object.
+    @param header: An L{interfaces.IHeader} object.
     @return: The number of bytes required to encode C{header}.
     @rtype: C{int}
     """
@@ -129,10 +166,10 @@ def encodeHeader(stream, header):
 
     @param stream: The stream to write the encoded header.
     @type stream: L{util.BufferedByteStream}
-    @param header: An I{IHeader} object.
-    @raise TypeError: If L{IHeader} is not provided by C{header}.
+    @param header: An I{interfaces.IHeader} object.
+    @raise TypeError: If L{interfaces.IHeader} is not provided by C{header}.
     """
-    if not IHeader.providedBy(header):
+    if not interfaces.IHeader.providedBy(header):
         raise TypeError('IHeader interface expected (got %s)' % (
             type(header),))
 
@@ -183,18 +220,18 @@ def decodeHeader(stream):
     @param stream: The byte stream to read the header from.
     @type stream: C{rtmpy.util.BufferedByteStream}
     @return: The read header from the stream.
-    @rtype: L{codec.Header}
+    @rtype: L{Header}
     """
     size, channelId = decodeHeaderByte(stream.read_uchar())
     relative = size != 12
 
-    header = codec.Header(channelId=channelId, relative=relative)
+    header = Header(channelId=channelId, relative=relative)
 
     if size == 1:
         return header
 
     if rtmp.DEBUG:
-        rtmp.log(stream, 'header size = %d' % (size,))
+        rtmp.log(None, 'header size = %d' % (size,))
 
     endian = stream.endian
     stream.endian = util.BufferedByteStream.ENDIAN_BIG
@@ -218,7 +255,7 @@ def decodeHeader(stream):
     stream.endian = endian
 
     if rtmp.DEBUG:
-        rtmp.log(stream, 'header read = %r' % (header,))
+        rtmp.log(None, 'header read = %r' % (header,))
 
     return header
 
@@ -226,34 +263,34 @@ def decodeHeader(stream):
 def diffHeaders(old, new):
     """
     Returns a header based on the differences between two headers. Both C{old}
-    and C{new} must implement L{IHeader}, be from the same channel and be
+    and C{new} must implement L{interfaces.IHeader}, be from the same channel and be
     absolute.
 
     @param old: The first header to compare.
-    @type old: L{IHeader}
+    @type old: L{interfaces.IHeader}
     @param new: The second header to compare.
-    @type new: L{IHeader}
+    @type new: L{interfaces.IHeader}
     @return: A header with the computed differences between old & new.
-    @rtype: L{codec.Header}
+    @rtype: L{Header}
     """
-    if not IHeader.providedBy(old):
+    if not interfaces.IHeader.providedBy(old):
         raise TypeError("Expected IHeader for old (got %r)" % (old,))
 
-    if not IHeader.providedBy(new):
+    if not interfaces.IHeader.providedBy(new):
         raise TypeError("Expected IHeader for new (got %r)" % (new,))
 
     if old.relative is not False:
-        raise codec.HeaderError("Received a non-absolute header for old " \
+        raise HeaderError("Received a non-absolute header for old " \
             "(relative = %r)" % (old.relative))
 
     if new.relative is not False:
-        raise codec.HeaderError("Received a non-absolute header for new " \
+        raise HeaderError("Received a non-absolute header for new " \
             "(relative = %r)" % (new.relative))
 
     if old.channelId != new.channelId:
-        raise codec.HeaderError("The two headers are not for the same channel")
+        raise HeaderError("The two headers are not for the same channel")
 
-    header = codec.Header(channelId=old.channelId, relative=True)
+    header = Header(channelId=old.channelId, relative=True)
 
     if new.timestamp != old.timestamp:
         header.timestamp = new.timestamp
@@ -273,35 +310,35 @@ def diffHeaders(old, new):
 def mergeHeaders(old, new):
     """
     Returns an absolute header that is the result of merging the values of
-    C{old} and C{new}. Both C{old} and C{new} must implement L{IHeader} and be
-    from the same channel. Also, C{old} must be absolute and C{new} must be
-    relative.
+    C{old} and C{new}. Both C{old} and C{new} must implement
+    L{interfaces.IHeader} and be from the same channel. Also, C{old} must be
+    absolute and C{new} must be relative.
 
     @param old: The first header to compare.
-    @type old: L{IHeader}
+    @type old: L{interfaces.IHeader}
     @param new: The second header to compare.
-    @type new: L{IHeader}
+    @type new: L{interfaces.IHeader}
     @return: A header with the merged values of old & new.
-    @rtype: L{codec.Header}
+    @rtype: L{Header}
     """
-    if not IHeader.providedBy(old):
+    if not interfaces.IHeader.providedBy(old):
         raise TypeError("Expected IHeader for old (got %r)" % (old,))
 
-    if not IHeader.providedBy(new):
+    if not interfaces.IHeader.providedBy(new):
         raise TypeError("Expected IHeader for new (got %r)" % (new,))
 
     if old.relative is not False:
-        raise codec.HeaderError("Received a non-absolute header for old " \
+        raise HeaderError("Received a non-absolute header for old " \
             "(relative = %r)" % (old.relative))
 
     if new.relative is not True:
-        raise codec.HeaderError("Received a non-relative header for new " \
+        raise HeaderError("Received a non-relative header for new " \
             "(relative = %r)" % (new.relative))
 
     if old.channelId != new.channelId:
-        raise codec.HeaderError("The two headers are not for the same channel")
+        raise HeaderError("The two headers are not for the same channel")
 
-    header = codec.Header(channelId=old.channelId, relative=False)
+    header = Header(channelId=old.channelId, relative=False)
 
     if new.timestamp is not None:
         header.timestamp = new.timestamp

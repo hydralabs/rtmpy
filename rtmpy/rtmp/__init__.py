@@ -18,21 +18,18 @@ packets are split up into fixed size body chunks.
 @see: U{RTMP (external)<http://rtmpy.org/wiki/RTMP>}
 """
 
-from twisted.internet import reactor, protocol, defer, task
-from twisted.internet.interfaces import ITransport
+from twisted.internet import protocol
 from zope.interface import implements
-from pyamf.util import IndexedCollection, BufferedByteStream
 
 from rtmpy.rtmp import interfaces
-from rtmpy.rtmp import log
 
+#: Set this to C{True} to force all rtmp.* instances to log debugging messages
+DEBUG = False
 
 #: The default RTMP port is a registered at U{IANA<http://iana.org>}.
 RTMP_PORT = 1935
 
 MAX_STREAMS = 0xffff
-
-DEBUG = False
 
 
 def log(obj, msg):
@@ -40,6 +37,12 @@ def log(obj, msg):
     Used to log interesting messages from within this module (and submodules).
     """
     print repr(obj), msg
+
+
+class BaseError(Exception):
+    """
+    Base error class for all RTMP related errors.
+    """
 
 
 class BaseProtocol(protocol.Protocol):
@@ -65,8 +68,10 @@ class BaseProtocol(protocol.Protocol):
 
     def buildHandshakeNegotiator(self):
         """
+        Builds and returns an object that will handle the handshake phase of
+        the connection. Must be implemented by subclasses.
         """
-        raise NotImplementedError
+        raise NotImplementedError()
 
     def connectionMade(self):
         if self.debug or DEBUG:
@@ -113,7 +118,7 @@ class BaseProtocol(protocol.Protocol):
 
     def dataReceived(self, data):
         """
-        Called when data is received from the underlying transport.
+        Called when data is received from the underlying L{transport}.
         """
         if self.state is BaseProtocol.STREAM:
             self.decodeStream(data)
@@ -124,8 +129,8 @@ class BaseProtocol(protocol.Protocol):
 
     def handshakeSuccess(self):
         """
-        Called when the RTMP handshake was successful. Once this is called,
-        packet streaming can commence.
+        Called when the RTMP handshake was successful. Once called, packet
+        streaming can commence.
         """
         from rtmpy.rtmp import codec
 
