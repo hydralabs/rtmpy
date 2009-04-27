@@ -128,7 +128,7 @@ class ClientToken(Token):
         if self._payload is not None:
             return
 
-        self.p_payloadayload = util.BufferedByteStream()
+        self._payload = util.BufferedByteStream()
 
         self._payload.write_ulong(self.uptime)
         self._payload.write_ulong(int(self.version))
@@ -308,7 +308,7 @@ class ClientNegotiator(BaseNegotiator):
         self.header = getHeader(self.client)
         self.receivedHeader = None
 
-        self.observer.write(self.header + self.client_payload)
+        self.observer.write(self.header + self.clientPayload)
 
     def generateToken(self):
         """
@@ -334,13 +334,13 @@ class ClientNegotiator(BaseNegotiator):
     def _dataReceived(self, data):
         data = self.buffer + data
 
-        if self.received_header is None:
+        if self.receivedHeader is None:
             if len(data) < 1:
                 self.buffer = data
 
                 return
 
-            self.received_header = data[0]
+            self.receivedHeader = data[0]
 
             if self.debug or rtmp.DEBUG:
                 rtmp.log(self, 'Received header = %r' % (self.receivedHeader,))
@@ -378,7 +378,7 @@ class ClientNegotiator(BaseNegotiator):
         if self.clientPayload != data[:HANDSHAKE_LENGTH]:
             if self.debug or rtmp.DEBUG:
                 rtmp.log(self, 'Client payload = (len:%d) %r' % (
-                    len(self.client_payload), self.client_payload,))
+                    len(self.clientPayload), self.clientPayload,))
                 rtmp.log(self, 'Received data = (len:%d) %r' % (
                     len(data[:HANDSHAKE_LENGTH]), data[:HANDSHAKE_LENGTH],))
 
@@ -453,7 +453,7 @@ class ServerNegotiator(BaseNegotiator):
     def _dataReceived(self, data):
         data = self.buffer + data
 
-        if self.received_header is None:
+        if self.receivedHeader is None:
             if len(data) < 1:
                 return
 
@@ -521,11 +521,15 @@ def decodeClientHandshake(data):
     """
     s = util.BufferedByteStream(data)
 
-    uptime = s.read_ulong()
-    version = versions.Version(s.read_ulong())
-    s.seek(0)
+    try:
+        uptime = s.read_ulong()
+        version = versions.Version(s.read_ulong())
+        s.seek(0)
 
-    payload = s.read(HANDSHAKE_LENGTH)
+        payload = s.read(HANDSHAKE_LENGTH)
+    except IOError:
+        raise HandshakeError(
+            'Not enough data to be able to decode a full client token')
 
     return ClientToken(uptime=uptime, version=version, payload=payload)
 
@@ -552,7 +556,7 @@ def decodeServerHandshake(client, data):
         raise HandshakeError(
             'Not enough data to be able to decode a full server token')
 
-    return ServerToken(client, uptime, version, payload)
+    return ServerToken(client, uptime=uptime, version=version, payload=payload)
 
 
 def generateBytes(length):

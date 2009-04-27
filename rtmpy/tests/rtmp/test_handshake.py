@@ -23,10 +23,10 @@ class BaseTokenTestCase(unittest.TestCase):
     def _generatePayload(self, t, payload):
         t.__class__.generatePayload(t)
 
-        p = t.payload.tell()
-        t.payload.seek(2, 0)
-        t.payload.write(payload)
-        t.payload.seek(p)
+        p = t._payload.tell()
+        t._payload.seek(2, 0)
+        t._payload.write(payload)
+        t._payload.seek(p)
 
     def _generateToken(self, *args, **kwargs):
         payload = None
@@ -57,14 +57,14 @@ class TokenClassTestCase(BaseTokenTestCase):
 
         self.assertEquals(t.uptime, 0)
         self.assertEquals(t.version, 0)
-        self.assertEquals(t.payload, None)
+        self.assertEquals(t._payload, None)
 
         t = self._generateToken(payload='foo.bar')
 
         self.assertEquals(t.uptime, 0)
         self.assertEquals(t.version, 0)
 
-        p = t.payload
+        p = t._payload
 
         self.assertTrue(isinstance(p, util.BufferedByteStream))
         self.assertEquals(p.tell(), 0)
@@ -116,10 +116,10 @@ class ClientTokenClassTestCase(TokenClassTestCase):
     def test_generate_payload(self):
         t = self._generateToken()
 
-        self.assertEquals(t.payload, None)
+        self.assertEquals(t._payload, None)
         t.generatePayload()
 
-        p = t.payload
+        p = t._payload
 
         self.assertTrue(isinstance(p, util.BufferedByteStream))
         self.assertEquals(p.tell(), 0)
@@ -127,26 +127,26 @@ class ClientTokenClassTestCase(TokenClassTestCase):
 
         t.generatePayload()
 
-        self.assertIdentical(p, t.payload)
+        self.assertIdentical(p, t._payload)
 
     def test_getDigest(self):
         t = self._generateToken()
 
-        self.assertEquals(t.payload, None)
+        self.assertEquals(t._payload, None)
         e = self.assertRaises(handshake.HandshakeError, t.getDigest)
         self.assertEquals(str(e),
             'No digest available for an empty handshake')
 
         t = self.token_class(version=versions.H264_MIN_FLASH)
         # magic offset = 4
-        t.payload = util.BufferedByteStream('\x00' * 8 + \
+        t._payload = util.BufferedByteStream('\x00' * 8 + \
             '\x01' * 4 + '\x02' * 4 + '\x00' * 32)
 
         self.assertEquals(t.getDigest(), '\x00' * 32)
 
         s = ''.join([chr(x) for x in xrange(1, 100)])
         # magic offset = 10
-        t.payload = util.BufferedByteStream('\x00' * 8  + s)
+        t._payload = util.BufferedByteStream('\x00' * 8  + s)
         # HACK
         del t._digest
 
@@ -167,16 +167,16 @@ class ClientTokenEncodingTestCase(BaseTokenTestCase):
     token_class = handshake.ClientToken
 
     def basicChecks(self, t, payload, check):
-        self.assertTrue(isinstance(t.payload, util.BufferedByteStream))
+        self.assertTrue(isinstance(t._payload, util.BufferedByteStream))
 
-        self.assertEquals(t.payload.getvalue(), payload)
+        self.assertEquals(t._payload.getvalue(), payload)
         self.assertEquals(len(payload), 1536)
         self.assertTrue(payload[:8], check)
 
     def test_defaults(self):
         t = self._generateToken()
 
-        self.assertEquals(t.payload, None)
+        self.assertEquals(t._payload, None)
         self.assertEquals(t.version, 0)
         self.assertEquals(t.uptime, 0)
 
@@ -216,8 +216,8 @@ class ServerTokenClassTestCase(TokenClassTestCase):
         t = self._generateToken()
         c = t.client
 
-        self.assertEquals(c.payload, None)
-        self.assertEquals(t.payload, None)
+        self.assertEquals(c._payload, None)
+        self.assertEquals(t._payload, None)
         e = self.assertRaises(handshake.HandshakeError, t.generatePayload)
         self.assertEquals(str(e), 'No digest available for an empty handshake')
 
@@ -227,7 +227,7 @@ class ServerTokenClassTestCase(TokenClassTestCase):
         t.getDigest = r
         c.generatePayload()
         t.generatePayload()
-        p = t.payload
+        p = t._payload
 
         self.assertTrue(isinstance(p, util.BufferedByteStream))
         self.assertEquals(p.tell(), 0)
@@ -237,24 +237,24 @@ class ServerTokenClassTestCase(TokenClassTestCase):
 
         t.generatePayload()
 
-        self.assertIdentical(p, t.payload)
+        self.assertIdentical(p, t._payload)
 
     def test_h264_payload(self):
         t = self._generateToken(version=versions.H264_MIN_FMS)
         c = t.client
         c.version = versions.H264_MIN_FLASH
 
-        c.payload = util.BufferedByteStream('\x00' * 8 + \
+        c._payload = util.BufferedByteStream('\x00' * 8 + \
             '\x01\x01\x01\x01' + '\x03' * 4 + '\x02' * 32 + '\x00' * (1536 - 48))
 
-        self.assertEquals(len(c.payload), 1536)
+        self.assertEquals(len(c._payload), 1536)
 
         t.generatePayload()
 
         self.assertNotEquals(c.getDigest(), None)
         self.assertNotEquals(t.getDigest(), None)
 
-        p = t.payload.getvalue()
+        p = t._payload.getvalue()
 
         self.assertEquals(len(p), 1536 * 2)
 
@@ -262,7 +262,7 @@ class ServerTokenClassTestCase(TokenClassTestCase):
         self.assertEquals(p[4:8], '\x03\x00\x01\x01')
         self.assertEquals(p[4:8], '\x03\x00\x01\x01')
         self.assertEquals(p[1536 - 64:1536],
-            handshake._digest(t.getDigest(), c.payload.getvalue()))
+            handshake._digest(t.getDigest(), c._payload.getvalue()))
 
     def test_str(self):
         t = self._generateToken(payload='hi', generate=True)
@@ -274,10 +274,10 @@ class ServerTokenClassTestCase(TokenClassTestCase):
         c = t.client
         c.version = versions.H264_MIN_FLASH
 
-        c.payload = util.BufferedByteStream('\x00' * 8 + \
+        c._payload = util.BufferedByteStream('\x00' * 8 + \
             '\x01\x01\x01\x01' + '\x03' * 4 + '\x02' * 32 + '\x00' * (1536 - 48))
 
-        self.assertEquals(len(c.payload), 1536)
+        self.assertEquals(len(c._payload), 1536)
 
         e = self.assertRaises(handshake.HandshakeError, t.generatePayload)
         self.assertEquals(str(e), 'Client not H.264 compatible')
@@ -298,7 +298,7 @@ class ServerTokenDigestTestCase(BaseTokenTestCase):
     def test_no_payload(self):
         t = self._generateToken()
 
-        self.assertEquals(t.payload, None)
+        self.assertEquals(t._payload, None)
         e = self.assertRaises(handshake.HandshakeError, t.getDigest)
         self.assertEquals(str(e),
             'No digest available for an empty handshake')
@@ -319,14 +319,14 @@ class ServerTokenDigestTestCase(BaseTokenTestCase):
         c.version = versions.H264_MIN_FLASH
 
         c.generatePayload()
-        t.payload = util.BufferedByteStream('hi')
+        t._payload = util.BufferedByteStream('hi')
 
         self.assertFalse(hasattr(t, '_digest'))
         d = t.getDigest()
         self.assertTrue(hasattr(t, '_digest'))
         self.assertEquals(d, t._digest)
 
-        t.payload = None
+        t._payload = None
         self.assertEquals(d, t.getDigest())
 
     def test_client_version(self):
@@ -344,9 +344,9 @@ class ServerTokenDigestTestCase(BaseTokenTestCase):
         c = t.client
         c.version = versions.H264_MIN_FLASH
 
-        c.payload = util.BufferedByteStream('\x00' * 8 + \
+        c._payload = util.BufferedByteStream('\x00' * 8 + \
             '\x01\x01\x01\x01' + ('\x02' * 4) + '\x00' * 32)
-        t.payload = util.BufferedByteStream('a')
+        t._payload = util.BufferedByteStream('a')
 
         self.assertEquals(t.getDigest(), 'LSL\xa3\x16(I-\x07\x82\xaf\xd3#' \
             '\xfa\xf9j]\x16\xd3NE\x0fc]u(\x0e\x8c\x93\t\xa6G')
@@ -420,10 +420,18 @@ class ClientHandshakeDecodingTestCase(unittest.TestCase):
     def test_no_data(self):
         f = handshake.decodeClientHandshake
 
-        self.assertRaises(EOStream, f, '')
-        self.assertRaises(IOError, f, 'a' * 5)
-        self.assertRaises(IOError, f, 'a' * 11)
-        self.assertRaises(IOError, f, 'a' * (1536 - 1))
+        e = self.assertRaises(handshake.HandshakeError, f, '')
+        self.assertEquals(str(e), 
+            'Not enough data to be able to decode a full client token')
+        e = self.assertRaises(handshake.HandshakeError, f, 'a' * 5)
+        self.assertEquals(str(e), 
+            'Not enough data to be able to decode a full client token')
+        e = self.assertRaises(handshake.HandshakeError, f, 'a' * 11)
+        self.assertEquals(str(e), 
+            'Not enough data to be able to decode a full client token')
+        e = self.assertRaises(handshake.HandshakeError, f, 'a' * (1536 - 1))
+        self.assertEquals(str(e), 
+            'Not enough data to be able to decode a full client token')
 
     def test_decode(self):
         d = '\x01\x02\x03\x04\x09\x08\x07\x06' + ('a' * (1536 - 8))
@@ -437,7 +445,7 @@ class ClientHandshakeDecodingTestCase(unittest.TestCase):
         self.assertEquals(t.version, 0x09080706)
         self.assertEquals(t.uptime, 0x1020304)
 
-        self.assertEquals(t.payload.getvalue(),
+        self.assertEquals(t._payload.getvalue(),
             '\x01\x02\x03\x04\x09\x08\x07\x06' + ('a' * (1536 - 8)))
 
 
@@ -456,10 +464,18 @@ class ServerHandshakeDecodingTestCase(unittest.TestCase):
     def test_no_data(self):
         f = handshake.decodeServerHandshake
 
-        self.assertRaises(EOStream, f, self.client, '')
-        self.assertRaises(IOError, f, self.client, 'a' * 5)
-        self.assertRaises(IOError, f, self.client, 'a' * 11)
-        self.assertRaises(IOError, f, self.client, 'a' * (1536 - 1))
+        e = self.assertRaises(handshake.HandshakeError, f, self.client, '')
+        self.assertEquals(str(e),
+            'Not enough data to be able to decode a full server token')
+        e = self.assertRaises(handshake.HandshakeError, f, self.client, 'a' * 5)
+        self.assertEquals(str(e),
+            'Not enough data to be able to decode a full server token')
+        e = self.assertRaises(handshake.HandshakeError, f, self.client, 'a' * 11)
+        self.assertEquals(str(e),
+            'Not enough data to be able to decode a full server token')
+        e = self.assertRaises(handshake.HandshakeError, f, self.client, 'a' * (1536 - 1))
+        self.assertEquals(str(e),
+            'Not enough data to be able to decode a full server token')
 
     def test_decode(self):
         d = '\x01\x02\x03\x04\x09\x08\x07\x06' + ('a' * (1536 - 8))
@@ -474,7 +490,7 @@ class ServerHandshakeDecodingTestCase(unittest.TestCase):
         self.assertEquals(t.version, 0x09080706)
         self.assertEquals(t.uptime, 0x1020304)
 
-        self.assertEquals(t.payload.getvalue(),
+        self.assertEquals(t._payload.getvalue(),
             '\x01\x02\x03\x04\x09\x08\x07\x06' + ('a' * (1536 - 8)))
 
 
@@ -526,7 +542,7 @@ class ServerNegotiatorTestCase(BaseNegotiatorTestCase):
 
     def test_start_defaults(self):
         self.assertFalse(hasattr(self.negotiator, 'header'))
-        self.assertFalse(hasattr(self.negotiator, 'received_header'))
+        self.assertFalse(hasattr(self.negotiator, 'receivedHeader'))
         self.assertEquals(self.negotiator.server, None)
         self.assertEquals(self.negotiator.client, None)
         self.assertFalse(self.negotiator.started)
@@ -538,13 +554,13 @@ class ServerNegotiatorTestCase(BaseNegotiatorTestCase):
         self.assertEquals(self.negotiator.uptime, None)
         self.assertEquals(self.negotiator.version, None)
         self.assertEquals(self.negotiator.header, None)
-        self.assertEquals(self.negotiator.received_header, None)
+        self.assertEquals(self.negotiator.receivedHeader, None)
         self.assertEquals(self.negotiator.buffer, '')
         self.assertTrue(self.negotiator.started)
 
     def test_start_args(self):
         self.assertFalse(hasattr(self.negotiator, 'header'))
-        self.assertFalse(hasattr(self.negotiator, 'received_header'))
+        self.assertFalse(hasattr(self.negotiator, 'receivedHeader'))
         self.assertEquals(self.negotiator.server, None)
         self.assertEquals(self.negotiator.client, None)
         self.assertFalse(self.negotiator.started)
@@ -556,7 +572,7 @@ class ServerNegotiatorTestCase(BaseNegotiatorTestCase):
         self.assertEquals(self.negotiator.uptime, 'foo')
         self.assertEquals(self.negotiator.version, 'bar')
         self.assertEquals(self.negotiator.header, None)
-        self.assertEquals(self.negotiator.received_header, None)
+        self.assertEquals(self.negotiator.receivedHeader, None)
         self.assertEquals(self.negotiator.buffer, '')
         self.assertTrue(self.negotiator.started)
 
@@ -598,7 +614,7 @@ class ServerNegotiatorTestCase(BaseNegotiatorTestCase):
         # h.264 compatible
         self.assertEquals(s.version, versions.H264_MIN_FMS)
         self.assertEquals(s.uptime, 0)
-        self.assertEquals(s.payload, None)
+        self.assertEquals(s._payload, None)
 
         # test version < h264 (should be 0)
         self.negotiator = self.klass(self.observer)
@@ -619,7 +635,7 @@ class ServerNegotiatorTestCase(BaseNegotiatorTestCase):
         self.assertIdentical(s.client, x)
         self.assertEquals(s.version, 0)
         self.assertEquals(s.uptime, 0)
-        self.assertEquals(s.payload, None)
+        self.assertEquals(s._payload, None)
 
         # test uptime
         self.negotiator = self.klass(self.observer)
@@ -639,7 +655,7 @@ class ServerNegotiatorTestCase(BaseNegotiatorTestCase):
         self.assertIdentical(s.client, x)
         self.assertEquals(s.version, versions.H264_MIN_FMS)
         self.assertEquals(s.uptime, 12345)
-        self.assertEquals(s.payload, None)
+        self.assertEquals(s._payload, None)
 
     def test_data(self):
         """
@@ -698,13 +714,13 @@ class ServerHandshakeNegotiationTestCase(unittest.TestCase):
         n = self.negotiator
         o = self.observer
 
-        self.assertEquals(n.received_header, None)
+        self.assertEquals(n.receivedHeader, None)
         self.assertEquals(n.buffer, '')
 
         n.dataReceived('')
 
         self.assertEquals(o.success, None)
-        self.assertEquals(n.received_header, None)
+        self.assertEquals(n.receivedHeader, None)
         self.assertEquals(n.buffer, '')
 
         self.assertEquals(n.client, None)
@@ -715,7 +731,7 @@ class ServerHandshakeNegotiationTestCase(unittest.TestCase):
         n = self.negotiator
         o = self.observer
 
-        self.assertEquals(n.received_header, None)
+        self.assertEquals(n.receivedHeader, None)
         self.assertEquals(n.buffer, '')
 
         n.dataReceived('f')
@@ -733,13 +749,13 @@ class ServerHandshakeNegotiationTestCase(unittest.TestCase):
         n = self.negotiator
         o = self.observer
 
-        self.assertEquals(n.received_header, None)
+        self.assertEquals(n.receivedHeader, None)
         self.assertEquals(n.buffer, '')
 
         n.dataReceived('\x03')
 
         self.assertEquals(o.success, None)
-        self.assertEquals(n.received_header, '\x03')
+        self.assertEquals(n.receivedHeader, '\x03')
         self.assertEquals(n.buffer, '')
 
         self.assertEquals(n.client, None)
@@ -750,13 +766,13 @@ class ServerHandshakeNegotiationTestCase(unittest.TestCase):
         n = self.negotiator
         o = self.observer
 
-        self.assertEquals(n.received_header, None)
+        self.assertEquals(n.receivedHeader, None)
         self.assertEquals(n.buffer, '')
 
         n.dataReceived('\x03' + 'a' * (handshake.HANDSHAKE_LENGTH - 1))
 
         self.assertEquals(o.success, None)
-        self.assertEquals(n.received_header, '\x03')
+        self.assertEquals(n.receivedHeader, '\x03')
         self.assertEquals(n.buffer, 'a' * (handshake.HANDSHAKE_LENGTH - 1))
 
         self.assertEquals(n.client, None)
@@ -770,7 +786,7 @@ class ServerHandshakeNegotiationTestCase(unittest.TestCase):
         n = self.negotiator
         o = self.observer
 
-        n.received_header = '\x03'
+        n.receivedHeader = '\x03'
 
         self.assertEquals(n.buffer, '')
 
@@ -790,7 +806,7 @@ class ServerHandshakeNegotiationTestCase(unittest.TestCase):
         n = self.negotiator
         o = self.observer
 
-        n.received_header = '\x03'
+        n.receivedHeader = '\x03'
         n.buffer = 'b' * 10
 
         n.dataReceived('a' * (handshake.HANDSHAKE_LENGTH - 11))
@@ -808,8 +824,8 @@ class ServerHandshakeNegotiationTestCase(unittest.TestCase):
         self.assertEquals(len(o.buffer), 1)
         d = o.buffer[0]
 
-        self.assertEquals(d[0], n.header, n.received_header)
-        self.assertEquals(d[1:], n.server_payload)
+        self.assertEquals(d[0], n.header, n.receivedHeader)
+        self.assertEquals(d[1:], n.serverPayload)
         self.assertTrue(o.success)
 
 
@@ -829,7 +845,7 @@ class ClientNegotiatorTestCase(BaseNegotiatorTestCase):
         o = self.observer
 
         self.assertFalse(hasattr(n, 'header'))
-        self.assertFalse(hasattr(n, 'received_header'))
+        self.assertFalse(hasattr(n, 'receivedHeader'))
         self.assertEquals(n.server, None)
         self.assertEquals(n.client, None)
         self.assertFalse(n.started)
@@ -841,7 +857,7 @@ class ClientNegotiatorTestCase(BaseNegotiatorTestCase):
         self.assertEquals(n.uptime, None)
         self.assertEquals(n.version, None)
         self.assertEquals(n.header, '\x03')
-        self.assertEquals(n.received_header, None)
+        self.assertEquals(n.receivedHeader, None)
         self.assertEquals(n.buffer, '')
         self.assertTrue(n.started)
 
@@ -849,14 +865,14 @@ class ClientNegotiatorTestCase(BaseNegotiatorTestCase):
         d = o.buffer[0]
 
         self.assertEquals(d[0], n.header)
-        self.assertEquals(d[1:], n.client_payload)
+        self.assertEquals(d[1:], n.clientPayload)
 
     def test_start_args(self):
         n = self.negotiator
         o = self.observer
 
         self.assertFalse(hasattr(n, 'header'))
-        self.assertFalse(hasattr(n, 'received_header'))
+        self.assertFalse(hasattr(n, 'receivedHeader'))
         self.assertEquals(n.server, None)
         self.assertEquals(n.client, None)
         self.assertFalse(n.started)
@@ -868,7 +884,7 @@ class ClientNegotiatorTestCase(BaseNegotiatorTestCase):
         self.assertEquals(n.uptime, 4321)
         self.assertEquals(n.version, 1234)
         self.assertEquals(n.header, '\x03')
-        self.assertEquals(n.received_header, None)
+        self.assertEquals(n.receivedHeader, None)
         self.assertEquals(n.buffer, '')
         self.assertTrue(n.started)
 
@@ -876,7 +892,7 @@ class ClientNegotiatorTestCase(BaseNegotiatorTestCase):
         d = o.buffer[0]
 
         self.assertEquals(d[0], n.header)
-        self.assertEquals(d[1:], n.client_payload)
+        self.assertEquals(d[1:], n.clientPayload)
 
     def test_generateToken(self):
         e = self.assertRaises(
@@ -897,7 +913,7 @@ class ClientNegotiatorTestCase(BaseNegotiatorTestCase):
         # h.264 compatible
         self.assertEquals(c.version, versions.H264_MIN_FLASH)
         self.assertEquals(c.uptime, 0)
-        self.assertEquals(c.payload, None)
+        self.assertEquals(c._payload, None)
         self.assertEquals(c.context, None)
 
         # test version < h264 (should be 0)
@@ -916,7 +932,7 @@ class ClientNegotiatorTestCase(BaseNegotiatorTestCase):
         self.assertEquals(c.__class__, handshake.ClientToken)
         self.assertEquals(c.version, 0)
         self.assertEquals(c.uptime, 0)
-        self.assertEquals(c.payload, None)
+        self.assertEquals(c._payload, None)
 
         # test uptime
         self.negotiator = self.klass(self.observer)
@@ -931,7 +947,7 @@ class ClientNegotiatorTestCase(BaseNegotiatorTestCase):
         self.assertEquals(c.__class__, handshake.ClientToken)
         self.assertEquals(c.version, versions.H264_MIN_FLASH)
         self.assertEquals(c.uptime, 12345)
-        self.assertEquals(c.payload, None)
+        self.assertEquals(c._payload, None)
 
     def test_data(self):
         """
@@ -995,13 +1011,13 @@ class ClientHandshakeNegotiationTestCase(unittest.TestCase):
         n = self.negotiator
         o = self.observer
 
-        self.assertEquals(n.received_header, None)
+        self.assertEquals(n.receivedHeader, None)
         self.assertEquals(n.buffer, '')
 
         n.dataReceived('')
 
         self.assertEquals(o.success, None)
-        self.assertEquals(n.received_header, None)
+        self.assertEquals(n.receivedHeader, None)
         self.assertEquals(n.buffer, '')
 
         self.assertNotEquals(n.client, None)
@@ -1012,7 +1028,7 @@ class ClientHandshakeNegotiationTestCase(unittest.TestCase):
         n = self.negotiator
         o = self.observer
 
-        self.assertEquals(n.received_header, None)
+        self.assertEquals(n.receivedHeader, None)
         self.assertEquals(n.buffer, '')
 
         n.dataReceived('f')
@@ -1031,13 +1047,13 @@ class ClientHandshakeNegotiationTestCase(unittest.TestCase):
         n = self.negotiator
         o = self.observer
 
-        self.assertEquals(n.received_header, None)
+        self.assertEquals(n.receivedHeader, None)
         self.assertEquals(n.buffer, '')
 
         n.dataReceived('\x03')
 
         self.assertEquals(o.success, None)
-        self.assertEquals(n.received_header, '\x03')
+        self.assertEquals(n.receivedHeader, '\x03')
         self.assertEquals(n.buffer, '')
 
         self.assertNotEquals(n.client, None)
@@ -1048,13 +1064,13 @@ class ClientHandshakeNegotiationTestCase(unittest.TestCase):
         n = self.negotiator
         o = self.observer
 
-        self.assertEquals(n.received_header, None)
+        self.assertEquals(n.receivedHeader, None)
         self.assertEquals(n.buffer, '')
 
         n.dataReceived('\x03' + 'a' * (handshake.HANDSHAKE_LENGTH - 1))
 
         self.assertEquals(o.success, None)
-        self.assertEquals(n.received_header, '\x03')
+        self.assertEquals(n.receivedHeader, '\x03')
         self.assertEquals(n.buffer, 'a' * (handshake.HANDSHAKE_LENGTH - 1))
 
         self.assertNotEquals(n.client, None)
@@ -1068,7 +1084,7 @@ class ClientHandshakeNegotiationTestCase(unittest.TestCase):
         n = self.negotiator
         o = self.observer
 
-        n.received_header = '\x03'
+        n.receivedHeader = '\x03'
 
         self.assertEquals(n.buffer, '')
 
@@ -1092,7 +1108,7 @@ class ClientHandshakeNegotiationTestCase(unittest.TestCase):
         n = self.negotiator
         o = self.observer
 
-        n.received_header = '\x03'
+        n.receivedHeader = '\x03'
         n.server = handshake.ServerToken(n.client, version=versions.H264_MIN_FMS)
 
         self.assertEquals(n.buffer, '')
@@ -1109,7 +1125,7 @@ class ClientHandshakeNegotiationTestCase(unittest.TestCase):
         n = self.negotiator
         o = self.observer
 
-        n.received_header = '\x03'
+        n.receivedHeader = '\x03'
         n.server = handshake.ServerToken(n.client)
 
         d = 'a' * 1536
