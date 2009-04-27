@@ -11,6 +11,49 @@ from rtmpy.rtmp import interfaces
 from rtmpy.rtmp import handshake
 
 
+class ChannelManager(object):
+    """
+    Mock for L{interfaces.IChannelManager}
+    """
+
+    implements(interfaces.IChannelManager)
+
+    def __init__(self, channels=None):
+        if channels is not None:
+            self.channels = channels
+        else:
+            self.channels = {}
+
+        self.frameSize = 128
+
+        self.complete = []
+        self.initialised = []
+
+    def getChannel(self, id):
+        try:
+            return self.channels[id]
+        except KeyError:
+            channel = self.channels[id] = Channel()
+            channel.registerManager(self)
+            channel.reset()
+
+        return self.channels[id]
+
+    def channelComplete(self, channel):
+        self.complete.append(channel)
+
+    def initialiseChannel(self, channel):
+        self.initialised.append(channel)
+
+        channel.reset()
+
+    def setFrameSize(self, size):
+        self.frameSize = size
+
+        for channel in self.channels.values():
+            channel.frameRemaining = size
+
+
 class Channel(object):
     """
     Mock for L{interfaces.IChannel}
