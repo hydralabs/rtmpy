@@ -206,6 +206,7 @@ class DecodingTestCase(BaseDecoderTestCase):
     def _createMockChannel(self, channelId):
         channel = self.decoder.channels[channelId] = mocks.Channel()
         channel.registerManager(self.decoder)
+        channel.reset()
 
         return channel
 
@@ -297,6 +298,8 @@ class DecodingTestCase(BaseDecoderTestCase):
         return self.deferred.addCallback(cb)
 
     def test_singleHeaderFullBody(self):
+        self.decoder.createChannel = self._createMockChannel
+
         # a full header channelId 3, datatype 2, bodyLength 50, streamId 1, timestamp 10
         self.buffer.write('\x03\x00\x00\n\x00\x002\x02\x01\x00\x00\x00')
         # complete the frame
@@ -319,8 +322,6 @@ class DecodingTestCase(BaseDecoderTestCase):
             self.assertEquals(h.timestamp, 10)
 
             self.assertEquals(c.buffer, 'a' * 50)
-
-            self.assertEquals(self.decoder.currentChannel, None)
 
         return self.deferred.addCallback(cb)
 

@@ -521,7 +521,7 @@ class Decoder(BaseCodec):
 
         self.currentChannel.dataReceived(self.buffer.read(available))
 
-        if self.currentChannel.frames != frames:
+        if self.currentChannel and self.currentChannel.frames != frames:
             # a complete frame was read from the stream which means a new
             # header and frame body will be next in the stream
             self.currentChannel = None
