@@ -52,6 +52,24 @@ class BaseCodecTestCase(unittest.TestCase):
         self.assertEquals(c.deferred, None)
         self.assertTrue(isinstance(c.buffer, util.BufferedByteStream))
         self.assertTrue(isinstance(c.job, task.LoopingCall))
+        self.assertEquals(c.observer, None)
+
+    def test_registerObserver(self):
+        c = codec.BaseCodec()
+
+        self.assertEquals(c.observer, None)
+
+        e = self.assertRaises(TypeError, c.registerObserver, object())
+        self.assertEquals(str(e),
+            "Expected ICodecObserver for observer (got <type 'object'>)")
+        self.assertEquals(c.observer, None)
+
+        self.assertTrue(interfaces.ICodecObserver.implementedBy(mocks.CodecObserver))
+
+        m = mocks.CodecObserver()
+        c.registerObserver(m)
+
+        self.assertIdentical(m, c.observer)
 
     def test_destroy_not_running(self):
         c = codec.BaseCodec()
@@ -244,6 +262,21 @@ class ChannelManagerTestCase(unittest.TestCase):
         c.channelComplete(channel)
 
         self.assertEquals(c.channels, {})
+
+        # test bodyComplete
+        c = codec.BaseCodec()
+
+        channel = mocks.Channel()
+        header = mocks.Header(channelId=10, relative=False)
+
+        o = channel.observer = mocks.ChannelObserver()
+
+        channel.setHeader(header)
+        c.channels = {10: channel}
+
+        c.channelComplete(channel)
+
+        self.assertEquals(o.events, [('body-complete',)])
 
     def test_initialiseChannel(self):
         channel = mocks.Channel()

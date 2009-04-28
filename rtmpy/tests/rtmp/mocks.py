@@ -11,6 +11,23 @@ from rtmpy.rtmp import interfaces
 from rtmpy.rtmp import handshake
 
 
+class CodecObserver(object):
+    """
+    Mock for L{interfaces.ICodecObserver}
+    """
+
+    implements(interfaces.ICodecObserver)
+
+    def __init__(self, channels=None):
+        if channels is not None:
+            self.channels = channels
+        else:
+            self.channels = []
+
+    def channelStart(self, channel):
+        self.channels.append(channel)
+
+
 class ChannelManager(object):
     """
     Mock for L{interfaces.IChannelManager}
@@ -64,6 +81,7 @@ class Channel(object):
     def __init__(self):
         self.header = None
         self.has_reset = False
+        self.observer = None
 
     def registerManager(self, manager):
         self.manager = manager

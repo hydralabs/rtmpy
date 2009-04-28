@@ -306,6 +306,7 @@ class BaseCodec(object):
 
     def __init__(self):
         self.channels = {}
+        self.observer = None
         self.deferred = None
         self.frameSize = FRAME_SIZE
 
@@ -317,6 +318,20 @@ class BaseCodec(object):
     def __del__(self):
         if hasattr(self, 'job') and self.job.running:
             self.job.stop()
+
+    def registerObserver(self, observer):
+        """
+        Registers an observer on this codec to allow channel/stream events to
+        propagate.
+
+        @param observer: The observer to be registered.
+        @type observer: L{interfaces.ICodecObserver}
+        """
+        if not interfaces.ICodecObserver.providedBy(observer):
+            raise TypeError('Expected ICodecObserver for observer ' \
+                '(got %s)' % (type(observer),))
+
+        self.observer = observer
 
     def getJob(self):
         """
@@ -423,6 +438,9 @@ class BaseCodec(object):
 
         del self.channels[header.channelId]
 
+        if channel.observer:
+            channel.observer.bodyComplete()
+
     def initialiseChannel(self, channel):
         """
         Called when a header has been applied to an inactive channel.
@@ -432,6 +450,14 @@ class BaseCodec(object):
                 "registered to this manager")
 
         channel.reset()
+
+        # we give the codec's observer a chance to decide to handle the
+        # channel data - this is especially important for video/audio data
+        # which means we can 'stream' it rather than buffering until the
+        # channel is complete - which would be crazy for large streams
+
+        if self.observer:
+            self.observer.channelReset(channel)
 
     def setFrameSize(self, size):
         self.frameSize = size

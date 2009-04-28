@@ -281,3 +281,17 @@ class IEvent(Interface):
         @param bbs: A stream object to read from.
         @type bbs: L{rtmpy.util.BufferedByteStream}
         """
+
+
+class ICodecObserver(Interface):
+    """
+    An object that observes RTMP codec events.
+    """
+
+    def channelStart(channel):
+        """
+        Called when a new channel has been started to be decoded.
+
+        @param channel: The channel that has been reset.
+        @type channel: L{IChannel}
+        """
