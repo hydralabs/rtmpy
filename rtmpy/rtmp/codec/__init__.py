@@ -419,7 +419,9 @@ class BaseCodec(object):
         """
         Called when the body of the channel has been satisfied.
         """
-        # more here
+        header = channel.getHeader()
+
+        del self.channels[header.channelId]
 
     def initialiseChannel(self, channel):
         """

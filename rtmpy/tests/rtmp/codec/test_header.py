@@ -13,6 +13,65 @@ from rtmpy import util, rtmp
 from rtmpy.tests.rtmp import mocks
 
 
+class HeaderTestCase(unittest.TestCase):
+    """
+    Tests for L{rtmp.Header}
+    """
+
+    def test_interface(self):
+        h = header.Header()
+
+        self.assertTrue(interfaces.IHeader.providedBy(h))
+
+    def test_init(self):
+        h = header.Header()
+
+        self.assertEquals(h.__dict__, {
+            'channelId': None,
+            'timestamp': None,
+            'datatype': None,
+            'bodyLength': None,
+            'streamId': None,
+            'relative': None
+        })
+
+    def test_kwargs(self):
+        d = {
+            'channelId': 1,
+            'timestamp': 50,
+            'datatype': 20,
+            'bodyLength': 2000,
+            'streamId': 98,
+            'relative': False
+        }
+
+        h = header.Header(**d)
+
+        self.assertEquals(h.__dict__, d)
+
+    def test_repr(self):
+        h = header.Header()
+
+        self.assertEquals(repr(h), '<rtmpy.rtmp.codec.header.Header '
+            'datatype=None timestamp=None bodyLength=None channelId=None '
+            'relative=None streamId=None at 0x%x>' % (id(h),))
+
+        d = {
+            'channelId': 1,
+            'timestamp': 50,
+            'datatype': 20,
+            'bodyLength': 2000,
+            'streamId': 98,
+            'relative': False
+        }
+
+        h = header.Header(**d)
+
+        self.assertEquals(repr(h), '<rtmpy.rtmp.codec.header.Header '
+            'datatype=20 timestamp=50 bodyLength=2000 channelId=1 '
+            'relative=False streamId=98 at 0x%x>' % (id(h),))
+
+
 class DecodeHeaderByteTestCase(unittest.TestCase):
     """
     Tests for L{header.decodeHeaderByte}

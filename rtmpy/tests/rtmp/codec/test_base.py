@@ -233,8 +233,17 @@ class ChannelManagerTestCase(unittest.TestCase):
         self.assertEquals(c.getNextAvailableChannelId(), codec.MAX_CHANNELS - 1)
 
     def test_channelComplete(self):
-        # TODO: complete me
-        pass
+        c = codec.BaseCodec()
+
+        channel = mocks.Channel()
+        header = mocks.Header(channelId=3, relative=False)
+
+        channel.setHeader(header)
+        c.channels = {3: channel}
+
+        c.channelComplete(channel)
+
+        self.assertEquals(c.channels, {})
 
     def test_initialiseChannel(self):
         channel = mocks.Channel()
