@@ -295,6 +295,17 @@ class ChannelManagerTestCase(unittest.TestCase):
 
         self.assertTrue(channel.has_reset)
 
+        # test the codec observer
+
+        c = codec.BaseCodec()
+        o = c.observer = mocks.CodecObserver()
+        channel = mocks.Channel()
+
+        channel.manager = c
+        c.initialiseChannel(channel)
+
+        self.assertEquals(o.events, [('channel-start', channel)])
+
     def test_setFrameSize(self):
         c = codec.BaseCodec()
         self.assertNotEquals(c.frameSize, 100)

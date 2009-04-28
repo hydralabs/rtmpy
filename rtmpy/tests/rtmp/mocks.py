@@ -18,14 +18,11 @@ class CodecObserver(object):
 
     implements(interfaces.ICodecObserver)
 
-    def __init__(self, channels=None):
-        if channels is not None:
-            self.channels = channels
-        else:
-            self.channels = []
+    def __init__(self):
+        self.events = []
 
     def channelStart(self, channel):
-        self.channels.append(channel)
+        self.events.append(('channel-start', channel))
 
 
 class ChannelManager(object):

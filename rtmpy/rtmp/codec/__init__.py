@@ -457,7 +457,7 @@ class BaseCodec(object):
         # channel is complete - which would be crazy for large streams
 
         if self.observer:
-            self.observer.channelReset(channel)
+            self.observer.channelStart(channel)
 
     def setFrameSize(self, size):
         self.frameSize = size
