@@ -91,11 +91,16 @@ class BaseProtocol(protocol.Protocol):
 
         Cleans up any timeouts/buffer etc.
         """
+        protocol.Protocol.connectionLost(self, reason)
+
         if self.debug or DEBUG:
             log(self, "Lost connection (reason:%s)" % str(reason))
 
-        self.decoder.pause()
-        self.encoder.pause()
+        if self.decoder:
+            self.decoder.pause()
+
+        if self.encoder:
+            self.encoder.pause()
 
     def decodeHandshake(self, data):
         """
@@ -124,6 +129,10 @@ class BaseProtocol(protocol.Protocol):
             self.decodeStream(data)
         elif self.state is BaseProtocol.HANDSHAKE:
             self.decodeHandshake(data)
+        else:
+            self.transport.loseConnection()
+
+            raise RuntimeError('Unknown state %r' % (self.state,))
 
     # interfaces.IHandshakeObserver
 
