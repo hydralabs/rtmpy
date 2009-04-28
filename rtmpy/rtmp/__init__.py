@@ -57,7 +57,7 @@ class BaseProtocol(protocol.Protocol):
     @type encrypted: C{bool}
     """
 
-    implements(interfaces.IHandshakeObserver)
+    implements(interfaces.IHandshakeObserver, interfaces.ICodecObserver)
 
     HANDSHAKE = 'handshake'
     STREAM = 'stream'
@@ -65,6 +65,9 @@ class BaseProtocol(protocol.Protocol):
     def __init__(self):
         self.encrypted = False
         self.debug = DEBUG
+
+        self.decoder = None
+        self.encoder = None
 
     def buildHandshakeNegotiator(self):
         """
@@ -91,11 +94,8 @@ class BaseProtocol(protocol.Protocol):
         if self.debug or DEBUG:
             log(self, "Lost connection (reason:%s)" % str(reason))
 
-        if hasattr(self, 'decoder'):
-            self.decoder.pause()
-
-        if hasattr(self, 'encoder'):
-            self.encoder.pause()
+        self.decoder.pause()
+        self.encoder.pause()
 
     def decodeHandshake(self, data):
         """
@@ -139,9 +139,12 @@ class BaseProtocol(protocol.Protocol):
 
         self.state = self.STREAM
 
-        self.decoder = codec.Decoder(self)
-        self.encoder = codec.Encoder(self)
+        self.decoder = codec.Decoder()
+        self.encoder = codec.Encoder()
 
+        # we only need to register for events on the decoder - the encoder
+        # takes care of itself (at least so far)
+        self.decoder.registerObserver(self)
         self.encoder.registerConsumer(self.transport)
 
         # TODO slot in support for RTMPE
@@ -160,6 +163,16 @@ class BaseProtocol(protocol.Protocol):
         """
         """
         self.transport.write(data)
+
+    # interfaces.ICodecObserver
+
+    def channelStart(self, channel):
+        """
+        Called when a channel has started to be decoded.
+        """
+        header = channel.getHeader()
+
+        print header.dataType
 
 
 class ClientProtocol(BaseProtocol):
