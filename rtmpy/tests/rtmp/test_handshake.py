@@ -740,7 +740,7 @@ class ServerHandshakeNegotiationTestCase(unittest.TestCase):
 
         try:
             r = o.reason.raiseException()
-        except handshake.HeaderError, e:
+        except handshake.HandshakeError, e:
             self.assertEquals(str(e), "Unknown header byte 'f'")
         except:
             self.fail('Unexpected error')
@@ -1037,7 +1037,7 @@ class ClientHandshakeNegotiationTestCase(unittest.TestCase):
 
         try:
             r = o.reason.raiseException()
-        except handshake.HeaderError, e:
+        except handshake.HandshakeError, e:
             self.assertEquals(str(e),
                 "Unknown header byte 'f'")
         except:
@@ -1140,7 +1140,7 @@ class ClientHandshakeNegotiationTestCase(unittest.TestCase):
 
         try:
             r = o.reason.raiseException()
-        except handshake.HandshakeVerificationError, e:
+        except handshake.VerificationError, e:
             self.assertEquals(str(e), '')
         except:
             self.fail('Unexpected error')

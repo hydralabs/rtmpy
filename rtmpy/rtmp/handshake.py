@@ -38,19 +38,13 @@ class HandshakeError(rtmp.BaseError):
     """
 
 
-class HeaderError(HandshakeError):
-    """
-    Raised if there is an error with the handshake header.
-    """
-
-
-class HeaderMismatch(HeaderError):
+class HeaderMismatch(HandshakeError):
     """
     Raised if the RTMP header bytes mismatch.
     """
 
 
-class HandshakeVerificationError(HandshakeError):
+class VerificationError(HandshakeError):
     """
     Raised if the handshake verification failed.
     """
@@ -346,7 +340,7 @@ class ClientNegotiator(BaseNegotiator):
                 rtmp.log(self, 'Received header = %r' % (self.receivedHeader,))
 
             if self.receivedHeader not in HEADER_BYTES:
-                raise HeaderError(
+                raise HandshakeError(
                     'Unknown header byte %r' % (self.receivedHeader,))
 
             if self.header != self.receivedHeader:
@@ -382,7 +376,7 @@ class ClientNegotiator(BaseNegotiator):
                 rtmp.log(self, 'Received data = (len:%d) %r' % (
                     len(data[:HANDSHAKE_LENGTH]), data[:HANDSHAKE_LENGTH],))
 
-            raise HandshakeVerificationError()
+            raise VerificationError()
 
         # if we get here then a successful handshake has been negotiated.
         # inform the observer accordingly
@@ -463,7 +457,7 @@ class ServerNegotiator(BaseNegotiator):
                 rtmp.log(self, 'Received header = %r' % (self.receivedHeader,))
 
             if self.receivedHeader not in HEADER_BYTES:
-                raise HeaderError(
+                raise HandshakeError(
                     'Unknown header byte %r' % (self.receivedHeader,))
 
             data = data[1:]

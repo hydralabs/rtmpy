@@ -102,7 +102,8 @@ def encodeHeaderByte(headerLength, channelId):
             headerLength,))
 
     if channelId > 0x3f or channelId < 0:
-        raise HeaderError('Expected channelId between 0x00 and 0x3f')
+        raise HeaderError('Expected channelId between 0x00 and 0x3f '
+            '(got %d)' % (channelId,))
 
     return (index << 6) | channelId
 

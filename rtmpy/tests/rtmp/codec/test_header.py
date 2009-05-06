@@ -125,10 +125,12 @@ class EncodeHeaderByteTestCase(unittest.TestCase):
 
         e = self.assertRaises(header.HeaderError,
             header.encodeHeaderByte, 1, -1)
-        self.assertEquals(str(e), 'Expected channelId between 0x00 and 0x3f')
+        self.assertEquals(str(e),
+            'Expected channelId between 0x00 and 0x3f (got -1)')
         e = self.assertRaises(header.HeaderError,
             header.encodeHeaderByte, 1, 0x40)
-        self.assertEquals(str(e), 'Expected channelId between 0x00 and 0x3f')
+        self.assertEquals(str(e),
+            'Expected channelId between 0x00 and 0x3f (got 64)')
 
     def test_return(self):
         self.assertEquals(header.encodeHeaderByte(12, 0), 0)
