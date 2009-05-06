@@ -7,14 +7,15 @@
 .. contents::
 
 
-Pre-requisites
+Prerequisites
 ----------------
 
-The following software packages are pre-requisites:
+The following software packages are prerequisites:
 
 - **Python** 2.3 or newer
 - **Twisted** 2.5 or newer
-- **PyAMF** 0.4.1 or newer
+- **PyAMF** 0.5 or newer
+- **zope.interface** 3.3.0 or newer
 - **PyWin32** b210 or newer (for Windows only)
 
 Installing
@@ -27,9 +28,9 @@ Installing
     $ python setup.py build
     $ python setup.py install
 
-If you have installed setuptools you can also optionally run tests like this:
+You can also optionally run tests like this:
 
 ::
 
-    $ python setup.py test
+    $ trial rtmpy
 
