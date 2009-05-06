@@ -132,8 +132,8 @@ class ClientToken(Token):
     def getDigest(self):
         """
         Returns an SHA-256 HMAC based on the payload. If the L{version} of
-        this token is less than L{versions.H264_MIN_FLASH} then
-        C{None} will be returned.
+        this token is less than L{versions.H264_MIN_FLASH} then C{None} will
+        be returned.
 
         @rtype: C{str} or C{None}
         @raise HandshakeError: No payload exists
@@ -200,7 +200,7 @@ class ServerToken(Token):
         digest = self.getDigest()
 
         if digest is None:
-            raise HandshakeError('Client not H.264 compatible')
+            digest = generateBytes(SHA256_DIGEST_LENGTH)
 
         client = self.client.encode()
         self._payload.seek(0, 2)
@@ -344,7 +344,7 @@ class ClientNegotiator(BaseNegotiator):
                     'Unknown header byte %r' % (self.receivedHeader,))
 
             if self.header != self.receivedHeader:
-                raise HeaderMismatch('My header = %r, received header = %r' % (
+                raise HeaderMismatch('My header %r, received header %r' % (
                     self.header, self.receivedHeader))
 
             data = data[1:]
@@ -409,7 +409,9 @@ class ServerNegotiator(BaseNegotiator):
 
         @param uptime: The number of milliseconds since the system booted.
             See L{Token.uptime}.
+        @type uptime: C{int} or C{None}
         @param version: The version of the connecting client.
+        @type version: C{int} or C{rtmpy.versions.Version} or C{None}
         """
         self.uptime = uptime
         self.version = version
@@ -422,12 +424,12 @@ class ServerNegotiator(BaseNegotiator):
         Generate a server handshake token.
         """
         if not self.started:
-            raise HandshakeError('`start` must be called before generating ' \
-                'server token')
+            raise HandshakeError(
+                '`start` must be called before generating server token')
 
         if self.client is None:
-            raise HandshakeError('client token is required before ' \
-                'generating server token')
+            raise HandshakeError(
+                'client token is required before generating server token')
 
         uptime = self.uptime
         version = self.version
@@ -467,26 +469,36 @@ class ServerNegotiator(BaseNegotiator):
 
             return
 
-        if len(data) > HANDSHAKE_LENGTH:
-            raise HandshakeError(
-                'Unexpected trailing data in client handshake')
+        if self.client is None:
+            if len(data) > HANDSHAKE_LENGTH:
+                raise HandshakeError(
+                    'Unexpected trailing data in client handshake')
 
-        self.client = decodeClientHandshake(data)
+            self.client = decodeClientHandshake(data)
 
-        if self.debug or rtmp.DEBUG:
-            rtmp.log(self, 'Decoded client token = %r' % (self.client,))
+            if self.debug or rtmp.DEBUG:
+                rtmp.log(self, 'Decoded client token = %r' % (self.client,))
 
-        self.generateToken()
-        self.header = getHeader(self.client)
-        self.serverPayload = self.server.encode()
+            self.generateToken()
+            self.header = getHeader(self.client)
+            self.serverPayload = self.server.encode()
 
-        if self.debug or rtmp.DEBUG:
-            rtmp.log(self, 'Server token = %r' % (self.server,))
+            if self.debug or rtmp.DEBUG:
+                rtmp.log(self, 'Server token = %r' % (self.server,))
 
-        self.observer.write(self.header + self.serverPayload)
+            self.observer.write(self.header + self.serverPayload)
 
+            data = ''
+
+        if len(data) < HANDSHAKE_LENGTH:
+            self.buffer = data
+
+            return
+
+        self.buffer = data[HANDSHAKE_LENGTH:]
         # at this point, as far as the server is concerned, handshaking has
         # been successful
+
         self.observer.handshakeSuccess()
 
     def dataReceived(self, data):

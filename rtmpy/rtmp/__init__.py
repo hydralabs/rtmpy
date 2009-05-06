@@ -118,6 +118,7 @@ class BaseProtocol(protocol.Protocol):
     def logAndDisconnect(self, failure=None):
         if self.debug or DEBUG:
             log(self, 'error %r' % (failure,))
+            log(self, failure.getBriefTraceback())
 
         self.transport.loseConnection()
 
@@ -156,6 +157,8 @@ class BaseProtocol(protocol.Protocol):
         self.decoder.registerObserver(self)
         self.encoder.registerConsumer(self.transport)
 
+        del self.handshaker
+
         # TODO slot in support for RTMPE
 
     def handshakeFailure(self, reason):
@@ -181,16 +184,17 @@ class BaseProtocol(protocol.Protocol):
         """
         header = channel.getHeader()
 
-        print header.dataType
-
 
 class ClientProtocol(BaseProtocol):
     """
-    A client woot!
+    A very basic RTMP protocol that will act like a client.
     """
 
     def buildHandshakeNegotiator(self):
         """
+        Generate a client handshake negotiator.
+
+        @rtype: L{handshake.ClientNegotiator}
         """
         from rtmpy.rtmp import handshake
 
@@ -198,14 +202,17 @@ class ClientProtocol(BaseProtocol):
 
     def connectionMade(self):
         """
+        Called when a connection is made to the RTMP server. Will begin
+        handshake negotiations.
         """
         BaseProtocol.connectionMade(self)
 
-        self.handshaker.start(version=0)
+        self.handshaker.start()
 
 
 class ClientFactory(protocol.ClientFactory):
     """
+    A helper class to provide a L{ClientProtocol} factory.
     """
 
     protocol = ClientProtocol
@@ -213,11 +220,14 @@ class ClientFactory(protocol.ClientFactory):
 
 class ServerProtocol(BaseProtocol):
     """
-    A server woot!
+    A very basic RTMP protocol that will act like a server.
     """
 
     def buildHandshakeNegotiator(self):
         """
+        Generate a server handshake negotiator.
+
+        @rtype: L{handshake.ServerNegotiator}
         """
         from rtmpy.rtmp import handshake
 
@@ -225,14 +235,29 @@ class ServerProtocol(BaseProtocol):
 
     def connectionMade(self):
         """
+        Called when a connection is made to the RTMP server. Will begin
+        handshake negotiations.
         """
         BaseProtocol.connectionMade(self)
 
         self.handshaker.start(version=0)
 
+    def handshakeSuccess(self):
+        """
+        Called when the handshake has been successfully negotiated. If there
+        is any data in the negotiator buffer it will be re-inserted into the
+        main RTMP stream (as any data after the handshake must be RTMP).
+        """
+        b = self.handshaker.buffer
+        BaseProtocol.handshakeSuccess(self)
+
+        if len(b) > 0:
+            self.dataReceived(b)
+
 
 class ServerFactory(protocol.Factory):
     """
+    A helper class to provide a L{ServerProtocol} factory.
     """
 
     protocol = ServerProtocol

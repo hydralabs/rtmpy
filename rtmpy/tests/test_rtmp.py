@@ -10,7 +10,7 @@ from twisted.internet import protocol
 from twisted.test.proto_helpers import StringTransportWithDisconnection
 
 from rtmpy import rtmp
-from rtmpy.rtmp import interfaces, codec
+from rtmpy.rtmp import interfaces, codec, handshake
 
 
 class Pausable(object):
@@ -205,6 +205,8 @@ class BaseProtocolTestCase(unittest.TestCase):
         self.assertEquals(p.encoder, None)
         self.assertFalse(hasattr(p, 'state'))
 
+        p.handshaker = 'foo'
+
         p.handshakeSuccess()
 
         d = p.decoder
@@ -216,6 +218,8 @@ class BaseProtocolTestCase(unittest.TestCase):
         self.assertIdentical(e.consumer, p.transport)
 
         self.assertEquals(p.state, 'stream')
+
+        self.assertFalse(hasattr(p, 'handshaker'))
 
     def test_handshakeFailure(self):
         p = rtmp.BaseProtocol()
@@ -236,3 +240,71 @@ class BaseProtocolTestCase(unittest.TestCase):
         p.write('foo')
 
         self.assertEquals(p.transport.io.getvalue(), 'foo')
+
+
+class ClientProtocolTestCase(unittest.TestCase):
+    """
+    Tests for L{rtmp.ClientProtocol}
+    """
+
+    def test_handshake_negotiator(self):
+        p = rtmp.ClientProtocol()
+        n = p.buildHandshakeNegotiator()
+
+        self.assertTrue(isinstance(n, handshake.ClientNegotiator))
+        self.assertFalse(n.started)
+        self.assertIdentical(n.observer, p)
+
+    def test_connection(self):
+        p = rtmp.ClientProtocol()
+        p.transport = StringTransportWithDisconnection()
+        p.transport.protocol = p
+
+        p.handshaker = handshake.ClientNegotiator(p)
+        p.connectionMade()
+
+        self.assertTrue(p.handshaker.started)
+
+
+class ServerProtocolTestCase(unittest.TestCase):
+    """
+    Tests for L{rtmp.ServerProtocol}
+    """
+
+    def test_handshake_negotiator(self):
+        p = rtmp.ServerProtocol()
+        n = p.buildHandshakeNegotiator()
+
+        self.assertTrue(isinstance(n, handshake.ServerNegotiator))
+        self.assertFalse(n.started)
+        self.assertIdentical(n.observer, p)
+
+    def test_connection(self):
+        p = rtmp.ServerProtocol()
+        p.transport = StringTransportWithDisconnection()
+        p.transport.protocol = p
+
+        p.handshaker = handshake.ServerNegotiator(p)
+        p.connectionMade()
+
+        self.assertTrue(p.handshaker.started)
+
+    def test_handshake_overflow(self):
+        class SimpleBuffer(object):
+            def __init__(self):
+                self.buffer = None
+
+        p = rtmp.ServerProtocol()
+
+        p.handshaker = SimpleBuffer()
+        p.handshaker.buffer = 'foo'
+        self.executed = False
+
+        def dataReceived(data):
+            self.assertEquals(data, 'foo')
+            self.executed = True
+
+        p.dataReceived = dataReceived
+        p.handshakeSuccess()
+
+        self.assertTrue(self.executed)

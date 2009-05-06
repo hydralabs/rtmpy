@@ -139,8 +139,8 @@ class ClientTokenClassTestCase(TokenClassTestCase):
 
         t = self.token_class(version=versions.H264_MIN_FLASH)
         # magic offset = 4
-        t._payload = util.BufferedByteStream('\x00' * 8 + \
-            '\x01' * 4 + '\x02' * 4 + '\x00' * 32)
+        t._payload = util.BufferedByteStream(
+            '\x00' * 8 + '\x01' * 4 + '\x02' * 4 + '\x00' * 32)
 
         self.assertEquals(t.getDigest(), '\x00' * 32)
 
@@ -244,8 +244,9 @@ class ServerTokenClassTestCase(TokenClassTestCase):
         c = t.client
         c.version = versions.H264_MIN_FLASH
 
-        c._payload = util.BufferedByteStream('\x00' * 8 + \
-            '\x01\x01\x01\x01' + '\x03' * 4 + '\x02' * 32 + '\x00' * (1536 - 48))
+        c._payload = util.BufferedByteStream('\x00' * 8 +
+            '\x01\x01\x01\x01' + '\x03' * 4 + '\x02' * 32 +
+            '\x00' * (1536 - 48))
 
         self.assertEquals(len(c._payload), 1536)
 
@@ -268,19 +269,6 @@ class ServerTokenClassTestCase(TokenClassTestCase):
         t = self._generateToken(payload='hi', generate=True)
         t.client.generatePayload()
         self.assertEquals(str(t), t.encode())
-
-    def test_h264_client_no_server(self):
-        t = self._generateToken()
-        c = t.client
-        c.version = versions.H264_MIN_FLASH
-
-        c._payload = util.BufferedByteStream('\x00' * 8 + \
-            '\x01\x01\x01\x01' + '\x03' * 4 + '\x02' * 32 + '\x00' * (1536 - 48))
-
-        self.assertEquals(len(c._payload), 1536)
-
-        e = self.assertRaises(handshake.HandshakeError, t.generatePayload)
-        self.assertEquals(str(e), 'Client not H.264 compatible')
 
 
 class ServerTokenDigestTestCase(BaseTokenTestCase):
@@ -458,8 +446,7 @@ class ServerHandshakeDecodingTestCase(unittest.TestCase):
         self.client = object()
 
     def test_types(self):
-        self.assertRaises(TypeError, handshake.decodeServerHandshake,
-            self.client, 123)
+        self.assertRaises(TypeError, handshake.decodeServerHandshake, self.client, 123)
 
     def test_no_data(self):
         f = handshake.decodeServerHandshake
@@ -797,8 +784,8 @@ class ServerHandshakeNegotiationTestCase(unittest.TestCase):
         try:
             r = o.reason.raiseException()
         except handshake.HandshakeError, e:
-            self.assertEquals(str(e), 'Unexpected trailing data in client ' \
-                'handshake')
+            self.assertEquals(str(e),
+                'Unexpected trailing data in client handshake')
         except:
             self.fail('Unexpected error')
 
@@ -811,8 +798,8 @@ class ServerHandshakeNegotiationTestCase(unittest.TestCase):
 
         n.dataReceived('a' * (handshake.HANDSHAKE_LENGTH - 11))
 
-        self.assertEquals(n.buffer, 'b' * 10 + \
-            'a' * (handshake.HANDSHAKE_LENGTH - 11))
+        self.assertEquals(n.buffer,
+            'b' * 10 + 'a' * (handshake.HANDSHAKE_LENGTH - 11))
         self.assertEquals(o.success, None)
 
         n.dataReceived('c')
@@ -826,7 +813,27 @@ class ServerHandshakeNegotiationTestCase(unittest.TestCase):
 
         self.assertEquals(d[0], n.header, n.receivedHeader)
         self.assertEquals(d[1:], n.serverPayload)
+        self.assertFalse(o.success)
+
+        self.assertEquals(n.buffer, '')
+        n.dataReceived('d' * (handshake.HANDSHAKE_LENGTH - 1))
+        self.assertFalse(o.success)
+        n.dataReceived('e')
         self.assertTrue(o.success)
+        self.assertEquals(n.buffer, '')
+
+    def test_client_overflow(self):
+        n = self.negotiator
+        o = self.observer
+
+        n.receivedHeader = '\x03'
+        n.client = 'foo' # not None
+
+        self.assertEquals(n.buffer, '')
+        n.dataReceived('a' * handshake.HANDSHAKE_LENGTH + 'bbbbbbbbbb')
+
+        self.assertTrue(o.success)
+        self.assertEquals(n.buffer, 'bbbbbbbbbb')
 
 
 class ClientNegotiatorTestCase(BaseNegotiatorTestCase):
@@ -897,8 +904,8 @@ class ClientNegotiatorTestCase(BaseNegotiatorTestCase):
     def test_generateToken(self):
         e = self.assertRaises(
             handshake.HandshakeError, self.negotiator.generateToken)
-        self.assertEquals(str(e), '`start` must be called before ' \
-            'generating server token')
+        self.assertEquals(str(e),
+            '`start` must be called before generating server token')
 
         # now test correct token generation with defaults
         self.negotiator = self.klass(self.observer)
