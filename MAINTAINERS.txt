@@ -5,6 +5,6 @@ look over the log messages to see all the patch contributors.
 If you have a question or comment, it's probably best to mail
 rtmpy-dev@rtmpy.org, rather than mailing any of these people directly.
 
-         thijs   Thijs Triemstra <info@collab.nl>
-         arnar   Arnar Birgisson <arnarbi@gmail.com>
-          nick   Nick Joyce <nick@boxdesign.co.uk>
+         thijs   Thijs Triemstra <thijs@rtmpy.org>
+         arnar   Arnar Birgisson <arnar@rtmpy.org>
+          nick   Nick Joyce <nick@rtmpy.org>
