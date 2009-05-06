@@ -31,7 +31,7 @@ class BaseChannelScheduler(object):
         Activates a channel for scheduling.
 
         @param channel: The channel to activate.
-        @type channel: L{implements.IChannel}
+        @type channel: L{interfaces.IChannel}
         """
         if channel in self.activeChannels:
             raise IndexError('channel already activated')
@@ -43,7 +43,7 @@ class BaseChannelScheduler(object):
         Deactivates a channel from scheduling.
 
         @param channel: The channel to activate.
-        @type channel: L{implements.IChannel}
+        @type channel: L{interfaces.IChannel}
         """
         try:
             idx = self.activeChannels.index(channel)

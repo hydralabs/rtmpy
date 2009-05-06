@@ -79,7 +79,7 @@ class Channel(object):
         @type manager: L{interfaces.IChannelManager}
         """
         if not interfaces.IChannelManager.providedBy(manager):
-            raise TypeError('Expected IChannelManager for manager ' \
+            raise TypeError('Expected IChannelManager for manager '
                 '(got %s)' % (type(manager),))
 
         self.manager = manager
@@ -94,7 +94,7 @@ class Channel(object):
         @type observer: L{interfaces.IChannelObserver}
         """
         if not interfaces.IChannelObserver.providedBy(observer):
-            raise TypeError('Expected IChannelObserver for observer ' \
+            raise TypeError('Expected IChannelObserver for observer '
                 '(got %s)' % (type(observer),))
 
         self.observer = observer
@@ -112,7 +112,7 @@ class Channel(object):
         @raise ChannelError: If no manager has been registered.
         """
         if self.manager is None:
-            raise NoManagerError('Resetting a channel requires a ' \
+            raise NoManagerError('Resetting a channel requires a '
                 'registered manager')
 
         self.frameRemaining = self.manager.frameSize
@@ -219,12 +219,13 @@ class Channel(object):
         @type data: C{str}
         """
         if self.header is None:
-            raise _header.HeaderError("Cannot write to a channel with no header")
+            raise _header.HeaderError(
+                'Cannot write to a channel with no header')
 
         l = len(data)
 
         if self.bodyRemaining - l < 0:
-            raise OverflowError('Attempted to write more data than was ' \
+            raise OverflowError('Attempted to write more data than was '
                 'expected (attempted:%d remaining:%d total:%d)' % (
                     l, self.bodyRemaining, self.bytes + self.bodyRemaining))
 
@@ -328,7 +329,7 @@ class BaseCodec(object):
         @type observer: L{interfaces.ICodecObserver}
         """
         if not interfaces.ICodecObserver.providedBy(observer):
-            raise TypeError('Expected ICodecObserver for observer ' \
+            raise TypeError('Expected ICodecObserver for observer '
                 '(got %s)' % (type(observer),))
 
         self.observer = observer
@@ -695,7 +696,8 @@ class ChannelContext(object):
 
     def write(self, data):
         """
-        Called by the channel when data becomes available.
+        Called by the channel when data becomes available. Data is appended to
+        the L{buffer} and if the channel is activated if it is not already.
         """
         self.buffer.append(data)
 
@@ -833,8 +835,8 @@ class Encoder(BaseCodec):
         Flags a channel as not actively producing data.
         """
         if not channel in self.channelContext:
-            raise RuntimeError('Attempted to deactivate a non-existant ' + \
-                'channel')
+            raise RuntimeError(
+                'Attempted to deactivate a non-existant channel')
 
         self.channelContext[channel].active = False
         self.scheduler.deactivateChannel(channel)
