@@ -454,7 +454,7 @@ class ServerNegotiator(BaseNegotiator):
             self.receivedHeader = data[0]
 
             if self.debug or rtmp.DEBUG:
-                rtmp.log(self, 'Received header = %r' % (self.receivedHeader,))
+                rtmp.log(self, 'Received header %r' % (self.receivedHeader,))
 
             if self.receivedHeader not in HEADER_BYTES:
                 raise HandshakeError(
@@ -522,8 +522,7 @@ def decodeClientHandshake(data):
 
         payload = s.read(HANDSHAKE_LENGTH)
     except IOError:
-        raise HandshakeError(
-            'Not enough data to be able to decode a full client token')
+        raise HandshakeError('Not enough data to decode a full client token')
 
     return ClientToken(uptime=uptime, version=version, payload=payload)
 
@@ -547,8 +546,7 @@ def decodeServerHandshake(client, data):
 
         payload = s.read(HANDSHAKE_LENGTH)
     except IOError:
-        raise HandshakeError(
-            'Not enough data to be able to decode a full server token')
+        raise HandshakeError('Not enough data to decode a full server token')
 
     return ServerToken(client, uptime=uptime, version=version, payload=payload)
 

@@ -422,16 +422,16 @@ class ClientHandshakeDecodingTestCase(unittest.TestCase):
 
         e = self.assertRaises(handshake.HandshakeError, f, '')
         self.assertEquals(str(e), 
-            'Not enough data to be able to decode a full client token')
+            'Not enough data to decode a full client token')
         e = self.assertRaises(handshake.HandshakeError, f, 'a' * 5)
         self.assertEquals(str(e), 
-            'Not enough data to be able to decode a full client token')
+            'Not enough data to decode a full client token')
         e = self.assertRaises(handshake.HandshakeError, f, 'a' * 11)
         self.assertEquals(str(e), 
-            'Not enough data to be able to decode a full client token')
+            'Not enough data to decode a full client token')
         e = self.assertRaises(handshake.HandshakeError, f, 'a' * (1536 - 1))
         self.assertEquals(str(e), 
-            'Not enough data to be able to decode a full client token')
+            'Not enough data to decode a full client token')
 
     def test_decode(self):
         d = '\x01\x02\x03\x04\x09\x08\x07\x06' + ('a' * (1536 - 8))
@@ -466,16 +466,16 @@ class ServerHandshakeDecodingTestCase(unittest.TestCase):
 
         e = self.assertRaises(handshake.HandshakeError, f, self.client, '')
         self.assertEquals(str(e),
-            'Not enough data to be able to decode a full server token')
+            'Not enough data to decode a full server token')
         e = self.assertRaises(handshake.HandshakeError, f, self.client, 'a' * 5)
         self.assertEquals(str(e),
-            'Not enough data to be able to decode a full server token')
+            'Not enough data to decode a full server token')
         e = self.assertRaises(handshake.HandshakeError, f, self.client, 'a' * 11)
         self.assertEquals(str(e),
-            'Not enough data to be able to decode a full server token')
+            'Not enough data to decode a full server token')
         e = self.assertRaises(handshake.HandshakeError, f, self.client, 'a' * (1536 - 1))
         self.assertEquals(str(e),
-            'Not enough data to be able to decode a full server token')
+            'Not enough data to decode a full server token')
 
     def test_decode(self):
         d = '\x01\x02\x03\x04\x09\x08\x07\x06' + ('a' * (1536 - 8))
