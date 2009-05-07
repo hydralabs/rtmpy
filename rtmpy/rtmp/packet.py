@@ -46,34 +46,34 @@ FLV_DATA = 0x16
 
 class BaseError(Exception):
     """
-    Base error class for all things `event`.
+    Base error class for all things `packet`.
     """
 
 
 class DecodeError(BaseError):
     """
-    Base error class for decoding RTMP events.
+    Base error class for decoding RTMP packets.
     """
 
 
 class TrailingDataError(DecodeError):
     """
-    Raised if decoding an event does not consume the whole buffer.
+    Raised if decoding an packet does not consume the whole buffer.
     """
 
 
 class EncodeError(BaseError):
     """
-    Base error class for encoding RTMP events.
+    Base error class for encoding RTMP packets.
     """
 
 
-class BaseEvent(object):
+class BasePacket(object):
     """
-    An abstract class that all event types must extend.
+    An abstract class that all packet types must extend.
     """
 
-    implements(interfaces.IEvent)
+    implements(interfaces.IPacket)
 
     def encode(self, buf):
         raise NotImplementedError()
@@ -82,10 +82,10 @@ class BaseEvent(object):
         raise NotImplementedError()
 
 
-class FrameSize(BaseEvent):
+class FrameSize(BasePacket):
     """
-    A frame size event. This determines the number of bytes for the frame body
-    in the RTMP stream.
+    A frame size packet. This determines the number of bytes for the frame
+    body in the RTMP stream.
 
     @ivar size: Number of bytes for RTMP frame bodies.
     @type size: C{int}
@@ -96,13 +96,13 @@ class FrameSize(BaseEvent):
 
     def decode(self, buf):
         """
-        Decode a frame size event.
+        Decode a frame size packet.
         """
         self.size = buf.read_ulong()
 
     def encode(self, buf):
         """
-        Encode a frame size event.
+        Encode a frame size packet.
         """
         if self.size is None:
             raise EncodeError('Frame size not set')
@@ -114,7 +114,7 @@ class FrameSize(BaseEvent):
                 '(expected int, got %r)' % (type(self.size),))
 
 
-class BytesRead(BaseEvent):
+class BytesRead(BasePacket):
     """
     Number of bytes read?
     """
@@ -124,13 +124,13 @@ class BytesRead(BaseEvent):
 
     def decode(self, buf):
         """
-        Decode a bytes read event.
+        Decode a bytes read packet.
         """
         self.size = buf.read_ulong()
 
     def encode(self, buf):
         """
-        Encode a bytes read event.
+        Encode a bytes read packet.
         """
         if self.size is None:
             raise EncodeError('Bytes read not set')
@@ -142,12 +142,14 @@ class BytesRead(BaseEvent):
                 '(expected int, got %r)' % (type(self.size),))
 
 
-class ControlEvent(BaseEvent):
+class ControlEvent(BasePacket):
     """
-    A control event. Akin to Red5's Ping Event.
+    A control packet. Akin to Red5's Ping Event.
     """
 
     UNDEFINED = -1
+    PING = 6
+    PONG = 7
 
     def __init__(self, type=None, value1=0, value2=UNDEFINED, value3=UNDEFINED):
         self.type = type
@@ -162,7 +164,7 @@ class ControlEvent(BaseEvent):
 
     def encode(self, buf):
         if self.type is None:
-            raise EncodeError('Unknown control event type (type:%r)' % (
+            raise EncodeError('Unknown control type (type:%r)' % (
                 self.type,))
 
         try:
@@ -196,9 +198,9 @@ class ControlEvent(BaseEvent):
         self.value3 = buf.read_long()
 
 
-class ServerBandwidth(BaseEvent):
+class ServerBandwidth(BasePacket):
     """
-    A server bandwidth event.
+    A server bandwidth packet.
     """
 
     def __init__(self, bandwidth=None):
@@ -206,13 +208,13 @@ class ServerBandwidth(BaseEvent):
 
     def decode(self, buf):
         """
-        Decode a server bandwidth event.
+        Decode a server bandwidth packet.
         """
         self.bandwidth = buf.read_ulong()
 
     def encode(self, buf):
         """
-        Encode a server bandwidth event.
+        Encode a server bandwidth packet.
         """
         if self.bandwidth is None:
             raise EncodeError('Server bandwidth not set')
@@ -224,9 +226,9 @@ class ServerBandwidth(BaseEvent):
                 '(expected int, got %r)' % (type(self.bandwidth),))
 
 
-class ClientBandwidth(BaseEvent):
+class ClientBandwidth(BasePacket):
     """
-    A server bandwidth event.
+    A server bandwidth packet.
     """
 
     def __init__(self, bandwidth=None, extra=None):
@@ -235,14 +237,14 @@ class ClientBandwidth(BaseEvent):
 
     def decode(self, buf):
         """
-        Decode a client bandwidth event.
+        Decode a client bandwidth packet.
         """
         self.bandwidth = buf.read_ulong()
         self.extra = buf.read_uchar()
 
     def encode(self, buf):
         """
-        Encode a client bandwidth event.
+        Encode a client bandwidth packet.
         """
         if self.bandwidth is None:
             raise EncodeError('Client bandwidth not set')
@@ -263,9 +265,9 @@ class ClientBandwidth(BaseEvent):
                 '(expected int, got %r)' % (type(self.extra),))
 
 
-class Notify(BaseEvent):
+class Notify(BasePacket):
     """
-    Stream notification event.
+    Stream notification packet.
     """
 
     def __init__(self, name=None, id=None, **kwargs):
@@ -304,6 +306,60 @@ class Invoke(Notify):
     """
 
 
+class AudioData(BasePacket):
+    """
+    A packet containing audio data.
+    """
+
+    def __init__(self, data=None):
+        self.data = data
+
+    def decode(self, buf):
+        """
+        Decode a frame size packet.
+        """
+        self.data = buf.read()
+
+    def encode(self, buf):
+        """
+        Encode an audio packet.
+        """
+        if self.data is None:
+            raise EncodeError('No audio data set')
+
+        try:
+            buf.write(self.data)
+        except TypeError:
+            raise EncodeError('Audio data wrong type '
+                '(expected str, got %r)' % (type(self.data),))
+
+
+class VideoData(BasePacket):
+    """
+    A packet containing video data. The packet has no other idea of the data
+    or even if it is valid ..
+    """
+
+    def __init__(self, data=None):
+        self.data = data
+
+    def decode(self, buf):
+        """
+        Decode a frame size packet.
+        """
+        self.data = buf.read()
+
+    def encode(self, buf):
+        """
+        Encode an audio packet. 
+        """
+        try:
+            buf.write(self.data)
+        except TypeError:
+            raise EncodeError('Video data wrong type '
+                '(expected str, got %r)' % (type(self.data),))
+
+
 TYPE_MAP = {
     FRAME_SIZE: FrameSize,
     BYTES_READ: BytesRead,
@@ -312,19 +368,21 @@ TYPE_MAP = {
     CLIENT_BANDWIDTH: ClientBandwidth,
     NOTIFY: Notify,
     INVOKE: Invoke,
+    AUDIO_DATA: AudioData,
+    VIDEO_DATA: VideoData
 }
 
 
 def decode(datatype, body, *args, **kwargs):
     """
-    A helper method that decodes a byte stream to an L{interfaces.IEvent}
+    A helper method that decodes a byte stream to an L{interfaces.IPacket}
     instance.
 
-    @param datatype: The type of the event.
+    @param datatype: The type of the packet.
     @type datatype: C{int}
-    @param body: The byte string holding the encoded form of the event.
-    @return: A deferred, whose callback will return the event instance.
-    @rtype: L{defer.Deferred} that contains a {interfaces.IEvent} instance
+    @param body: The byte string holding the encoded form of the packet.
+    @return: A deferred, whose callback will return the packet instance.
+    @rtype: L{defer.Deferred} that contains a {interfaces.IPacket} instance
         corresponding to C{datatype}
     @raise DecodeError: The datatype is not known.
     @raise TrailingDataError: Raised if the body was not completely decoded.
@@ -336,45 +394,45 @@ def decode(datatype, body, *args, **kwargs):
             raise DecodeError('Unknown datatype \'%r\'' % (datatype,))
 
         buf = BufferedByteStream(body)
-        # create an event instance
-        event = TYPE_MAP[datatype]()
+        # create an packet instance
+        packet = TYPE_MAP[datatype]()
 
         def cb(res):
             # check here to ensure the whole buffer has been consumed
             if not buf.at_eof():
                 raise TrailingDataError()
 
-            return event
+            return packet
 
-        d = defer.maybeDeferred(event.decode, buf, *args, **kwargs)
+        d = defer.maybeDeferred(packet.decode, buf, *args, **kwargs)
 
         return d.addCallback(cb)
 
     return defer.maybeDeferred(_decode)
 
 
-def encode(event, *args, **kwargs):
+def encode(packet, *args, **kwargs):
     """
-    A helper method that encodes an event.
+    A helper method that encodes an packet.
 
-    @param event: The event to be encoded.
-    @type event: L{interfaces.IEvent}
-    @return: A deferred, whose callback will return a tuple, the event
-        datatype and the encoded event byte string.
+    @param packet: The packet to be encoded.
+    @type packet: L{interfaces.IPacket}
+    @return: A deferred, whose callback will return a tuple, the packet
+        datatype and the encoded packet byte string.
     @rtype: L{defer.Deferred} that contains a tuple (C{int}, C{str})
-    @raise EncodeError: If the event class does not correspond to a registered
+    @raise EncodeError: If the packet class does not correspond to a registered
         type.
-    @raise TypeError: The event does not implement L{interfaces.IEvent}
+    @raise TypeError: The packet does not implement L{interfaces.IPacket}
     @note: This function doesn't actually raise the exceptions, they are
         wrapped by the deferred.
     """
     def _encode():
-        if not interfaces.IEvent.providedBy(event):
-            raise TypeError('Expected an event interface (got:%r)' % (
-                type(event),))
+        if not interfaces.IPacket.providedBy(packet):
+            raise TypeError('Expected an packet interface (got:%r)' % (
+                type(packet),))
 
         datatype = None
-        kls = event.__class__
+        kls = packet.__class__
 
         for t, c in TYPE_MAP.iteritems():
             if c is kls:
@@ -383,14 +441,14 @@ def encode(event, *args, **kwargs):
                 break
 
         if datatype is None:
-            raise EncodeError('Unknown event type for %r' % (event,))
+            raise EncodeError('Unknown packet type for %r' % (packet,))
 
         body = BufferedByteStream()
 
         def cb(res):
             return datatype, body.getvalue()
 
-        d = defer.maybeDeferred(event.encode, body, *args, **kwargs)
+        d = defer.maybeDeferred(packet.encode, body, *args, **kwargs)
 
         return d.addCallback(cb)
 

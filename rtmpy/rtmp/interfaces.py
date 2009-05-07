@@ -260,9 +260,9 @@ class IHandshakeNegotiator(Interface):
         """
 
 
-class IEvent(Interface):
+class IPacket(Interface):
     """
-    An RTMP Event.
+    An RTMP Packet.
 
     @see: L{http://osflash.org/documentation/rtmp#rtmp_datatypes}
     """
@@ -300,7 +300,19 @@ class ICodecObserver(Interface):
 
 class IStream(Interface):
     """
+    A stream sends or receives packets  from the various channels
     """
+
+
+class IProducingStream(IStream):
+
+    def send(event, ):
+        """
+        """
+
+    def receive(packet):
+        """
+        """
 
 
 class IStreamManager(Interface):
