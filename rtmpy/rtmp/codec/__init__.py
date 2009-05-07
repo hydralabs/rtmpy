@@ -437,10 +437,10 @@ class BaseCodec(object):
         """
         header = channel.getHeader()
 
-        del self.channels[header.channelId]
-
         if channel.observer:
             channel.observer.bodyComplete()
+
+        channel.reset()
 
     def initialiseChannel(self, channel):
         """

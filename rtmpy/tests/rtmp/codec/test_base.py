@@ -254,6 +254,7 @@ class ChannelManagerTestCase(unittest.TestCase):
         c = codec.BaseCodec()
 
         channel = mocks.Channel()
+        channel.manager = mocks.ChannelManager()
         header = mocks.Header(channelId=3, relative=False)
 
         channel.setHeader(header)
@@ -261,7 +262,8 @@ class ChannelManagerTestCase(unittest.TestCase):
 
         c.channelComplete(channel)
 
-        self.assertEquals(c.channels, {})
+        self.assertEquals(c.channels, {3: channel})
+        self.assertTrue(channel.has_reset)
 
         # test bodyComplete
         c = codec.BaseCodec()
@@ -270,6 +272,7 @@ class ChannelManagerTestCase(unittest.TestCase):
         header = mocks.Header(channelId=10, relative=False)
 
         o = channel.observer = mocks.ChannelObserver()
+        channel.manager = mocks.ChannelManager()
 
         channel.setHeader(header)
         c.channels = {10: channel}
