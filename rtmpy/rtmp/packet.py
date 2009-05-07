@@ -311,12 +311,14 @@ class AudioData(BasePacket):
     A packet containing audio data.
     """
 
+    implements(interfaces.IStreamingPacket)
+
     def __init__(self, data=None):
         self.data = data
 
     def decode(self, buf):
         """
-        Decode a frame size packet.
+        Decode an audio packet.
         """
         self.data = buf.read()
 
@@ -340,19 +342,24 @@ class VideoData(BasePacket):
     or even if it is valid ..
     """
 
+    implements(interfaces.IStreamingPacket)
+
     def __init__(self, data=None):
         self.data = data
 
     def decode(self, buf):
         """
-        Decode a frame size packet.
+        Decode an audio packet.
         """
         self.data = buf.read()
 
     def encode(self, buf):
         """
-        Encode an audio packet. 
+        Encode a video packet. 
         """
+        if self.data is None:
+            raise EncodeError('No video data set')
+
         try:
             buf.write(self.data)
         except TypeError:

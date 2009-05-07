@@ -213,6 +213,7 @@ class EncodeTestCase(BaseTestCase):
 
         return d
 
+
 class BasePacketTestCase(unittest.TestCase):
     """
     Tests for L{packet.BasePacket}
@@ -927,6 +928,9 @@ class AudioDataTestCase(BaseTestCase):
     Tests for L{packet.AudioData}
     """
 
+    def test_interface(self):
+        self.assertTrue(interfaces.IStreamingPacket.implementedBy(packet.VideoData))
+
     def test_create(self):
         x = packet.AudioData()
         self.assertEquals(x.__dict__, {'data': None})
@@ -991,6 +995,84 @@ class AudioDataTestCase(BaseTestCase):
             self.executed = True
 
         d = packet.decode(7, 'abcdefg' * 50).addCallback(cb)
+        d.addCallback(lambda x: self.assertTrue(self.executed))
+        d.addErrback(self._fail)
+
+        return d
+
+
+class VideoDataTestCase(BaseTestCase):
+    """
+    Tests for L{packet.VideoData}
+    """
+
+    def test_interface(self):
+        self.assertTrue(interfaces.IStreamingPacket.implementedBy(packet.VideoData))
+
+    def test_create(self):
+        x = packet.VideoData()
+        self.assertEquals(x.__dict__, {'data': None})
+
+        x = packet.VideoData(10)
+        self.assertEquals(x.__dict__, {'data': 10})
+
+        x = packet.VideoData(data=20)
+        self.assertEquals(x.__dict__, {'data': 20})
+
+    def test_raw_encode(self):
+        # test default encode
+        x = packet.VideoData()
+        e = self.assertRaises(packet.EncodeError, x.encode, self.buffer)
+        self.assertEquals(str(e), 'No video data set')
+
+        # test non-str encode
+        x = packet.VideoData(data=20)
+        e = self.assertRaises(packet.EncodeError, x.encode, self.buffer)
+        self.assertEquals(str(e), 'Video data wrong type '
+            '(expected str, got <type \'int\'>)')
+
+        x = packet.VideoData(data='foo.bar')
+        e = x.encode(self.buffer)
+
+        self.assertEquals(e, None)
+
+        self.assertEquals(self.buffer.getvalue(), 'foo.bar')
+
+    def test_raw_decode(self):
+        x = packet.VideoData()
+
+        self.assertEquals(x.data, None)
+        self.buffer.write('foo.bar')
+        self.buffer.seek(0)
+
+        e = x.decode(self.buffer)
+
+        self.assertEquals(e, None)
+        self.assertEquals(x.data, 'foo.bar')
+
+    def test_encode(self):
+        e = packet.VideoData(data=('abcdefg' * 50))
+        self.executed = False
+
+        def cb(r):
+            self.assertEquals(r, (8, 'abcdefg' * 50))
+            self.executed = True
+
+        d = packet.encode(e).addCallback(cb)
+        d.addCallback(lambda x: self.assertTrue(self.executed))
+        d.addErrback(self._fail)
+
+        return d
+
+    def test_decode(self):
+        self.executed = False
+
+        def cb(r):
+            self.assertTrue(isinstance(r, packet.VideoData))
+            self.assertEquals(r.__dict__, {'data': 'abcdefg' * 50})
+            self.executed = True
+
+        d = packet.decode(8, 'abcdefg' * 50).addCallback(cb)
         d.addCallback(lambda x: self.assertTrue(self.executed))
         d.addErrback(self._fail)
 

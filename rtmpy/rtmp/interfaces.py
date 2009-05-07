@@ -289,6 +289,13 @@ class IPacket(Interface):
         """
 
 
+class IStreamingPacket(IPacket):
+    """
+    Flags an L{IPacket} as streaming. This means that the codec/stream should
+    not wait to en/decode the data.
+    """
+
+
 class ICodecObserver(Interface):
     """
     An object that observes RTMP codec events.
@@ -305,18 +312,20 @@ class ICodecObserver(Interface):
 
 class IStream(Interface):
     """
-    A stream sends or receives packets  from the various channels
+    A stream sends or receives RTMP packets.
     """
 
+    time = Attribute(
+        "")
 
-class IProducingStream(IStream):
-
-    def send(event, ):
+    def send(packet, channelId=None):
         """
+        Dispatch packets to the RTMP stream.
         """
 
     def receive(packet):
         """
+        Called when a packet is received from the stream.
         """
 
 
