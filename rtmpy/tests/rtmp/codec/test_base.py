@@ -281,7 +281,7 @@ class ChannelManagerTestCase(unittest.TestCase):
 
         c.channelComplete(channel)
 
-        self.assertEquals(o.events, [('body-complete',)])
+        self.assertEquals(o.events, [('body-complete', channel)])
 
     def test_initialiseChannel(self):
         channel = mocks.Channel()
@@ -384,7 +384,7 @@ class ChannelTestCase(unittest.TestCase):
         o = mocks.ChannelObserver()
         c.registerObserver(o)
 
-        self.assertEquals(o.events, [('data-received', 'hello')])
+        self.assertEquals(o.events, [('data-received', c, 'hello')])
         self.assertEquals(o.buffer, 'hello')
 
     def test_reset(self):
@@ -462,16 +462,6 @@ class ChannelTestCase(unittest.TestCase):
 
         c.onComplete()
         self.assertEquals(m.complete, [c])
-
-        c = codec.Channel()
-        m = mocks.ChannelManager()
-        o = mocks.ChannelObserver()
-
-        c.manager = m
-        c.observer = o
-
-        c.onComplete()
-        self.assertEquals(o.events, [('body-complete',)])
 
 
 class ChannelHeaderTestCase(unittest.TestCase):
@@ -600,7 +590,8 @@ class ChannelDataTestCase(unittest.TestCase):
         self.assertEquals(self.channel.buffer, None)
         self.channel.dataReceived('foo bar')
 
-        self.assertEquals(observer.events, [('data-received', 'foo bar')])
+        self.assertEquals(observer.events,
+            [('data-received', self.channel, 'foo bar')])
         self.assertEquals(observer.buffer, 'foo bar')
         self.assertEquals(self.channel.buffer, None)
 

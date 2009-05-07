@@ -105,7 +105,7 @@ class Channel(object):
         self.observer = observer
 
         if self.buffer is not None:
-            self.observer.dataReceived(self.buffer)
+            self.observer.dataReceived(self, self.buffer)
             self.buffer = None
 
     def reset(self):
@@ -188,7 +188,7 @@ class Channel(object):
         registered.
         """
         if self.observer is not None:
-            self.observer.dataReceived(data)
+            self.observer.dataReceived(self, data)
 
             return
 
@@ -259,11 +259,6 @@ class Channel(object):
                 'complete a channel')
 
         self.manager.channelComplete(self)
-
-        if self.observer:
-            self.observer.bodyComplete()
-
-        self.reset()
 
     def __repr__(self):
         s = []
@@ -455,7 +450,7 @@ class BaseCodec(object):
         header = channel.getHeader()
 
         if channel.observer:
-            channel.observer.bodyComplete()
+            channel.observer.bodyComplete(channel)
 
         channel.reset()
 
@@ -599,7 +594,8 @@ class Decoder(BaseCodec):
 
         frames = self.currentChannel.frames
 
-        self.currentChannel.dataReceived(self.buffer.read(available))
+        self.currentChannel.dataReceived(
+            self.currentChannel, self.buffer.read(available))
 
         if self.currentChannel and self.currentChannel.frames != frames:
             # a complete frame was read from the stream which means a new

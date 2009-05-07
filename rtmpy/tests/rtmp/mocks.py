@@ -214,13 +214,13 @@ class ChannelObserver(object):
         self.channel = None
         self.buffer = ''
 
-    def dataReceived(self, data):
-        self.events.append(('data-received', data))
+    def dataReceived(self, channel, data):
+        self.events.append(('data-received', channel, data))
 
         self.buffer += str(data)
 
-    def bodyComplete(self):
-        self.events.append(('body-complete',))
+    def bodyComplete(self, channel):
+        self.events.append(('body-complete', channel))
 
 
 class HandshakeObserver(object):

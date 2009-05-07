@@ -165,18 +165,23 @@ class IChannelObserver(Interface):
     Observes L{IChannel} events.
     """
 
-    def dataReceived(data):
+    def dataReceived(channel, data):
         """
         Called when the channel receives some data.
 
+        @param channel: The channel that received the data.
+        @type channel: {IChannel}
         @param data: The data received by the channel.
         @type data: C{str}
         """
 
-    def bodyComplete():
+    def bodyComplete(channel):
         """
         Called when the amount of data received by the channel matches that
         of its header.
+
+        @param channel: The channel that completed its body.
+        @type channel: {IChannel}
         """
 
 
