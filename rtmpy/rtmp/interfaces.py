@@ -116,7 +116,8 @@ class IChannelManager(Interface):
     """
 
     frameSize = Attribute(
-        "An C{int} that defines the size (in bytes) of each frame body.")
+        "A read-only C{int} that defines the size (in bytes) of each frame "
+        "body. Set the frameSize via L{setFrameSize}")
 
     def getChannel(channelId):
         """
@@ -294,4 +295,38 @@ class ICodecObserver(Interface):
 
         @param channel: The channel that has been reset.
         @type channel: L{IChannel}
+        """
+
+
+class IStream(Interface):
+    """
+    """
+
+
+class IStreamManager(Interface):
+    """
+    
+    """
+
+    def registerStream(streamId, stream):
+        """
+        Registers a L{IStream} instance to the manager, based on the streamId.
+
+        @param streamId: The id used to identify the stream to the manager.
+        @type streamId: C{int}
+        @param stream: The stream instance.
+        @type stream: L{interfaces.IStream}
+        @raise ValueError: C{streamId} is not in the correct range
+        @raise TypeError: C{stream} does not implement L{interfaces.IStream}
+        @raise IndexError: C{streamId} is already registered to another stream
+        """
+
+    def removeStream(streamId):
+        """
+        Removes the stream from this manager.
+
+        @param streamId: The id used to identify the stream to the manager.
+        @type streamId: C{int}
+        @raise ValueError: C{streamId} is not in the correct range
+        @raise IndexError: C{streamId} does not have a stream registered to it
         """

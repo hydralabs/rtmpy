@@ -17,8 +17,13 @@ from rtmpy.rtmp import interfaces
 from rtmpy.rtmp.codec import header as _header
 
 
-MAX_CHANNELS = 64
+#: The default number of bytes per RTMP frame (excluding header)
 FRAME_SIZE = 128
+
+#: Maximum number of channels that can be active per RTMP stream
+MAX_CHANNELS = 64
+#: Maximum number of streams that can be active per RTMP stream
+MAX_STREAMS = 0xffff
 
 
 class DecodeError(rtmp.BaseError):
@@ -284,6 +289,13 @@ class Channel(object):
         )
 
 
+class Stream(object):
+    """
+    """
+
+    implements(interfaces.IStream)
+
+
 class BaseCodec(object):
     """
     Abstract functionality for an rtmp codec. Manages the creation/deletion
@@ -295,8 +307,10 @@ class BaseCodec(object):
     @ivar job: A L{task.LoopingCall<twisted.internet.task.LoopingCall>}
         instance that is used to iteratively call the method supplied by
         L{getJob}.
-    @ivar channels: A list of channels.
-    @type channels: C{dict} of L{Channel}
+    @ivar channels: A collection of channels.
+    @type channels: C{dict} of C{id: L{Channel}}
+    @ivar channels: A collection of streams.
+    @type channels: C{dict} of C{id: L{Stream}}
     @ivar frameSize: The number of bytes for each frame content.
     @type frameSize: C{int}
     """
@@ -304,9 +318,12 @@ class BaseCodec(object):
     implements(interfaces.IChannelManager)
 
     channel_class = Channel
+    stream_class = Stream
 
     def __init__(self):
         self.channels = {}
+        self.streams = {}
+
         self.observer = None
         self.deferred = None
         self.frameSize = FRAME_SIZE
@@ -465,6 +482,26 @@ class BaseCodec(object):
 
         for channel in self.channels.values():
             channel.frameRemaining = size
+
+    # interfaces.IStreamManager
+
+    def registerStream(self, streamId, stream):
+        """
+        Registers a stream to this manager.
+        """
+        if streamId < 0 or streamId > MAX_STREAMS:
+            raise ValueError('streamId is not in range (got:%d)' % (
+                int(streamId),))
+
+        if not interfaces.IStream.providedBy(stream):
+            raise TypeError('IStream interface expected (got:%r)' % (
+                type(stream),))
+
+        if streamId in self.streams.keys():
+            raise IndexError('Stream already registered (streamId:%d)' % (
+                int(streamId),))
+
+        self.streams[streamId] = stream
 
 
 class Decoder(BaseCodec):

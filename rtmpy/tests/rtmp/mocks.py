@@ -249,3 +249,10 @@ class HandshakeObserver(object):
         """
         """
         self.buffer.append(data)
+
+
+class Stream(object):
+    """
+    """
+
+    implements(interfaces.IStream)

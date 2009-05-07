@@ -22,6 +22,7 @@ class ModuleConstTestCase(unittest.TestCase):
 
     def test_constants(self):
         self.assertEquals(codec.MAX_CHANNELS, 64)
+        self.assertEquals(codec.MAX_STREAMS, 0xffff)
         self.assertEquals(codec.FRAME_SIZE, 128)
 
 
@@ -64,7 +65,8 @@ class BaseCodecTestCase(unittest.TestCase):
             "Expected ICodecObserver for observer (got <type 'object'>)")
         self.assertEquals(c.observer, None)
 
-        self.assertTrue(interfaces.ICodecObserver.implementedBy(mocks.CodecObserver))
+        self.assertTrue(
+            interfaces.ICodecObserver.implementedBy(mocks.CodecObserver))
 
         m = mocks.CodecObserver()
         c.registerObserver(m)
@@ -689,3 +691,72 @@ class ChannelDataTestCase(unittest.TestCase):
         self.assertEquals(self.channel.bodyRemaining, 0)
 
         self.assertTrue(self.executed)
+
+
+class StreamManagerTestCase(unittest.TestCase):
+    """
+    Tests for L{interfaces.IStreamManager} implementation of
+    L{codec.BaseCodec}.
+    """
+
+    @classmethod
+    def _getJob(cls):
+        return lambda: None
+
+    def setUp(self):
+        self._getJob = codec.BaseCodec.getJob
+        codec.BaseCodec.getJob = BaseCodecTestCase._getJob
+
+    def tearDown(self):
+        codec.BaseCodec.getJob = self._getJob
+
+    def test_init(self):
+        c = codec.BaseCodec()
+
+        self.assertEquals(c.streams, {})
+
+    def test_registerStream(self):
+        c = codec.BaseCodec()
+
+        e = self.assertRaises(ValueError, c.registerStream, -1, None)
+        self.assertEquals(str(e), 'streamId is not in range (got:-1)')
+        self.assertEquals(c.streams, {})
+
+        c = codec.BaseCodec()
+
+        e = self.assertRaises(ValueError, c.registerStream, 0x10000, None)
+        self.assertEquals(str(e), 'streamId is not in range (got:65536)')
+        self.assertEquals(c.streams, {})
+
+        c = codec.BaseCodec()
+
+        x = object()
+        self.assertFalse(interfaces.IStream.providedBy(x))
+        e = self.assertRaises(TypeError, c.registerStream, 0, x)
+        self.assertEquals(str(e), "IStream interface expected "
+            "(got:<type 'object'>)")
+        self.assertEquals(c.streams, {})
+
+        c = codec.BaseCodec()
+
+        c.streams = {3: None}
+        s = mocks.Stream()
+
+        self.assertTrue(interfaces.IStream.providedBy(s))
+        e = self.assertRaises(IndexError, c.registerStream, 3, s)
+        self.assertEquals(str(e), 'Stream already registered (streamId:3)')
+        self.assertEquals(c.streams, {3: None})
+
+        # test a successful registration
+
+        c = codec.BaseCodec()
+        s = mocks.Stream()
+
+        self.assertEquals(c.streams, {})
+        c.registerStream(1, s)
+        self.assertEquals(c.streams, {1: s})
+
+        # show that we can add the same stream twice
+        c.registerStream(2, s)
+
+        self.assertEquals(c.streams, {1: s, 2: s})

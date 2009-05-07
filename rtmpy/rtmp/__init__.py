@@ -29,8 +29,6 @@ DEBUG = False
 #: The default RTMP port is a registered at U{IANA<http://iana.org>}.
 RTMP_PORT = 1935
 
-MAX_STREAMS = 0xffff
-
 
 def log(obj, msg):
     """
