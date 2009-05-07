@@ -760,3 +760,34 @@ class StreamManagerTestCase(unittest.TestCase):
         c.registerStream(2, s)
 
         self.assertEquals(c.streams, {1: s, 2: s})
+
+    def test_removeStream(self):
+        c = codec.BaseCodec()
+        self.assertEquals(c.streams, {})
+
+        e = self.assertRaises(IndexError, c.removeStream, 2)
+        self.assertEquals(str(e), 'Unknown streamId 2')
+        self.assertEquals(c.streams, {})
+
+        e = self.assertRaises(ValueError, c.removeStream, 'foo')
+        self.assertEquals(str(e),
+            "invalid literal for int() with base 10: 'foo'")
+
+        c = codec.BaseCodec()
+        s1, s2 = object(), object()
+
+        c.streams = {3: s1, 56: s2}
+
+        e = self.assertRaises(IndexError, c.removeStream, 2)
+        self.assertEquals(str(e), 'Unknown streamId 2')
+        self.assertEquals(c.streams, {3: s1, 56: s2})
+
+        x = c.removeStream(3)
+        self.assertEquals(c.streams, {56: s2})
+        self.assertIdentical(x, s1)
+
+        y = c.removeStream(56)
+        self.assertEquals(c.streams, {})
+        self.assertIdentical(y, s2)
+
+        

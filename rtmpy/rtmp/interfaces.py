@@ -305,7 +305,7 @@ class IStream(Interface):
 
 class IStreamManager(Interface):
     """
-    
+    A manager that handles RTMP streams.
     """
 
     def registerStream(streamId, stream):
@@ -327,6 +327,8 @@ class IStreamManager(Interface):
 
         @param streamId: The id used to identify the stream to the manager.
         @type streamId: C{int}
+        @return: The stream object that has been removed.
+        @rtype: L{IStream}
         @raise ValueError: C{streamId} is not in the correct range
         @raise IndexError: C{streamId} does not have a stream registered to it
         """

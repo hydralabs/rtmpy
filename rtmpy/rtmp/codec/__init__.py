@@ -501,8 +501,22 @@ class BaseCodec(object):
             raise IndexError('Stream already registered (streamId:%d)' % (
                 int(streamId),))
 
-        self.streams[streamId] = stream
+        self.streams[int(streamId)] = stream
 
+    def removeStream(self, streamId):
+        """
+        Removes a registered stream from the manager.
+        """
+        i = int(streamId)
+
+        try:
+            s = self.streams[i]
+        except KeyError:
+            raise IndexError('Unknown streamId %d' % (i,))
+
+        del self.streams[i]
+
+        return s
 
 class Decoder(BaseCodec):
     """
@@ -537,7 +551,7 @@ class Decoder(BaseCodec):
             self.buffer.seek(headerPosition)
 
             if self.debug or rtmp.DEBUG:
-                rtmp.log(self, 'Not enough data to read header. ' \
+                rtmp.log(self, 'Not enough data to read header. '
                     'Rewinding to %d' % (headerPosition,))
 
             return None
@@ -632,7 +646,7 @@ class Decoder(BaseCodec):
             # not enough bytes left in the stream to continue decoding, we
             # require a complete header to decode
             if self.debug or rtmp.DEBUG:
-                rtmp.log(self, 'Not enough buffer to read header ' \
+                rtmp.log(self, 'Not enough buffer to read header '
                     '(%d:remaining)' % (self.buffer.remaining(),))
 
             self.pause()
@@ -702,6 +716,7 @@ class Decoder(BaseCodec):
         BaseCodec.channelComplete(self, channel)
 
         self.currentChannel = None
+
 
 class ChannelContext(object):
     """
