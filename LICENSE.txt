@@ -1,4 +1,4 @@
-RTMPy is available under the terms of the MIT license.  The full text of the
+RTMPy is available under the terms of the MIT license. The full text of the
 MIT license is included below.
 
 MIT License
