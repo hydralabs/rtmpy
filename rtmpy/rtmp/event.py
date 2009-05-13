@@ -276,7 +276,7 @@ class Notify(BaseEvent):
     def __init__(self, name=None, id=None, *args):
         self.name = name
         self.id = id
-        self.argv = args
+        self.argv = list(args)
 
     def __repr__(self):
         return '<%s name=%r id=%r argv=%r at 0x%x>' % (
