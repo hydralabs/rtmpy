@@ -45,7 +45,6 @@ class BaseChannelScheduler(object):
         @param channel: The channel to activate.
         @type channel: L{interfaces.IChannel}
         """
-        print 'deactivating', channel
         try:
             idx = self.activeChannels.index(channel)
         except ValueError:

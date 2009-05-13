@@ -150,3 +150,4 @@ class LoopingChannelSchedulerTestCase(BaseChannelSchedulerTestCase):
         self.assertEquals(len(s.activeChannels), 2)
         self.assertEquals(s.getNextChannel(), None)
         self.assertEquals(len(s.activeChannels), 0)
+        self.assertEquals(s.activeChannels, [])
