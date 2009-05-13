@@ -104,7 +104,7 @@ class ServerFactory(protocol.ServerFactory):
 
     protocol = ServerProtocol
 
-    def __init__(self, applications):
+    def __init__(self, applications={}):
         self.applications = applications
 
         for app in self.applications.values():

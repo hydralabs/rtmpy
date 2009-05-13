@@ -9,11 +9,11 @@ RTMP codecs. Encoders and decoders for rtmp streams.
 @since: 0.1
 """
 
-from twisted.internet import task
+from twisted.internet import task, defer
 from zope.interface import implements
 
 from rtmpy import rtmp, util
-from rtmpy.rtmp import interfaces
+from rtmpy.rtmp import interfaces, event
 from rtmpy.rtmp.codec import header as _header
 
 
@@ -26,22 +26,21 @@ MAX_CHANNELS = 64
 MAX_STREAMS = 0xffff
 
 
-class DecodeError(rtmp.BaseError):
+class DecodeError(Exception):
     """
     Raised if there is an error decoding an RTMP bytestream.
     """
 
 
-class EncodeError(rtmp.BaseError):
+class EncodeError(Exception):
     """
     Raised if there is an error encoding an RTMP bytestream.
     """
 
 
-class NoManagerError(rtmp.BaseError):
+class ProtocolError(Exception):
     """
-    Raised if an operation performed on a channel requires a registered
-    manager.
+    Raised if an error occurs whilst handling the protocol.
     """
 
 
@@ -67,28 +66,13 @@ class Channel(object):
 
     implements(interfaces.IChannel)
 
-    def __init__(self):
-        self.manager = None
+    def __init__(self, manager):
+        self.manager = manager
         self.header = None
         self.buffer = None
         self.observer = None
 
         self.debug = rtmp.DEBUG
-
-    def registerManager(self, manager):
-        """
-        Registers a manager to this channel. The channel will L{reset} itself
-        when a manager is registered.
-
-        @param manager: The manager to register to this channel.
-        @type manager: L{interfaces.IChannelManager}
-        """
-        if not interfaces.IChannelManager.providedBy(manager):
-            raise TypeError('Expected IChannelManager for manager '
-                '(got %s)' % (type(manager),))
-
-        self.manager = manager
-        self.reset()
 
     def registerObserver(self, observer):
         """
@@ -98,33 +82,24 @@ class Channel(object):
         @param observer: The observer for this channel.
         @type observer: L{interfaces.IChannelObserver}
         """
-        if not interfaces.IChannelObserver.providedBy(observer):
-            raise TypeError('Expected IChannelObserver for observer '
-                '(got %s)' % (type(observer),))
-
         self.observer = observer
 
         if self.buffer is not None:
-            self.observer.dataReceived(self, self.buffer)
+            self.observer.dataReceived(self.buffer)
             self.buffer = None
 
     def reset(self):
         """
         Called to reset the channel's context.
 
-        @note: Does not reset any header information that may already be
-            applied to this channel.
+        @note: Does not reset any header information or observer that may
+            already be applied to this channel.
         @raise ChannelError: If no manager has been registered.
         """
-        if self.manager is None:
-            raise NoManagerError('Resetting a channel requires a '
-                'registered manager')
-
         self.frameRemaining = self.manager.frameSize
         self.frames = 0
         self.bytes = 0
         self.buffer = None
-        self.observer = None
         self.bodyRemaining = None
 
     def getHeader(self):
@@ -149,15 +124,6 @@ class Channel(object):
         if self.debug or rtmp.DEBUG:
             rtmp.log(self, 'setHeader(%s)' % (header,))
 
-        # this method is going to be called a lot - is this strictly
-        # necessary?
-        if not interfaces.IHeader.providedBy(header):
-            raise TypeError("Expected header to implement IHeader")
-
-        if self.manager is None:
-            raise NoManagerError(
-                'Setting the header requires a registered manager')
-
         if self.header is None:
             if header.relative is True:
                 raise _header.HeaderError(
@@ -171,13 +137,12 @@ class Channel(object):
         if header.relative is False:
             old_header, self.header = self.header, header
 
-            if old_header is None:
-                self.manager.initialiseChannel(self)
+            self.manager.initialiseChannel(self, old_header)
         else:
-            # this stops a circular import error
-            from rtmpy.rtmp.codec.header import mergeHeaders
+            if self.observer is not None:
+                self.observer.headerChanged(header)
 
-            self.header = mergeHeaders(self.header, header)
+            self.header = _header.mergeHeaders(self.header, header)
 
         self.bodyRemaining = self.header.bodyLength - self.bytes
 
@@ -188,7 +153,7 @@ class Channel(object):
         registered.
         """
         if self.observer is not None:
-            self.observer.dataReceived(self, data)
+            self.observer.dataReceived(data)
 
             return
 
@@ -237,15 +202,14 @@ class Channel(object):
         if self.debug or rtmp.DEBUG:
             rtmp.log(self, 'Received %d bytes' % (l,))
 
-        self._write(data)
-
         self.bytes += l
         self.bodyRemaining -= l
+        self._adjustFrameRemaining(l)
+
+        self._write(data)
 
         if self.bodyRemaining == 0:
             self.onComplete()
-
-        self._adjustFrameRemaining(l)
 
     def onComplete(self):
         """
@@ -284,13 +248,6 @@ class Channel(object):
         )
 
 
-class Stream(object):
-    """
-    """
-
-    implements(interfaces.IStream)
-
-
 class BaseCodec(object):
     """
     Abstract functionality for an rtmp codec. Manages the creation/deletion
@@ -304,8 +261,6 @@ class BaseCodec(object):
         L{getJob}.
     @ivar channels: A collection of channels.
     @type channels: C{dict} of C{id: L{Channel}}
-    @ivar channels: A collection of streams.
-    @type channels: C{dict} of C{id: L{Stream}}
     @ivar frameSize: The number of bytes for each frame content.
     @type frameSize: C{int}
     """
@@ -313,13 +268,12 @@ class BaseCodec(object):
     implements(interfaces.IChannelManager)
 
     channel_class = Channel
-    stream_class = Stream
 
-    def __init__(self):
+    def __init__(self, protocol):
+        self.protocol = protocol
         self.channels = {}
-        self.streams = {}
+        self.activeChannels = []
 
-        self.observer = None
         self.deferred = None
         self.frameSize = FRAME_SIZE
 
@@ -331,20 +285,6 @@ class BaseCodec(object):
     def __del__(self):
         if hasattr(self, 'job') and self.job.running:
             self.job.stop()
-
-    def registerObserver(self, observer):
-        """
-        Registers an observer on this codec to allow channel/stream events to
-        propagate.
-
-        @param observer: The observer to be registered.
-        @type observer: L{interfaces.ICodecObserver}
-        """
-        if not interfaces.ICodecObserver.providedBy(observer):
-            raise TypeError('Expected ICodecObserver for observer '
-                '(got %s)' % (type(observer),))
-
-        self.observer = observer
 
     def getJob(self):
         """
@@ -403,8 +343,7 @@ class BaseCodec(object):
             raise IndexError("channelId is out of range (got:%d)" % (
                 channelId,))
 
-        channel = self.channels[channelId] = BaseCodec.channel_class()
-        channel.registerManager(self)
+        channel = self.channels[channelId] = self.channel_class(self)
 
         return channel
 
@@ -429,7 +368,7 @@ class BaseCodec(object):
         """
         Returns a free channelId.
         """
-        keys = self.channels.keys()
+        keys = self.activeChannels.sort()
 
         if len(keys) == MAX_CHANNELS:
             raise OverflowError("No free channel")
@@ -447,71 +386,44 @@ class BaseCodec(object):
         """
         Called when the body of the channel has been satisfied.
         """
+        if self.debug or rtmp.DEBUG:
+            rtmp.log(self, 'channelComplete(%s)' % (channel,))
+
         header = channel.getHeader()
 
         if channel.observer:
-            channel.observer.bodyComplete(channel)
+            channel.observer.bodyComplete()
 
         channel.reset()
+        header = channel.getHeader()
 
-    def initialiseChannel(self, channel):
+        self.activeChannels.remove(header.channelId)
+
+    def initialiseChannel(self, channel, oldHeader):
         """
         Called when a header has been applied to an inactive channel.
+
+        @param channel: The channel that the new header has been applied to.
+        @type channel: L{Channel}
+        @param oldHeader: The previous header on the channel before the new
+            one was applied.
+        @type oldHeader: L{Header}
         """
         if channel.manager != self:
             raise ValueError("Cannot initialise a channel that isn\'t "
                 "registered to this manager")
 
         channel.reset()
+        header = channel.getHeader()
 
-        # we give the codec's observer a chance to decide to handle the
-        # channel data - this is especially important for video/audio data
-        # which means we can 'stream' it rather than buffering until the
-        # channel is complete - which would be crazy for large streams
-
-        if self.observer:
-            self.observer.channelStart(channel)
+        self.activeChannels.append(header.channelId)
 
     def setFrameSize(self, size):
         self.frameSize = size
 
-        for channel in self.channels.values():
-            channel.frameRemaining = size
+        for channelId in self.activeChannels:
+            self.channels[channelId].frameRemaining = size
 
-    # interfaces.IStreamManager
-
-    def registerStream(self, streamId, stream):
-        """
-        Registers a stream to this manager.
-        """
-        if streamId < 0 or streamId > MAX_STREAMS:
-            raise ValueError('streamId is not in range (got:%d)' % (
-                int(streamId),))
-
-        if not interfaces.IStream.providedBy(stream):
-            raise TypeError('IStream interface expected (got:%r)' % (
-                type(stream),))
-
-        if streamId in self.streams.keys():
-            raise IndexError('Stream already registered (streamId:%d)' % (
-                int(streamId),))
-
-        self.streams[int(streamId)] = stream
-
-    def removeStream(self, streamId):
-        """
-        Removes a registered stream from the manager.
-        """
-        i = int(streamId)
-
-        try:
-            s = self.streams[i]
-        except KeyError:
-            raise IndexError('Unknown streamId %d' % (i,))
-
-        del self.streams[i]
-
-        return s
 
 class Decoder(BaseCodec):
     """
@@ -523,8 +435,8 @@ class Decoder(BaseCodec):
     @type currentChannel: L{interfaces.IChannel}
     """
 
-    def __init__(self,):
-        BaseCodec.__init__(self)
+    def __init__(self, protocol):
+        BaseCodec.__init__(self, protocol)
 
         self.currentChannel = None
 
@@ -712,6 +624,27 @@ class Decoder(BaseCodec):
 
         self.currentChannel = None
 
+        header = channel.getHeader()
+        stream = self.protocol.getStream(header.streamId)
+
+        stream.channelUnregistered(channel)
+
+    def initialiseChannel(self, channel, oldHeader):
+        """
+        Called when a header has been applied to an inactive channel.
+        """
+        BaseCodec.initialiseChannel(self, channel, oldHeader)
+
+        header = channel.getHeader()
+
+        if oldHeader is not None and oldHeader.streamId != header.streamId:
+            stream = self.protocol.getStream(oldHeader.streamId)
+
+            stream.channelUnregistered(channel)
+
+        stream = self.protocol.getStream(header.streamId)
+        stream.channelRegistered(channel)
+
 
 class ChannelContext(object):
     """
@@ -739,9 +672,10 @@ class ChannelContext(object):
         self.header = None
         self.bytes = 0
 
-        self.channel.registerConsumer(self)
+        self.queue = []
+        self.currentPacket = None
 
-    def write(self, data):
+    def dataReceived(self, data):
         """
         Called by the channel when data becomes available. Data is appended to
         the L{buffer} and if the channel is activated if it is not already.
@@ -753,6 +687,9 @@ class ChannelContext(object):
             self.active = True
 
     def _deactivate(self):
+        if len(self.queue) > 0:
+            return
+
         self.encoder.deactivateChannel(self.channel)
         self.active = False
 
@@ -805,7 +742,7 @@ class ChannelContext(object):
         Returns the minimum number of bytes required to complete a frame.
         @rtype: C{int}
         """
-        bytesLeft = self.channel.bytes - self.bytes
+        bytesLeft = self.channel.bodyRemaining - self.bytes
         frameSize = self.encoder.frameSize
 
         available = min(bytesLeft, frameSize)
@@ -821,6 +758,12 @@ class ChannelContext(object):
         """
         self.header = self.channel.getHeader()
 
+    def headerChanged(self, header):
+        print 'header changed', header
+
+    def bodyComplete(self):
+        pass
+
 
 class Encoder(BaseCodec):
     """
@@ -834,8 +777,8 @@ class Encoder(BaseCodec):
     @type scheduler: L{interfaces.IChannelScheduler}
     """
 
-    def __init__(self):
-        BaseCodec.__init__(self)
+    def __init__(self, protocol):
+        BaseCodec.__init__(self, protocol)
 
         self.channelContext = {}
         self.consumer = None
@@ -867,14 +810,24 @@ class Encoder(BaseCodec):
         """
         self.consumer = consumer
 
+    def createChannel(self, channelId):
+        channel = BaseCodec.createChannel(self, channelId)
+
+        context = self.channelContext[channel] = ChannelContext(channel, self)
+        channel.registerObserver(context)
+
+        return channel
+
     def activateChannel(self, channel):
         """
         Flags a channel as actively producing data.
         """
-        if not channel in self.channelContext:
-            self.channelContext[channel] = ChannelContext(channel, self)
+        context = self.channelContext[channel]
 
-        self.channelContext[channel].active = True
+        if context.active:
+            return
+
+        context.active = True
         self.scheduler.activateChannel(channel)
 
     def deactivateChannel(self, channel):
@@ -887,6 +840,33 @@ class Encoder(BaseCodec):
 
         self.channelContext[channel].active = False
         self.scheduler.deactivateChannel(channel)
+
+    def _runQueue(self, context):
+        """
+        """
+        if self.debug or rtmp.DEBUG:
+            rtmp.log(self, 'runQueue(%s)' % (context,))
+            rtmp.log(self, 'channel = %r' % (context.channel,))
+            print context.queue, len(context.buffer)
+
+        channel = context.channel
+
+        if context.currentPacket:
+            context.currentPacket.callback(None)
+            context.currentPacket = None
+
+        try:
+            header, payload, d = context.queue[0]
+            context.currentPacket = d
+            del context.queue[0]
+        except IndexError:
+            if len(context.buffer) == 0:
+                self.deactivateChannel(channel)
+
+            return
+
+        channel.setHeader(header)
+        channel.dataReceived(payload)
 
     def writeFrame(self, context):
         """
@@ -918,7 +898,7 @@ class Encoder(BaseCodec):
         to the C{consumer}. If there is nothing to do then L{pause} will be
         called.
         """
-        channel = self.scheduler.getNextChannel()
+        channel = self.getNextChannel()
 
         if channel is None:
             self.pause()
@@ -931,3 +911,34 @@ class Encoder(BaseCodec):
             self.consumer.write(self.buffer.getvalue())
 
             self.buffer.truncate(0)
+
+    def channelComplete(self, channel):
+        BaseCodec.channelComplete(self, channel)
+
+        context = self.channelContext[channel]
+        self._runQueue(context)
+
+    def writePacket(self, streamId, channelId, datatype, payload, timestamp=None):
+        kwargs = {
+            'channelId': channelId,
+            'streamId': streamId,
+            'datatype': datatype,
+            'bodyLength': len(payload),
+            'timestamp': timestamp
+        }
+
+        header = _header.Header(**kwargs)
+        d = defer.Deferred()
+
+        channel = self.getChannel(channelId)
+        context = self.channelContext[channel]
+
+        if len(context.queue) == 0 and context.active is False:
+            channel.setHeader(header)
+            context.dataReceived(payload)
+            d.callback(None)
+        else:
+            context.queue.append((header, payload, d))
+            self.activateChannel(channel)
+
+        return d

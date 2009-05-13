@@ -41,7 +41,11 @@ class Header(object):
         self.datatype = kwargs.get('datatype', None)
         self.bodyLength = kwargs.get('bodyLength', None)
         self.streamId = kwargs.get('streamId', None)
-        self.relative = kwargs.get('relative', None)
+
+    def _get_relative(self):
+        return None in [self.timestamp, self.datatype, self.bodyLength, self.streamId]
+
+    relative = property(_get_relative)
 
     def __repr__(self):
         s = ['%s=%r' % (k, v) for k, v in self.__dict__.iteritems()]

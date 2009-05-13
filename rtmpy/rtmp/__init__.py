@@ -18,10 +18,12 @@ packets are split up into fixed size body chunks.
 @see: U{RTMP (external)<http://rtmpy.org/wiki/RTMP>}
 """
 
-from twisted.internet import protocol
+from twisted.internet import protocol, defer
 from zope.interface import implements
+from odict import odict
 
-from rtmpy.rtmp import interfaces
+from rtmpy.rtmp import interfaces, stream, scheduler
+from rtmpy import util
 
 #: Set this to C{True} to force all rtmp.* instances to log debugging messages
 DEBUG = False
@@ -55,7 +57,7 @@ class BaseProtocol(protocol.Protocol):
     @type encrypted: C{bool}
     """
 
-    implements(interfaces.IHandshakeObserver, interfaces.ICodecObserver)
+    implements(interfaces.IHandshakeObserver)
 
     HANDSHAKE = 'handshake'
     STREAM = 'stream'
@@ -146,13 +148,13 @@ class BaseProtocol(protocol.Protocol):
             log(self, "Successful handshake")
 
         self.state = self.STREAM
+        self.streams = {}
 
-        self.decoder = codec.Decoder()
-        self.encoder = codec.Encoder()
+        self.decoder = codec.Decoder(self)
+        self.encoder = codec.Encoder(self)
 
         # we only need to register for events on the decoder - the encoder
         # takes care of itself (at least so far)
-        self.decoder.registerObserver(self)
         self.encoder.registerConsumer(self.transport)
 
         del self.handshaker
@@ -174,13 +176,26 @@ class BaseProtocol(protocol.Protocol):
         """
         self.transport.write(data)
 
-    # interfaces.ICodecObserver
+    def writePacket(self, *args, **kwargs):
+        d = self.encoder.writePacket(*args, **kwargs)
 
-    def channelStart(self, channel):
+        if self.encoder.deferred is None:
+            self.encoder.start().addErrback(self.logAndDisconnect)
+
+        return d
+
+    # interfaces.IStreamManager
+
+    def registerStream(self, streamId, stream):
         """
-        Called when a channel has started to be decoded.
         """
-        header = channel.getHeader()
+        self.streams[streamId] = stream
+        stream.streamId = streamId
+
+    def getStream(self, streamId):
+        """
+        """
+        return self.streams[streamId]
 
 
 class ClientProtocol(BaseProtocol):
@@ -247,10 +262,43 @@ class ServerProtocol(BaseProtocol):
         main RTMP stream (as any data after the handshake must be RTMP).
         """
         b = self.handshaker.buffer
+
         BaseProtocol.handshakeSuccess(self)
+
+        self.encoder.registerScheduler(scheduler.LoopingChannelScheduler())
+
+        self.registerStream(0, stream.ServerControlStream(self))
+        self.client = None
 
         if len(b) > 0:
             self.dataReceived(b)
+
+    def onConnect(self, *args):
+        """
+        Called when a 'connect' packet is received from the endpoint.
+        """
+        stream = self.getStream(0)
+        r = defer.Deferred()
+
+        def cb(res):
+            print 'sending response'
+            # connection always succeeds
+            r.callback((
+                odict([('capabilities', 31), ('fmsVer', u'FMS/3,0,1,123')]),
+                odict([('code', u'NetConnection.Connect.Success'), ('objectEncoding', 0), ('description', u'Connection succeeded.'), ('level', u'status')])
+            ))
+
+        def writeClientBW(res):
+            print 'writing client bw'
+            d = stream.writeEvent(event.ClientBandwidth(2500000L, 2), channelId=2)
+
+            d.addCallback(cb)
+
+        d = stream.writeEvent(event.ServerBandwidth(2500000L), channelId=2)
+        d.addCallback(writeClientBW)
+
+
+        return r
 
 
 class ServerFactory(protocol.Factory):

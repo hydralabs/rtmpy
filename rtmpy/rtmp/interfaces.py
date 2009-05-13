@@ -102,12 +102,6 @@ class IChannel(Interface):
         except the header.
         """
 
-    def onComplete():
-        """
-        Called when the channel has received all of the body data. Used to
-        inform the manager and observer of the event.
-        """
-
 
 class IChannelManager(Interface):
     """
@@ -165,7 +159,7 @@ class IChannelObserver(Interface):
     Observes L{IChannel} events.
     """
 
-    def dataReceived(channel, data):
+    def dataReceived(data):
         """
         Called when the channel receives some data.
 
@@ -175,13 +169,21 @@ class IChannelObserver(Interface):
         @type data: C{str}
         """
 
-    def bodyComplete(channel):
+    def bodyComplete():
         """
         Called when the amount of data received by the channel matches that
         of its header.
 
         @param channel: The channel that completed its body.
         @type channel: {IChannel}
+        """
+
+    def headerChanged(header):
+        """
+        A new header was set on the channel.
+
+        @param header: The new relative header.
+        @type header: L{IHeader}
         """
 
 
@@ -265,9 +267,9 @@ class IHandshakeNegotiator(Interface):
         """
 
 
-class IPacket(Interface):
+class IEvent(Interface):
     """
-    An RTMP Packet.
+    An RTMP Event.
 
     @see: L{http://osflash.org/documentation/rtmp#rtmp_datatypes}
     """
@@ -289,36 +291,15 @@ class IPacket(Interface):
         """
 
 
-class IStreamingPacket(IPacket):
-    """
-    Flags an L{IPacket} as streaming. This means that the codec/stream should
-    not wait to en/decode the data.
-    """
-
-
-class ICodecObserver(Interface):
-    """
-    An object that observes RTMP codec events.
-    """
-
-    def channelStart(channel):
-        """
-        Called when a new channel has been started to be decoded.
-
-        @param channel: The channel that has been reset.
-        @type channel: L{IChannel}
-        """
-
-
 class IStream(Interface):
     """
     A stream sends or receives RTMP packets.
     """
 
-    time = Attribute(
+    timestamp = Attribute(
         "")
 
-    def send(packet, channelId=None):
+    def send(packet):
         """
         Dispatch packets to the RTMP stream.
         """
@@ -327,6 +308,18 @@ class IStream(Interface):
         """
         Called when a packet is received from the stream.
         """
+
+    def onChannelRegistered(channel):
+        """
+        Called when the decoder has registered a channel with this stream.
+        """
+
+
+class IStreamable(Interface):
+    """
+    Flags the implementing class as streaming. Used for marking audio/video
+    data events so that any observers are immediately notified.
+    """
 
 
 class IStreamManager(Interface):
