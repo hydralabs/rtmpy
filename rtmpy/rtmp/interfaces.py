@@ -290,6 +290,105 @@ class IEvent(Interface):
         @type bbs: L{rtmpy.util.BufferedByteStream}
         """
 
+    def dispatch(listener):
+        """
+        Dispatch the event to the listener. Calls the correct method with the
+        correct args according to L{IEventListener}.
+
+        @param listener: Receives the event dispatch request.
+        @type listener: L{IEventListener}
+        @return: Whatever is returned by the call to C{listener}.
+        @rtype: C{mixed}
+        """
+
+
+class IEventListener(Interface):
+    """
+    Receives dispatched events.
+    """
+
+    def onInvoke(invoke):
+        """
+        Called when an invoke event have been received.
+
+        @param invoke: The object representing the call request. See
+            L{rtmpy.rtmp.event.Invoke} for an example implementation.
+        @return: The response, or a L{defer.Deferred} that will return the
+            response.
+        """
+
+    def onNotify(notify):
+        """
+        Similar to L{onInvoke} but no response is expected and will be
+        ignored.
+
+        @param notify: The object representing the notify request.
+        @return: Ignored
+        """
+
+    def onFrameSize(size):
+        """
+        Called when the RTMP frame size has changed.
+
+        @param size: The new size of the frames.
+        @type size: C{int}
+        """
+
+    def onBytesRead(bytes):
+        """
+        Called when the connected endpoint reports the number of raw bytes
+        read from the stream.
+
+        @param bytes: The number of bytes read.
+        @type bytes: C{int}
+        """
+
+    def onControlMessage(message):
+        """
+        Called when a control message is received by the connected endpoint.
+
+        @param message: The received message.
+        @type message: L{rtmpy.rtmp.event.ControlMessage}
+        """
+
+    def onDownstreamBandwidth(bandwidth):
+        """
+        Called when the connected endpoint reports its downstream bandwidth
+        limit.
+
+        @param bandwidth: The amount of bandwidth available (it appears to be
+            measured in KBps).
+        @type bandwidth: C{int}
+        """
+
+    def onUpstreamBandwidth(bandwidth, extra):
+        """
+        Called when the connected endpoint reports its upstream bandwidth
+        limit.
+
+        @param bandwidth: The amount of bandwidth available (it appears to be
+            measured in KBps).
+        @type bandwidth: C{int}
+        @param extra: Not quite sure what this represents atm.
+        @type extra: C{int}
+        """
+
+    def onAudioData(data):
+        """
+        Called when audio data is received.
+
+        @param data: The raw data received on the audio channel.
+        @type data: C{str}
+        """
+
+    def onVideoData(data):
+        """
+        Called when video data is received.
+
+        @param data: The raw data received on the video channel.
+        @type data: C{str}
+        """
+
 
 class IStream(Interface):
     """

@@ -21,9 +21,9 @@ BYTES_READ = 0x03
 #: A stream control message, has subtypes
 CONTROL = 0x04
 #: The servers downstream bandwidth
-SERVER_BANDWIDTH = 0x05
+DOWNSTREAM_BANDWIDTH = 0x05
 #: The clients upstream bandwidth
-CLIENT_BANDWIDTH = 0x06
+UPSTREAM_BANDWIDTH = 0x06
 #: Packet containing audio
 AUDIO_DATA = 0x07
 #: Packet containing video data
@@ -70,7 +70,7 @@ class EncodeError(BaseError):
 
 class BaseEvent(object):
     """
-    An abstract class that all event types must extend.
+    An abstract class that all event types extend.
     """
 
     implements(interfaces.IEvent)
@@ -100,12 +100,18 @@ class FrameSize(BaseEvent):
     def decode(self, buf):
         """
         Decode a frame size event.
+
+        @param buf: Contains the encoded data.
+        @type buf: L{BufferedByteStream}
         """
         self.size = buf.read_ulong()
 
     def encode(self, buf):
         """
         Encode a frame size event.
+
+        @param buf: Receives the encoded data.
+        @type buf: L{BufferedByteStream}
         """
         if self.size is None:
             raise EncodeError('Frame size not set')
@@ -116,33 +122,60 @@ class FrameSize(BaseEvent):
             raise EncodeError('Frame size wrong type '
                 '(expected int, got %r)' % (type(self.size),))
 
+    def dispatch(self, listener):
+        """
+        Dispatches an 'onFrameSize' event to the listener.
+
+        @param listener: The listener to frame size events.
+        @type listener: L{interfaces.IEventListener}
+        """
+        return listener.onFrameSize(self.size)
+
 
 class BytesRead(BaseEvent):
     """
-    Number of bytes read?
+    A bytes read event.
+
+    @param bytes: The number of bytes read.
+    @type bytes: C{int}
     """
 
-    def __init__(self, size=None):
-        self.size = size
+    def __init__(self, bytes=None):
+        self.bytes = bytes
 
     def decode(self, buf):
         """
         Decode a bytes read event.
+
+        @param buf: Contains the encoded data.
+        @type buf: L{BufferedByteStream}
         """
-        self.size = buf.read_ulong()
+        self.bytes = buf.read_ulong()
 
     def encode(self, buf):
         """
         Encode a bytes read event.
+
+        @param buf: Receives the encoded data.
+        @type buf: L{BufferedByteStream}
         """
-        if self.size is None:
+        if self.bytes is None:
             raise EncodeError('Bytes read not set')
 
         try:
-            buf.write_ulong(self.size)
+            buf.write_ulong(self.bytes)
         except TypeError:
             raise EncodeError('Bytes read wrong type '
-                '(expected int, got %r)' % (type(self.size),))
+                '(expected int, got %r)' % (type(self.bytes),))
+
+    def dispatch(self, listener):
+        """
+        Dispatches an 'onBytesRead' event to the listener.
+
+        @param listener: The event listener.
+        @type listener: L{interfaces.IEventListener}
+        """
+        return listener.onBytesRead(self.bytes)
 
 
 class ControlEvent(BaseEvent):
@@ -165,10 +198,27 @@ class ControlEvent(BaseEvent):
             self.__class__.__name__, self.type, self.value1, self.value2,
             self.value3, id(self))
 
+    def decode(self, buf):
+        """
+        Decode a control message event.
+
+        @param buf: Contains the encoded data.
+        @type buf: L{BufferedByteStream}
+        """
+        self.type = buf.read_short()
+        self.value1 = buf.read_long()
+        self.value2 = buf.read_long()
+        self.value3 = buf.read_long()
+
     def encode(self, buf):
+        """
+        Encode a control message event.
+
+        @param buf: Receives the encoded data.
+        @type buf: L{BufferedByteStream}
+        """
         if self.type is None:
-            raise EncodeError('Unknown control type (type:%r)' % (
-                self.type,))
+            raise EncodeError('Type not set')
 
         try:
             buf.write_short(self.type)
@@ -194,16 +244,19 @@ class ControlEvent(BaseEvent):
             raise EncodeError('TypeError encoding value3 '
                 '(expected int, got %r)' % (type(self.value3),))
 
-    def decode(self, buf):
-        self.type = buf.read_short()
-        self.value1 = buf.read_long()
-        self.value2 = buf.read_long()
-        self.value3 = buf.read_long()
+    def dispatch(self, listener):
+        """
+        Dispatches an 'onControlMessage' event to the listener.
+
+        @param listener: The event listener.
+        @type listener: L{interfaces.IEventListener}
+        """
+        return listener.onControlMessage(self)
 
 
-class ServerBandwidth(BaseEvent):
+class DownstreamBandwidth(BaseEvent):
     """
-    A server bandwidth event.
+    A downstream bandwidth event.
     """
 
     def __init__(self, bandwidth=None):
@@ -211,27 +264,46 @@ class ServerBandwidth(BaseEvent):
 
     def decode(self, buf):
         """
-        Decode a server bandwidth event.
+        Decode a downstream bandwidth event.
+
+        @param buf: Contains the encoded data.
+        @type buf: L{BufferedByteStream}
         """
         self.bandwidth = buf.read_ulong()
 
     def encode(self, buf):
         """
-        Encode a server bandwidth event.
+        Encode a downstream bandwidth event.
+
+        @param buf: Receives the encoded data.
+        @type buf: L{BufferedByteStream}
         """
         if self.bandwidth is None:
-            raise EncodeError('Server bandwidth not set')
+            raise EncodeError('Downstream bandwidth not set')
 
         try:
             buf.write_ulong(self.bandwidth)
         except TypeError:
-            raise EncodeError('Server bandwidth wrong type '
+            raise EncodeError('TypeError for downstream bandwidth '
                 '(expected int, got %r)' % (type(self.bandwidth),))
 
+    def dispatch(self, listener):
+        """
+        Dispatches an 'onDownstreamBandwidth' event to the listener.
 
-class ClientBandwidth(BaseEvent):
+        @param listener: The event listener.
+        @type listener: L{interfaces.IEventListener}
+        """
+        return listener.onDownstreamBandwidth(self)
+
+
+class UpstreamBandwidth(BaseEvent):
     """
-    A server bandwidth event.
+    An upstream bandwidth event.
+
+    @param bandwidth: The upstream bandwidth available.
+    @type bandwidth: C{int}
+    @param extra: Not sure what this is supposed to represent atm.
     """
 
     def __init__(self, bandwidth=None, extra=None):
@@ -240,37 +312,58 @@ class ClientBandwidth(BaseEvent):
 
     def decode(self, buf):
         """
-        Decode a client bandwidth event.
+        Decode an upstream bandwidth event.
+
+        @param buf: Contains the encoded data.
+        @type buf: L{BufferedByteStream}
         """
         self.bandwidth = buf.read_ulong()
         self.extra = buf.read_uchar()
 
     def encode(self, buf):
         """
-        Encode a client bandwidth event.
+        Encode an upstream bandwidth event.
+
+        @param buf: Receives the encoded data.
+        @type buf: L{BufferedByteStream}
         """
         if self.bandwidth is None:
-            raise EncodeError('Client bandwidth not set')
+            raise EncodeError('Upstream bandwidth not set')
 
         if self.extra is None:
-            raise EncodeError('Client extra not set')
+            raise EncodeError('Extra not set')
 
         try:
             buf.write_ulong(self.bandwidth)
         except TypeError:
-            raise EncodeError('Client bandwidth wrong type '
+            raise EncodeError('TypeError: Upstream bandwidth '
                 '(expected int, got %r)' % (type(self.bandwidth),))
 
         try:
             buf.write_uchar(self.extra)
         except TypeError:
-            raise EncodeError('Client extra wrong type '
+            raise EncodeError('TypeError: extra '
                 '(expected int, got %r)' % (type(self.extra),))
+
+    def dispatch(self, listener):
+        """
+        Dispatches an 'onUpstreamBandwidth' event to the listener.
+
+        @param listener: The event listener.
+        @type listener: L{interfaces.IEventListener}
+        """
+        return listener.onUpstreamBandwidth(self.bandwidth, self.extra)
 
 
 class Notify(BaseEvent):
     """
-    Stream notification event.
+    A notification event.
+
+    @param name: The method name to call.
+    @type name: C{str}
+    @param id: The global identifier (per connection) for the call.
+    @type id: C{int}
+    @param argv: A list of elements to represent the method arguments.
     """
 
     def __init__(self, name=None, id=None, *args):
@@ -282,20 +375,17 @@ class Notify(BaseEvent):
         return '<%s name=%r id=%r argv=%r at 0x%x>' % (
             self.__class__.__name__, self.name, self.id, self.argv, id(self))
 
-    def encode(self, buf, encoding=pyamf.AMF0):
-        def _encode():
-            encoder = pyamf.get_encoder(encoding)
-            encoder.stream = buf
-
-            for e in [self.name, self.id]:
-                encoder.writeElement(e)
-
-            for e in self.argv:
-                encoder.writeElement(e)
-
-        return threads.deferToThread(_encode)
-
     def decode(self, buf, encoding=pyamf.AMF0):
+        """
+        Decode a notification event.
+
+        @param buf: Contains the encoded data.
+        @type buf: L{BufferedByteStream}
+        @param encoding: The AMF encoding type. Defaults to AMF0.
+        @return: A L{defer.Deferred} that will `callback` when the decoding is
+            finished.
+        @rtype: L{defer.Deferred}
+        """
         def _decode():
             decoder = pyamf.get_decoder(encoding)
             decoder.stream = buf
@@ -310,6 +400,38 @@ class Notify(BaseEvent):
 
         return threads.deferToThread(_decode)
 
+    def encode(self, buf, encoding=pyamf.AMF0):
+        """
+        Decode a notification event.
+
+        @param buf: Contains the encoded data.
+        @type buf: L{BufferedByteStream}
+        @param encoding: The AMF encoding type. Defaults to AMF0.
+        @return: A L{defer.Deferred} that will `callback` when the encoding is
+            finished.
+        @rtype: L{defer.Deferred}
+        """
+        def _encode():
+            encoder = pyamf.get_encoder(encoding)
+            encoder.stream = buf
+
+            for e in [self.name, self.id]:
+                encoder.writeElement(e)
+
+            for e in self.argv:
+                encoder.writeElement(e)
+
+        return threads.deferToThread(_encode)
+
+    def dispatch(self, listener):
+        """
+        Dispatches an 'onNotify' event to the listener.
+
+        @param listener: The event listener.
+        @type listener: L{interfaces.IEventListener}
+        """
+        return listener.onNotify(self)
+
 
 class Invoke(Notify):
     """
@@ -317,80 +439,95 @@ class Invoke(Notify):
     """
 
     def dispatch(self, listener):
+        """
+        Dispatches an 'onInvoke' event to the listener.
+
+        @param listener: The event listener.
+        @type listener: L{interfaces.IEventListener}
+        """
         return listener.onInvoke(self)
 
 
-class AudioData(BaseEvent):
+class BaseStreamingEvent(BaseEvent):
+    """
+    An event containing streaming data.
+
+    @param data: The raw audio data.
+    @type data: C{str}
+    """
+
+    implements(interfaces.IStreamable)
+
+    def __init__(self, data=None):
+        self.data = data
+
+    def decode(self, buf):
+        """
+        Decode a streaming event.
+
+        @param buf: Contains the encoded data.
+        @type buf: L{BufferedByteStream}
+        """
+        self.data = buf.read()
+
+    def encode(self, buf):
+        """
+        Encode a streaming event.
+
+        @param buf: Receives the encoded data.
+        @type buf: L{BufferedByteStream}
+        """
+        if self.data is None:
+            raise EncodeError('No data set')
+
+        try:
+            buf.write(self.data)
+        except TypeError:
+            raise EncodeError('TypeError: data (expected str, got %r)' % (
+                type(self.data),))
+
+
+class AudioData(BaseStreamingEvent):
     """
     A event containing audio data.
     """
 
-    implements(interfaces.IStreamable)
-
-    def __init__(self, data=None):
-        self.data = data
-
-    def decode(self, buf):
+    def dispatch(self, listener):
         """
-        Decode an audio event.
+        Dispatches an 'onAudioData' event to the listener.
+
+        @param listener: The event listener.
+        @type listener: L{interfaces.IEventListener}
         """
-        self.data = buf.read()
-
-    def encode(self, buf):
-        """
-        Encode an audio event.
-        """
-        if self.data is None:
-            raise EncodeError('No audio data set')
-
-        try:
-            buf.write(self.data)
-        except TypeError:
-            raise EncodeError('Audio data wrong type '
-                '(expected str, got %r)' % (type(self.data),))
+        return listener.onAudioData(self.data)
 
 
-class VideoData(BaseEvent):
+class VideoData(BaseStreamingEvent):
     """
-    A event containing video data. The event has no other idea of the data
-    or even if it is valid ..
+    A event containing video data.
     """
 
-    implements(interfaces.IStreamable)
-
-    def __init__(self, data=None):
-        self.data = data
-
-    def decode(self, buf):
+    def dispatch(self, listener):
         """
-        Decode an audio event.
-        """
-        self.data = buf.read()
+        Dispatches an 'onVideoData' event to the listener.
 
-    def encode(self, buf):
+        @param listener: The event listener.
+        @type listener: L{interfaces.IEventListener}
         """
-        Encode a video event. 
-        """
-        if self.data is None:
-            raise EncodeError('No video data set')
-
-        try:
-            buf.write(self.data)
-        except TypeError:
-            raise EncodeError('Video data wrong type '
-                '(expected str, got %r)' % (type(self.data),))
+        return listener.onVideoData(self.data)
 
 
 TYPE_MAP = {
     FRAME_SIZE: FrameSize,
     BYTES_READ: BytesRead,
     CONTROL: ControlEvent,
-    SERVER_BANDWIDTH: ServerBandwidth,
-    CLIENT_BANDWIDTH: ClientBandwidth,
+    DOWNSTREAM_BANDWIDTH: DownstreamBandwidth,
+    UPSTREAM_BANDWIDTH: UpstreamBandwidth,
     NOTIFY: Notify,
     INVOKE: Invoke,
     AUDIO_DATA: AudioData,
-    VIDEO_DATA: VideoData
+    VIDEO_DATA: VideoData,
+    # TODO: Shared object etc.
 }
 
 
@@ -402,6 +539,7 @@ def decode(datatype, body, *args, **kwargs):
     @param datatype: The type of the event.
     @type datatype: C{int}
     @param body: The byte string holding the encoded form of the event.
+    @type body: C{str}
     @return: A deferred, whose callback will return the event instance.
     @rtype: L{defer.Deferred} that contains a {interfaces.IEvent} instance
         corresponding to C{datatype}
@@ -411,12 +549,12 @@ def decode(datatype, body, *args, **kwargs):
         wrapped by the deferred.
     """
     def _decode():
-        if datatype not in TYPE_MAP:
+        try:
+            event = TYPE_MAP[datatype]()
+        except KeyError:
             raise DecodeError('Unknown datatype \'%r\'' % (datatype,))
 
         buf = BufferedByteStream(body)
-        # create an event instance
-        event = TYPE_MAP[datatype]()
 
         def cb(res):
             # check here to ensure the whole buffer has been consumed
@@ -476,7 +614,14 @@ def encode(event, *args, **kwargs):
     return defer.maybeDeferred(_encode)
 
 
-def get_type_class(type):
+def get_type_class(datatype):
     """
+    A helper method that returns the mapped event class to the supplied
+    datatype.
+
+    @param datatype: The event type
+    @type datatype: C{int}
+    @return: The event class that is mapped to C{datatype}.
+    @rtype: C{class} implementing L{interfaces.IEvent}
     """
     return TYPE_MAP[type]

@@ -5,10 +5,10 @@
 Tests for L{rtmpy.rtmp.event}.
 """
 
+from zope.interface import implements
 from twisted.trial import unittest
 from twisted.internet import defer
 from twisted.python.failure import Failure
-from zope.interface import implements
 import pyamf
 
 from rtmpy.rtmp import interfaces, event
@@ -226,6 +226,7 @@ class BaseEventTestCase(unittest.TestCase):
 
         self.assertRaises(NotImplementedError, x.encode, None)
         self.assertRaises(NotImplementedError, x.decode, None)
+        self.assertRaises(NotImplementedError, x.dispatch, None)
 
 
 class FrameSizeTestCase(BaseTestCase):
@@ -336,7 +337,7 @@ class ControlEventTestCase(BaseTestCase):
     def test_raw_encode(self):
         x = event.ControlEvent()
         e = self.assertRaises(event.EncodeError, x.encode, self.buffer)
-        self.assertEquals(str(e), 'Unknown control type (type:None)')
+        self.assertEquals(str(e), 'Type not set')
 
         # test types ..
         x = event.ControlEvent(type='3')
@@ -690,13 +691,13 @@ class BytesReadTestCase(BaseTestCase):
 
     def test_create(self):
         x = event.BytesRead()
-        self.assertEquals(x.__dict__, {'size': None})
+        self.assertEquals(x.__dict__, {'bytes': None})
 
         x = event.BytesRead(10)
-        self.assertEquals(x.__dict__, {'size': 10})
+        self.assertEquals(x.__dict__, {'bytes': 10})
 
-        x = event.BytesRead(size=20)
-        self.assertEquals(x.__dict__, {'size': 20})
+        x = event.BytesRead(bytes=20)
+        self.assertEquals(x.__dict__, {'bytes': 20})
 
     def test_raw_encode(self):
         # test default encode
@@ -705,12 +706,12 @@ class BytesReadTestCase(BaseTestCase):
         self.assertEquals(str(e), 'Bytes read not set')
 
         # test non-int encode
-        x = event.BytesRead(size='foo.bar')
+        x = event.BytesRead(bytes='foo.bar')
         e = self.assertRaises(event.EncodeError, x.encode, self.buffer)
         self.assertEquals(str(e), 'Bytes read wrong type '
             '(expected int, got <type \'str\'>)')
 
-        x = event.BytesRead(size=50)
+        x = event.BytesRead(bytes=50)
         e = x.encode(self.buffer)
 
         self.assertEquals(e, None)
@@ -720,17 +721,17 @@ class BytesReadTestCase(BaseTestCase):
     def test_raw_decode(self):
         x = event.BytesRead()
 
-        self.assertEquals(x.size, None)
+        self.assertEquals(x.bytes, None)
         self.buffer.write('\x00\x00\x00\x32')
         self.buffer.seek(0)
 
         e = x.decode(self.buffer)
 
         self.assertEquals(e, None)
-        self.assertEquals(x.size, 50)
+        self.assertEquals(x.bytes, 50)
 
     def test_encode(self):
-        e = event.BytesRead(size=2342)
+        e = event.BytesRead(bytes=2342)
         self.executed = False
 
         def cb(r):
@@ -748,7 +749,7 @@ class BytesReadTestCase(BaseTestCase):
 
         def cb(r):
             self.assertTrue(isinstance(r, event.BytesRead))
-            self.assertEquals(r.__dict__, {'size': 2342})
+            self.assertEquals(r.__dict__, {'bytes': 2342})
             self.executed = True
 
         d = event.decode(3, '\x00\x00\t&').addCallback(cb)
@@ -758,34 +759,34 @@ class BytesReadTestCase(BaseTestCase):
         return d
 
 
-class ServerBandwidthTestCase(BaseTestCase):
+class DownstreamBandwidthTestCase(BaseTestCase):
     """
-    Tests for L{event.ServerBandwidth}
+    Tests for L{event.DownstreamBandwidth}
     """
 
     def test_create(self):
-        x = event.ServerBandwidth()
+        x = event.DownstreamBandwidth()
         self.assertEquals(x.__dict__, {'bandwidth': None})
 
-        x = event.ServerBandwidth(10)
+        x = event.DownstreamBandwidth(10)
         self.assertEquals(x.__dict__, {'bandwidth': 10})
 
-        x = event.ServerBandwidth(bandwidth=20)
+        x = event.DownstreamBandwidth(bandwidth=20)
         self.assertEquals(x.__dict__, {'bandwidth': 20})
 
     def test_raw_encode(self):
         # test default encode
-        x = event.ServerBandwidth()
+        x = event.DownstreamBandwidth()
         e = self.assertRaises(event.EncodeError, x.encode, self.buffer)
-        self.assertEquals(str(e), 'Server bandwidth not set')
+        self.assertEquals(str(e), 'Downstream bandwidth not set')
 
         # test non-int encode
-        x = event.ServerBandwidth(bandwidth='foo.bar')
+        x = event.DownstreamBandwidth(bandwidth='foo.bar')
         e = self.assertRaises(event.EncodeError, x.encode, self.buffer)
-        self.assertEquals(str(e), 'Server bandwidth wrong type '
-            '(expected int, got <type \'str\'>)')
+        self.assertEquals(str(e), "TypeError for downstream bandwidth "
+            "(expected int, got <type 'str'>)")
 
-        x = event.ServerBandwidth(bandwidth=50)
+        x = event.DownstreamBandwidth(bandwidth=50)
         e = x.encode(self.buffer)
 
         self.assertEquals(e, None)
@@ -793,7 +794,7 @@ class ServerBandwidthTestCase(BaseTestCase):
         self.assertEquals(self.buffer.getvalue(), '\x00\x00\x00\x32')
 
     def test_raw_decode(self):
-        x = event.ServerBandwidth()
+        x = event.DownstreamBandwidth()
 
         self.assertEquals(x.bandwidth, None)
         self.buffer.write('\x00\x00\x00\x32')
@@ -805,7 +806,7 @@ class ServerBandwidthTestCase(BaseTestCase):
         self.assertEquals(x.bandwidth, 50)
 
     def test_encode(self):
-        e = event.ServerBandwidth(bandwidth=2342)
+        e = event.DownstreamBandwidth(bandwidth=2342)
         self.executed = False
 
         def cb(r):
@@ -822,7 +823,7 @@ class ServerBandwidthTestCase(BaseTestCase):
         self.executed = False
 
         def cb(r):
-            self.assertTrue(isinstance(r, event.ServerBandwidth))
+            self.assertTrue(isinstance(r, event.DownstreamBandwidth))
             self.assertEquals(r.__dict__, {'bandwidth': 2342})
             self.executed = True
 
@@ -833,48 +834,48 @@ class ServerBandwidthTestCase(BaseTestCase):
         return d
 
 
-class ClientBandwidthTestCase(BaseTestCase):
+class UpstreamBandwidthTestCase(BaseTestCase):
     """
-    Tests for L{event.ClientBandwidth}
+    Tests for L{event.UpstreamBandwidth}
     """
 
     def test_create(self):
-        x = event.ClientBandwidth()
+        x = event.UpstreamBandwidth()
         self.assertEquals(x.__dict__, {'bandwidth': None, 'extra': None})
 
-        x = event.ClientBandwidth(10, 32)
+        x = event.UpstreamBandwidth(10, 32)
         self.assertEquals(x.__dict__, {'bandwidth': 10, 'extra': 32})
 
-        x = event.ClientBandwidth(bandwidth=20, extra=233)
+        x = event.UpstreamBandwidth(bandwidth=20, extra=233)
         self.assertEquals(x.__dict__, {'bandwidth': 20, 'extra': 233})
 
     def test_raw_encode(self):
         # test default encode
-        x = event.ClientBandwidth()
+        x = event.UpstreamBandwidth()
         e = self.assertRaises(event.EncodeError, x.encode, self.buffer)
-        self.assertEquals(str(e), 'Client bandwidth not set')
+        self.assertEquals(str(e), 'Upstream bandwidth not set')
         self.buffer.truncate(0)
 
-        x = event.ClientBandwidth(bandwidth='234')
+        x = event.UpstreamBandwidth(bandwidth='234')
         e = self.assertRaises(event.EncodeError, x.encode, self.buffer)
-        self.assertEquals(str(e), 'Client extra not set')
-        self.buffer.truncate(0)
-
-        # test non-int encode
-        x = event.ClientBandwidth(bandwidth='foo.bar', extra=234)
-        e = self.assertRaises(event.EncodeError, x.encode, self.buffer)
-        self.assertEquals(str(e), 'Client bandwidth wrong type '
-            '(expected int, got <type \'str\'>)')
+        self.assertEquals(str(e), 'Extra not set')
         self.buffer.truncate(0)
 
         # test non-int encode
-        x = event.ClientBandwidth(bandwidth=1200, extra='asdfas')
+        x = event.UpstreamBandwidth(bandwidth='foo.bar', extra=234)
         e = self.assertRaises(event.EncodeError, x.encode, self.buffer)
-        self.assertEquals(str(e), 'Client extra wrong type '
-            '(expected int, got <type \'str\'>)')
+        self.assertEquals(str(e), "TypeError: Upstream bandwidth "
+            "(expected int, got <type 'str'>)")
         self.buffer.truncate(0)
 
-        x = event.ClientBandwidth(bandwidth=50, extra=12)
+        # test non-int encode
+        x = event.UpstreamBandwidth(bandwidth=1200, extra='asdfas')
+        e = self.assertRaises(event.EncodeError, x.encode, self.buffer)
+        self.assertEquals(str(e), "TypeError: extra "
+            "(expected int, got <type 'str'>)")
+        self.buffer.truncate(0)
+
+        x = event.UpstreamBandwidth(bandwidth=50, extra=12)
         e = x.encode(self.buffer)
 
         self.assertEquals(e, None)
@@ -882,7 +883,7 @@ class ClientBandwidthTestCase(BaseTestCase):
         self.assertEquals(self.buffer.getvalue(), '\x00\x00\x00\x32\x0C')
 
     def test_raw_decode(self):
-        x = event.ClientBandwidth()
+        x = event.UpstreamBandwidth()
 
         self.assertEquals(x.bandwidth, None)
         self.buffer.write('\x00\x00\x00\x32\x0C')
@@ -895,7 +896,7 @@ class ClientBandwidthTestCase(BaseTestCase):
         self.assertEquals(x.extra, 12)
 
     def test_encode(self):
-        e = event.ClientBandwidth(bandwidth=2342, extra=65)
+        e = event.UpstreamBandwidth(bandwidth=2342, extra=65)
         self.executed = False
 
         def cb(r):
@@ -912,7 +913,7 @@ class ClientBandwidthTestCase(BaseTestCase):
         self.executed = False
 
         def cb(r):
-            self.assertTrue(isinstance(r, event.ClientBandwidth))
+            self.assertTrue(isinstance(r, event.UpstreamBandwidth))
             self.assertEquals(r.__dict__, {'bandwidth': 2342, 'extra': 65})
             self.executed = True
 
@@ -945,13 +946,13 @@ class AudioDataTestCase(BaseTestCase):
         # test default encode
         x = event.AudioData()
         e = self.assertRaises(event.EncodeError, x.encode, self.buffer)
-        self.assertEquals(str(e), 'No audio data set')
+        self.assertEquals(str(e), 'No data set')
 
         # test non-str encode
         x = event.AudioData(data=20)
         e = self.assertRaises(event.EncodeError, x.encode, self.buffer)
-        self.assertEquals(str(e), 'Audio data wrong type '
-            '(expected str, got <type \'int\'>)')
+        self.assertEquals(str(e), "TypeError: data "
+            "(expected str, got <type 'int'>)")
 
         x = event.AudioData(data='foo.bar')
         e = x.encode(self.buffer)
@@ -1023,13 +1024,13 @@ class VideoDataTestCase(BaseTestCase):
         # test default encode
         x = event.VideoData()
         e = self.assertRaises(event.EncodeError, x.encode, self.buffer)
-        self.assertEquals(str(e), 'No video data set')
+        self.assertEquals(str(e), 'No data set')
 
         # test non-str encode
         x = event.VideoData(data=20)
         e = self.assertRaises(event.EncodeError, x.encode, self.buffer)
-        self.assertEquals(str(e), 'Video data wrong type '
-            '(expected str, got <type \'int\'>)')
+        self.assertEquals(str(e), "TypeError: data "
+            "(expected str, got <type 'int'>)")
 
         x = event.VideoData(data='foo.bar')
         e = x.encode(self.buffer)
