@@ -294,7 +294,7 @@ class DownstreamBandwidth(BaseEvent):
         @param listener: The event listener.
         @type listener: L{interfaces.IEventListener}
         """
-        return listener.onDownstreamBandwidth(self)
+        return listener.onDownstreamBandwidth(self.bandwidth)
 
 
 class UpstreamBandwidth(BaseEvent):

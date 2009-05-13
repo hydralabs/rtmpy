@@ -38,6 +38,61 @@ class MockPacket(object):
         return self.expected_decode
 
 
+class MockEventListener(object):
+    """
+    """
+
+    implements(interfaces.IEventListener)
+
+    def __init__(self):
+        self.calls = []
+
+    def onInvoke(self, *args, **kwargs):
+        self.calls.append(('invoke', args, kwargs))
+
+        return self
+
+    def onNotify(self, *args, **kwargs):
+        self.calls.append(('notify', args, kwargs))
+
+        return self
+
+    def onFrameSize(self, *args, **kwargs):
+        self.calls.append(('frame-size', args, kwargs))
+
+        return self
+
+    def onBytesRead(self, *args, **kwargs):
+        self.calls.append(('bytes-read', args, kwargs))
+
+        return self
+
+    def onControlMessage(self, *args, **kwargs):
+        self.calls.append(('control', args, kwargs))
+
+        return self
+
+    def onDownstreamBandwidth(self, *args, **kwargs):
+        self.calls.append(('bw-down', args, kwargs))
+
+        return self
+
+    def onUpstreamBandwidth(self, *args, **kwargs):
+        self.calls.append(('bw-up', args, kwargs))
+
+        return self
+
+    def onAudioData(self, *args, **kwargs):
+        self.calls.append(('audio', args, kwargs))
+
+        return self
+
+    def onVideoData(self, *args, **kwargs):
+        self.calls.append(('video', args, kwargs))
+
+        return self
+
+
 class BaseTestCase(unittest.TestCase):
     """
     Ensures that L{event.TYPE_MAP} is properly restored.
@@ -303,6 +358,15 @@ class FrameSizeTestCase(BaseTestCase):
 
         return d
 
+    def test_dispatch(self):
+        listener = MockEventListener()
+        x = event.FrameSize(5678)
+
+        ret = x.dispatch(listener)
+        self.assertIdentical(ret, listener)
+
+        self.assertEquals(listener.calls, [('frame-size', (5678,), {})])
+
 
 class ControlEventTestCase(BaseTestCase):
     """
@@ -437,6 +501,15 @@ class ControlEventTestCase(BaseTestCase):
             '<ControlEvent type=9 value1=13 value2=45 value3=23 at 0x%x>' % (
                 id(e)))
 
+    def test_dispatch(self):
+        listener = MockEventListener()
+        x = event.ControlEvent()
+
+        ret = x.dispatch(listener)
+        self.assertIdentical(ret, listener)
+
+        self.assertEquals(listener.calls, [('control', (x,), {})])
+
 
 class NotifyTestCase(BaseTestCase):
     """
@@ -559,6 +632,15 @@ class NotifyTestCase(BaseTestCase):
         d.addErrback(self._fail)
 
         return d
+
+    def test_dispatch(self):
+        listener = MockEventListener()
+        x = event.Notify()
+
+        ret = x.dispatch(listener)
+        self.assertIdentical(ret, listener)
+
+        self.assertEquals(listener.calls, [('notify', (x,), {})])
 
 
 class InvokeTestCase(BaseTestCase):
@@ -683,6 +765,15 @@ class InvokeTestCase(BaseTestCase):
 
         return d
 
+    def test_dispatch(self):
+        listener = MockEventListener()
+        x = event.Invoke()
+
+        ret = x.dispatch(listener)
+        self.assertIdentical(ret, listener)
+
+        self.assertEquals(listener.calls, [('invoke', (x,), {})])
+
 
 class BytesReadTestCase(BaseTestCase):
     """
@@ -758,6 +849,15 @@ class BytesReadTestCase(BaseTestCase):
 
         return d
 
+    def test_dispatch(self):
+        listener = MockEventListener()
+        x = event.BytesRead(90)
+
+        ret = x.dispatch(listener)
+        self.assertIdentical(ret, listener)
+
+        self.assertEquals(listener.calls, [('bytes-read', (90,), {})])
+
 
 class DownstreamBandwidthTestCase(BaseTestCase):
     """
@@ -832,6 +932,15 @@ class DownstreamBandwidthTestCase(BaseTestCase):
         d.addErrback(self._fail)
 
         return d
+
+    def test_dispatch(self):
+        listener = MockEventListener()
+        x = event.DownstreamBandwidth('foo')
+
+        ret = x.dispatch(listener)
+        self.assertIdentical(ret, listener)
+
+        self.assertEquals(listener.calls, [('bw-down', ('foo',), {})])
 
 
 class UpstreamBandwidthTestCase(BaseTestCase):
@@ -923,6 +1032,15 @@ class UpstreamBandwidthTestCase(BaseTestCase):
 
         return d
 
+    def test_dispatch(self):
+        listener = MockEventListener()
+        x = event.UpstreamBandwidth('foo', 'bar')
+
+        ret = x.dispatch(listener)
+        self.assertIdentical(ret, listener)
+
+        self.assertEquals(listener.calls, [('bw-up', ('foo', 'bar'), {})])
+
 
 class AudioDataTestCase(BaseTestCase):
     """
@@ -1001,6 +1119,15 @@ class AudioDataTestCase(BaseTestCase):
 
         return d
 
+    def test_dispatch(self):
+        listener = MockEventListener()
+        x = event.AudioData('foo')
+
+        ret = x.dispatch(listener)
+        self.assertIdentical(ret, listener)
+
+        self.assertEquals(listener.calls, [('audio', ('foo',), {})])
+
 
 class VideoDataTestCase(BaseTestCase):
     """
@@ -1078,3 +1205,12 @@ class VideoDataTestCase(BaseTestCase):
         d.addErrback(self._fail)
 
         return d
+
+    def test_dispatch(self):
+        listener = MockEventListener()
+        x = event.VideoData('foo')
+
+        ret = x.dispatch(listener)
+        self.assertIdentical(ret, listener)
+
+        self.assertEquals(listener.calls, [('video', ('foo',), {})])
