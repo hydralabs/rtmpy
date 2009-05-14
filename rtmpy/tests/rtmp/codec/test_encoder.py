@@ -33,10 +33,10 @@ class BaseEncoderTestCase(unittest.TestCase):
         """
         Generates a unique channel.
         """
-        h = mocks.Header(channelId=self._channelId, relative=False)
+        c = self.encoder.getChannel(self._channelId)
+        h = mocks.Header(channelId=self._channelId, bodyLength=0, relative=False)
         self._channelId += 1
 
-        c = mocks.Channel(self.encoder)
         c.reset()
         c.setHeader(h)
 
@@ -78,7 +78,7 @@ class ChannelContextTestCase(BaseEncoderTestCase):
 
         self.context.reset(h)
 
-        self.assertIdentical(self.context.header, h)
+        self.assertEquals(self.context.header, None)
         self.assertEquals(self.context.bytesRequired, 50)
         self.assertEquals(self.context.bytes, 0)
         self.assertEquals(self.buffer.getvalue(), '')
@@ -87,7 +87,7 @@ class ChannelContextTestCase(BaseEncoderTestCase):
         self.assertFalse(self.context.active)
         self.assertEquals(self.buffer.tell(), 0)
 
-        self.encoder.activeChannels = set([self.channel])
+        self.encoder.activeChannels = [0]
         self.encoder.channelContext = {self.channel: self.context}
 
         self.context.dataReceived('hello')
@@ -95,23 +95,29 @@ class ChannelContextTestCase(BaseEncoderTestCase):
         self.assertEquals(self.buffer.getvalue(), 'hello')
         self.assertEquals(self.buffer.tell(), 5)
 
-        self.assertEquals(self.encoder.activeChannels, set([self.channel]))
+        self.assertEquals(self.encoder.activeChannels, [0])
 
     def test_getRelativeHeader(self):
-        h = mocks.Header(relative=False, channelId=3, bodyLength=50,
+        h = mocks.Header(relative=False, channelId=0, bodyLength=50,
             timestamp=10)
         self.channel.setHeader(h)
 
         self.assertIdentical(self.context.getRelativeHeader(), h)
         self.assertIdentical(self.context.header, None)
 
-        self.context.header = mocks.Header(relative=False, channelId=3,
+        self.context.header = mocks.Header(relative=False, channelId=0,
             bodyLength=10, timestamp=2)
 
         h = self.context.getRelativeHeader()
 
         self.assertTrue(interfaces.IHeader.providedBy(h))
         self.assertTrue(h.relative)
+
+        self.assertEquals(h.datatype, None)
+        self.assertEquals(h.timestamp, 2)
+        self.assertEquals(h.bodyLength, 10)
+        self.assertEquals(h.channelId, 0)
+        self.assertEquals(h.streamId, None)
 
     def test_bufferError(self):
         self.executed = False
@@ -185,9 +191,6 @@ class MinimumFrameSizeTestCase(BaseEncoderTestCase):
     def test_lessThanBodyLength(self):
         self.channel.bytes = 10
 
-        self.assertEquals(self.context.bytes, 0)
-        self.assertEquals(self.channel.bodyRemaining, 168)
-
         self.assertEquals(self.context.getMinimumFrameSize(), 128)
 
     def test_bad(self):
@@ -246,7 +249,7 @@ class EncoderTestCase(BaseEncoderTestCase):
     """
 
     def test_init(self):
-        e = codec.Encoder()
+        e = codec.Encoder(None)
 
         self.assertEquals(e.channelContext, {})
         self.assertEquals(e.consumer, None)
@@ -256,7 +259,7 @@ class EncoderTestCase(BaseEncoderTestCase):
         self.assertEquals(self.encoder.getJob(), self.encoder.encode)
 
     def test_registerScheduler(self):
-        e = codec.Encoder()
+        e = codec.Encoder(None)
         s = mocks.LoopingScheduler()
 
         self.assertTrue(interfaces.IChannelScheduler.providedBy(s))
@@ -280,32 +283,29 @@ class EncoderTestCase(BaseEncoderTestCase):
         self.assertIdentical(otherConsumer, self.encoder.consumer)
 
     def test_activateChannel(self):
-        channel = self._generateChannel()
+        channel = self.encoder.getChannel(0)
 
-        self.assertFalse(channel in self.encoder.channelContext)
+        self.assertTrue(channel in self.encoder.channelContext)
+        self.assertFalse(channel in self.encoder.activeChannels)
         self.assertFalse(channel in self.scheduler.activeChannels)
 
         self.encoder.activateChannel(channel)
         self.assertTrue(channel in self.encoder.channelContext)
+        self.assertTrue(0 in self.encoder.activeChannels)
         self.assertTrue(channel in self.scheduler.activeChannels)
 
     def test_deactivateChannel(self):
-        channel = self._generateChannel()
+        channel = self.encoder.getChannel(0)
 
-        self.assertFalse(channel in self.encoder.channelContext.keys())
+        self.assertTrue(channel in self.encoder.channelContext)
+        self.assertFalse(channel in self.encoder.activeChannels)
         self.assertFalse(channel in self.scheduler.activeChannels)
 
-        e = self.assertRaises(
-            RuntimeError, self.encoder.deactivateChannel, channel)
-        self.assertEquals(str(e), 'Attempted to deactivate a ' \
-            'non-existant channel')
+        e = self.assertEquals(self.encoder.deactivateChannel(channel), None)
 
-        context = codec.ChannelContext(channel, self.encoder)
-
-        self.encoder.channelContext[channel] = context
         self.encoder.activateChannel(channel)
 
-        self.assertTrue(channel in self.encoder.channelContext.keys())
+        self.assertTrue(channel in self.encoder.channelContext)
 
         self.encoder.deactivateChannel(channel)
         self.assertFalse(channel in self.scheduler.activeChannels)
@@ -316,15 +316,14 @@ class EncoderTestCase(BaseEncoderTestCase):
         self.assertFalse(self.encoder.job.running)
 
     def test_single(self):
-        ch = self._generateChannel()
-        h = ch.getHeader()
-        h.bodyLength = 50
-        h.datatype = 4
-        h.streamId = 8
-        h.relative = False
-        h.timestamp = 2341234
+        ch = self.encoder.getChannel(0)
 
-        self.encoder.activateChannel(ch)
+        h = mocks.Header(bodyLength=50, datatype=4, streamId=8, channelId=0,
+            relative=False, timestamp=2341234)
+
+        ch.setHeader(h)
+
+        self.assertEquals(self.encoder.activeChannels, [])
         context = self.encoder.channelContext[ch]
         ch.dataReceived('f' * 50)
 
@@ -336,7 +335,9 @@ class EncoderTestCase(BaseEncoderTestCase):
 
             self.assertEquals(self.encoder.buffer.getvalue(), '')
 
-        return self.encoder.start().addCallback(cb)
+        self.encoder.start()
+
+        return self.encoder.deferred.addCallback(cb)
 
 
 class FrameWritingTestCase(BaseEncoderTestCase):
@@ -354,14 +355,15 @@ class FrameWritingTestCase(BaseEncoderTestCase):
     def _generateContext(self, bodyLength=1000):
         channel = self.encoder.createChannel(self._channelId)
 
-        h = mocks.Header(relative=False, bodyLength=bodyLength)
+        h = mocks.Header(relative=False, channelId=self._channelId,
+            bodyLength=bodyLength)
 
-        header = channel.getHeader()
-        header.bodyLength = bodyLength
+        context = self.contexts[channel]
 
-        self.encoder.activateChannel(channel)
+        context.reset(h)
+        channel.setHeader(h)
 
-        return self.contexts[channel]
+        return context
 
     def test_nodata(self):
         context = self._generateContext()
@@ -388,23 +390,31 @@ class FrameWritingTestCase(BaseEncoderTestCase):
         channel.dataReceived('a' * 200)
 
         self.assertEquals(self.buffer.getvalue(), '')
-        self.assertEquals(
-            min(channel.bodyRemaining, self.encoder.frameSize), 128)
 
         self.encoder.writeFrame(context)
         self.assertEquals(self.buffer.getvalue(), '\x00\x003C\x00\x03\xe8\x03'
             'F\x00\x00\x00' + ('a' * self.encoder.frameSize))
 
+        self.buffer.truncate()
+
         self.assertEquals(context.buffer.getvalue(), 'a' * 72)
         self.assertIdentical(context.header, header)
-
-        self.assertEquals(
-            min(channel.bodyRemaining, self.encoder.frameSize), 128)
+        self.assertTrue(context.active)
+        self.assertEquals(context.getMinimumFrameSize(), 128)
 
         self.encoder.writeFrame(context)
 
-        self.assertEquals(self.buffer.getvalue(), '\x00\x003C\x00\x03\xe8\x03'
-            'F\x00\x00\x00aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa'
-            'aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa'
-            'aaaaaaaaaaaaa\xc0aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa'
-            'aaaaaaaaaaaaaaaaaaaaaaaaa')
+        self.assertEquals(self.buffer.getvalue(), '')
+        self.assertFalse(context.active)
+        self.assertFalse(0 in self.encoder.activeChannels)
+
+        channel.dataReceived('b' * 56)
+
+        self.assertEquals(self.buffer.getvalue(), '')
+        self.assertTrue(context.active)
+        self.assertTrue(0 in self.encoder.activeChannels)
+
+        self.encoder.writeFrame(context)
+
+        self.assertEquals(self.buffer.getvalue(),
+            '\xc0' + ('a' * 72) + ('b' * 56))

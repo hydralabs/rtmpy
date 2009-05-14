@@ -171,7 +171,10 @@ class LoopingScheduler(object):
     def deactivateChannel(self, channel):
         """
         """
-        self.activeChannels.remove(channel)
+        try:
+            self.activeChannels.remove(channel)
+        except ValueError:
+            pass
 
     def getNextChannel(self):
         """

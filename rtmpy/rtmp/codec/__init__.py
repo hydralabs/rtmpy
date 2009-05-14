@@ -360,6 +360,7 @@ class BaseCodec(object):
                 channelId,))
 
         channel = self.channels[channelId] = self.channel_class(self)
+        self.channels[channel] = channelId
 
         return channel
 
@@ -399,6 +400,32 @@ class BaseCodec(object):
 
             count += 1
 
+    def deactivateChannel(self, channel):
+        """
+        """
+        try:
+            channelId = self.channels[channel]
+        except KeyError:
+            raise RuntimeError('Channel is not registered to this codec')
+
+        try:
+            self.activeChannels.remove(channelId)
+        except ValueError:
+            pass
+
+    def activateChannel(self, channel):
+        """
+        """
+        try:
+            channelId = self.channels[channel]
+        except KeyError:
+            raise RuntimeError('Channel is not registered to this codec')
+
+        if channelId in self.activeChannels:
+            return
+
+        self.activeChannels.append(channelId)
+
     def channelComplete(self, channel):
         """
         Called when the body of the channel has been satisfied.
@@ -409,9 +436,6 @@ class BaseCodec(object):
         header = channel.getHeader()
 
         channel.reset()
-        header = channel.getHeader()
-
-        self.activeChannels.remove(header.channelId)
 
     def initialiseChannel(self, channel, oldHeader):
         """
@@ -429,8 +453,6 @@ class BaseCodec(object):
 
         channel.reset()
         header = channel.getHeader()
-
-        self.activeChannels.append(header.channelId)
 
     def setFrameSize(self, size):
         self.frameSize = size
@@ -636,6 +658,8 @@ class Decoder(BaseCodec):
         """
         BaseCodec.channelComplete(self, channel)
 
+        self.deactivateChannel(channel)
+
         self.currentChannel = None
 
         header = channel.getHeader()
@@ -692,10 +716,9 @@ class ChannelContext(object):
         """
         Called to reset the context when the channel has been reappropriated.
         """
-        self.header = header
         self.buffer.truncate()
         self.bytes = 0
-        self.bytesRequired = self.header.bodyLength
+        self.bytesRequired = header.bodyLength
 
     def dataReceived(self, data):
         """
@@ -757,7 +780,7 @@ class ChannelContext(object):
         if self.header is None:
             return self.channel.getHeader()
 
-        return _header.diffHeaders(self.header, self.channel.getHeader())
+        return _header.diffHeaders(self.channel.getHeader(), self.header)
 
     def getMinimumFrameSize(self):
         """
@@ -847,11 +870,9 @@ class Encoder(BaseCodec):
         """
         Flags a channel as actively producing data.
         """
+        BaseCodec.activateChannel(self, channel)
+
         context = self.channelContext[channel]
-
-        if context.active:
-            return
-
         context.active = True
         self.scheduler.activateChannel(channel)
 
@@ -859,9 +880,7 @@ class Encoder(BaseCodec):
         """
         Flags a channel as not actively producing data.
         """
-        if not channel in self.channelContext:
-            raise RuntimeError(
-                'Attempted to deactivate a non-existant channel')
+        BaseCodec.deactivateChannel(self, channel)
 
         self.channelContext[channel].active = False
         self.scheduler.deactivateChannel(channel)
@@ -933,7 +952,7 @@ class Encoder(BaseCodec):
         to the C{consumer}. If there is nothing to do then L{pause} will be
         called.
         """
-        channel = self.getNextChannel()
+        channel = self.scheduler.getNextChannel()
 
         if channel is None:
             self.pause()
