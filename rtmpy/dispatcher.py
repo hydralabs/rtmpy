@@ -187,7 +187,7 @@ class EventDispatcher(object):
         """
         Adds a listener to this event dispatcher. If L{dispatchEvent} is
         called with the corresponding C{event} then listener will be called
-        with the supplied C{*args} and C{**kwargs}
+        with the supplied C{*args} and C{**kwargs}.
         """
         if self._dispatchDepth > 0:
             self._updateQueue.append(

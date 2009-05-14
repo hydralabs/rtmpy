@@ -5,6 +5,8 @@
 
 """
 Contains various implementations for scheduling RTMP channels for encoding.
+
+@since: 0.1
 """
 
 from zope.interface import implements

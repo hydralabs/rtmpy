@@ -7,6 +7,7 @@ RTMP handshake support.
 
 @see: U{RTMP Handshake on RTMPy wiki (external)
       <http://rtmpy.org/wiki/RTMP#a3.Handshake>}
+@since: 0.1
 """
 
 import random, hmac, hashlib
@@ -251,6 +252,10 @@ class BaseNegotiator(object):
     implements(interfaces.IHandshakeNegotiator)
 
     def __init__(self, observer):
+        """
+        @raise TypeError: L{interfaces.IHandshakeObserver} expected for
+            C{observer}.
+        """
         if not interfaces.IHandshakeObserver.providedBy(observer):
             raise TypeError('IHandshakeObserver interface ' \
                 'expected (got:%s)' % (type(observer),))
@@ -267,6 +272,8 @@ class BaseNegotiator(object):
     def dataReceived(self, data):
         """
         Called when Implemented by concrete subclasses.
+        
+        @raise NotImplementedError:
         """
         raise NotImplementedError()
 
@@ -284,6 +291,8 @@ class ClientNegotiator(BaseNegotiator):
         @param uptime: The number of milliseconds since the system booted.
             See L{Token.uptime}.
         @param version: The version of the connecting client.
+        @raise HandshakeError: Once started, handshake negotiator cannot be
+            re-started.
         """
         if self.started:
             raise HandshakeError(
@@ -307,6 +316,9 @@ class ClientNegotiator(BaseNegotiator):
     def generateToken(self):
         """
         An internal method that generates a client token.
+        
+        @raise HandshakeError: L{start} must be called before generating server
+            token.
         """
         if not self.started:
             raise HandshakeError(
@@ -326,6 +338,10 @@ class ClientNegotiator(BaseNegotiator):
         self.client = ClientToken(uptime, version)
 
     def _dataReceived(self, data):
+        """
+        @raise HandshakeError: Unknown header byte.
+        @raise HeaderMismatch: Headers don't match.
+        """
         data = self.buffer + data
 
         if self.receivedHeader is None:
@@ -387,6 +403,8 @@ class ClientNegotiator(BaseNegotiator):
         Called when handshake data has been received. If an error occurs
         whilst negotiating the handshake then C{handshakeFailure} will be
         called.
+        
+        @raise HandshakeError: Data received, but not L{started} yet.
         """
         try:
             if not self.started:
@@ -422,6 +440,11 @@ class ServerNegotiator(BaseNegotiator):
     def generateToken(self):
         """
         Generate a server handshake token.
+        
+        @raise HandshakeError: `start` must be called before generating server
+            token.
+        @raise HandshakeError: 'client token is required before generating
+            server token.
         """
         if not self.started:
             raise HandshakeError(
@@ -447,6 +470,10 @@ class ServerNegotiator(BaseNegotiator):
         self.server = ServerToken(client, uptime, version)
 
     def _dataReceived(self, data):
+        """
+        @raise HandshakeError: Unknown header byte.
+        @raise HandshakeError: Unexpected trailing data in client handshake.
+        """
         data = self.buffer + data
 
         if self.receivedHeader is None:
@@ -506,6 +533,8 @@ class ServerNegotiator(BaseNegotiator):
         Called when handshake data has been received. If an error occurs
         whilst negotiating the handshake then C{handshakeFailure} will be
         called, citing the reason.
+        
+        @raise HandshakeError: Data received, but not started.
         """
         try:
             if not self.started:
@@ -523,7 +552,7 @@ def decodeClientHandshake(data):
     @type data: C{str}
     @return: The decoded client token.
     @rtype: L{ClientToken}
-    @raise EOFError: Not enough data supplied to fully decode token.
+    @raise HandshakeError: Not enough data supplied to fully decode token.
     """
     s = util.BufferedByteStream(data)
 
@@ -548,6 +577,7 @@ def decodeServerHandshake(client, data):
     @type data: C{str}
     @return: The decoded server token.
     @rtype: L{ServerToken}
+    @raise HandshakeError: Not enough data to decode a full server token.
     """
     s = util.BufferedByteStream(data)
 
@@ -574,6 +604,7 @@ def generateBytes(length):
     @type length: C{int}
     @return: A random string of bytes, length C{length}.
     @rtype: C{str}
+    @raise TypeError: C{int} expected for C{length}.
     """
     # FIXME: sloooow
     if not isinstance(length, (int, long)):

@@ -114,9 +114,9 @@ class Channel(object):
     def setHeader(self, header):
         """
         Applies a new header to this channel. If this channel has no previous
-        header then the new header must be absolute (relative=True). Otherwise
-        the new values will be applied to the existing header. Setting the
-        header requires a registered manager.
+        header then the new header must be absolute (C{relative=True}).
+        Otherwise the new values will be applied to the existing header.
+        Setting the header requires a registered manager.
 
         @param header: The header to apply to this channel.
         @type header: L{interfaces.IHeader}
@@ -214,6 +214,9 @@ class Channel(object):
     def onComplete(self):
         """
         Called when the channel has receieved the correct amount of data.
+        
+        @raise NoManagerError: A registered manager is required to complete a
+            channel.
         """
         if self.debug or rtmp.DEBUG:
             rtmp.log(self, 'body completed')
@@ -299,8 +302,8 @@ class BaseCodec(object):
         Starts or resumes the job. If the job is already running (i.e. not
         stopped) then this is a noop.
 
-        @return: The deferred from starting the job.
-        @rtype: L{twisted.internet.defer.Deferred}
+        @return: The Deferred from starting the job.
+        @rtype: L{Deferred<twisted.internet.defer.Deferred>}
         """
         if self.job.running:
             return self.deferred

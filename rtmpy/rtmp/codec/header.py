@@ -8,6 +8,8 @@ Utility/helper functions for encoding and decoding RTMP headers.
 
 @see: U{RTMP Packet Structure on OSFlash
     (external)<http://osflash.org/documentation/rtmp#rtmp_packet_structure>}
+    
+@since: 0.1
 """
 
 from zope.interface import implements

@@ -4,6 +4,8 @@
 
 """
 RTMP Stream implementation.
+
+@since: 0.1
 """
 
 from zope.interface import implements
@@ -54,7 +56,8 @@ class ControlStream(object):
     def __init__(self, protocol):
         self.protocol = protocol
         self.decodingChannels = {}
-        self.encodingChannels = {} # a list of channels that are encoding stuff
+        #: a list of channels that are encoding stuff
+        self.encodingChannels = {}
         self.timestamp = 0
 
     def registerChannel(self, channelId):

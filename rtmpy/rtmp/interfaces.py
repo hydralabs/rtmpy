@@ -3,6 +3,8 @@
 
 """
 Interface documentation for RTMP primitives.
+
+@since: 0.1
 """
 
 from zope.interface import Interface, Attribute
@@ -23,8 +25,8 @@ class IHeader(Interface):
         "An C{int} time value - not sure what this represents atm.")
     datatype = Attribute(
         "The datatype for the corresponding channel. See "
-        "L{http://osflash.org/documentation/rtmp#rtmp_datatypes} for a list "
-        "of possibles.")
+        "U{RTMP datatypes on OSFlash<http://osflash.org/documentation/rtmp#rtmp_datatypes>} "
+        "for a list of possibles.")
     bodyLength = Attribute(
         "An C{int} which represents the length of the channel body.")
     streamId = Attribute(
@@ -163,8 +165,6 @@ class IChannelObserver(Interface):
         """
         Called when the channel receives some data.
 
-        @param channel: The channel that received the data.
-        @type channel: {IChannel}
         @param data: The data received by the channel.
         @type data: C{str}
         """
@@ -173,9 +173,6 @@ class IChannelObserver(Interface):
         """
         Called when the amount of data received by the channel matches that
         of its header.
-
-        @param channel: The channel that completed its body.
-        @type channel: {IChannel}
         """
 
     def headerChanged(header):
@@ -271,12 +268,13 @@ class IEvent(Interface):
     """
     An RTMP Event.
 
-    @see: L{http://osflash.org/documentation/rtmp#rtmp_datatypes}
+    @see: U{RTMP datatypes on OSFlash (external)
+        <http://osflash.org/documentation/rtmp#rtmp_datatypes>}
     """
 
     def encode(bbs):
         """
-        Encodes the event instance to C{bbs}. Can return a deferred.
+        Encodes the event instance to C{bbs}. Can return a L{defer.Deferred}.
 
         @param bbs: A stream object to write to.
         @type bbs: L{rtmpy.util.BufferedByteStream}
@@ -284,7 +282,7 @@ class IEvent(Interface):
 
     def decode(bbs):
         """
-        Decodes the event instance from C{bbs}. Can return a deferred.
+        Decodes the event instance from C{bbs}. Can return a L{defer.Deferred}.
 
         @param bbs: A stream object to read from.
         @type bbs: L{rtmpy.util.BufferedByteStream}
@@ -395,8 +393,7 @@ class IStream(Interface):
     A stream sends or receives RTMP packets.
     """
 
-    timestamp = Attribute(
-        "")
+    timestamp = Attribute("")
 
     def send(packet):
         """
@@ -428,15 +425,15 @@ class IStreamManager(Interface):
 
     def registerStream(streamId, stream):
         """
-        Registers a L{IStream} instance to the manager, based on the streamId.
+        Registers a L{IStream} instance to the manager, based on the C{streamId}.
 
         @param streamId: The id used to identify the stream to the manager.
         @type streamId: C{int}
         @param stream: The stream instance.
         @type stream: L{interfaces.IStream}
-        @raise ValueError: C{streamId} is not in the correct range
-        @raise TypeError: C{stream} does not implement L{interfaces.IStream}
-        @raise IndexError: C{streamId} is already registered to another stream
+        @raise ValueError: C{streamId} is not in the correct range.
+        @raise TypeError: C{stream} does not implement L{interfaces.IStream}.
+        @raise IndexError: C{streamId} is already registered to another stream.
         """
 
     def removeStream(streamId):
@@ -447,6 +444,6 @@ class IStreamManager(Interface):
         @type streamId: C{int}
         @return: The stream object that has been removed.
         @rtype: L{IStream}
-        @raise ValueError: C{streamId} is not in the correct range
-        @raise IndexError: C{streamId} does not have a stream registered to it
+        @raise ValueError: C{streamId} is not in the correct range.
+        @raise IndexError: C{streamId} does not have a stream registered to it.
         """

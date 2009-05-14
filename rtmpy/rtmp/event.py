@@ -3,6 +3,8 @@
 
 """
 RTMP Channel type declarations.
+
+@since: 0.1
 """
 
 from twisted.internet import defer, threads
@@ -46,7 +48,7 @@ FLV_DATA = 0x16
 
 class BaseError(Exception):
     """
-    Base error class for all things `event`.
+    Base error class for all things C{event}.
     """
 
 
@@ -118,6 +120,7 @@ class FrameSize(BaseEvent):
 
         @param buf: Receives the encoded data.
         @type buf: L{BufferedByteStream}
+        @raise EncodeError: Frame size not set or wrong type.
         """
         if self.size is None:
             raise EncodeError('Frame size not set')
@@ -164,6 +167,7 @@ class BytesRead(BaseEvent):
 
         @param buf: Receives the encoded data.
         @type buf: L{BufferedByteStream}
+        @raise EncodeError: Bytes read not set or wrong type.
         """
         if self.bytes is None:
             raise EncodeError('Bytes read not set')
@@ -222,6 +226,7 @@ class ControlEvent(BaseEvent):
 
         @param buf: Receives the encoded data.
         @type buf: L{BufferedByteStream}
+        @raise EncodeError: Type not set or unexpected type.
         """
         if self.type is None:
             raise EncodeError('Type not set')
@@ -283,6 +288,8 @@ class DownstreamBandwidth(BaseEvent):
 
         @param buf: Receives the encoded data.
         @type buf: L{BufferedByteStream}
+        @raise EncodeError: Downstream bandwidth not set.
+        @raise EncodeError: C{TypeError} for downstream bandwidth.
         """
         if self.bandwidth is None:
             raise EncodeError('Downstream bandwidth not set')
@@ -309,7 +316,7 @@ class UpstreamBandwidth(BaseEvent):
 
     @param bandwidth: The upstream bandwidth available.
     @type bandwidth: C{int}
-    @param extra: Not sure what this is supposed to represent atm.
+    @param extra: Not sure what this is supposed to represent at the moment.
     """
 
     def __init__(self, bandwidth=None, extra=None):
@@ -332,6 +339,9 @@ class UpstreamBandwidth(BaseEvent):
 
         @param buf: Receives the encoded data.
         @type buf: L{BufferedByteStream}
+        @raise EncodeError: Upstream bandwidth or L{extra} not set.
+        @raise EncodeError: C{TypeError} for upstream bandwidth or
+            L{extra}.
         """
         if self.bandwidth is None:
             raise EncodeError('Upstream bandwidth not set')
@@ -408,7 +418,7 @@ class Notify(BaseEvent):
 
     def encode(self, buf, encoding=pyamf.AMF0):
         """
-        Decode a notification event.
+        Encode a notification event.
 
         @param buf: Contains the encoded data.
         @type buf: L{BufferedByteStream}
@@ -482,6 +492,7 @@ class BaseStreamingEvent(BaseEvent):
 
         @param buf: Receives the encoded data.
         @type buf: L{BufferedByteStream}
+        @raise EncodeError: No L{data} set or C{TypeError} for L{data}.
         """
         if self.data is None:
             raise EncodeError('No data set')
@@ -522,7 +533,7 @@ class VideoData(BaseStreamingEvent):
         """
         return listener.onVideoData(self.data)
 
-
+#: Type map.
 TYPE_MAP = {
     FRAME_SIZE: FrameSize,
     BYTES_READ: BytesRead,
@@ -552,7 +563,7 @@ def decode(datatype, body, *args, **kwargs):
     @raise DecodeError: The datatype is not known.
     @raise TrailingDataError: Raised if the body was not completely decoded.
     @note: This function doesn't actually raise the exceptions, they are
-        wrapped by the deferred.
+        wrapped by the L{defer.Deferred}.
     """
     def _decode():
         try:
@@ -589,7 +600,7 @@ def encode(event, *args, **kwargs):
         type.
     @raise TypeError: The event does not implement L{interfaces.IEvent}
     @note: This function doesn't actually raise the exceptions, they are
-        wrapped by the deferred.
+        wrapped by the L{defer.Deferred}.
     """
     def _encode():
         if not interfaces.IEvent.providedBy(event):
@@ -629,6 +640,7 @@ def get_type_class(datatype):
     @type datatype: C{int}
     @return: The event class that is mapped to C{datatype}.
     @rtype: C{class} implementing L{interfaces.IEvent}
+    @raise UnknownEventType: Unknown event type for C{datatype}.
     """
     try:
         return TYPE_MAP[datatype]

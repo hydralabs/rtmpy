@@ -7,6 +7,7 @@
 Versions for products.
 
 @see: L{Version}
+@since: 0.1
 """
 
 
@@ -94,5 +95,8 @@ class Version(object):
             return cmp(str(self), other)
 
 
+#: Minimum version of the Adobe Flash Player that supports H.264 streaming
 H264_MIN_FLASH = Version('9,0,115,0')
+
+#: Minimum version of Adobe Flash Media Server that supports H.264 streaming
 H264_MIN_FMS = Version('3,0,1,1')

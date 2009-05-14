@@ -7,7 +7,7 @@ RTMP implementation.
 
 The Real Time Messaging Protocol (RTMP) is a protocol that is primarily used
 to stream audio and video over the internet to the
-U{Flash Player<http://en.wikipedia.org/wiki/Flash_Player>}.
+U{Adobe Flash Player<http://en.wikipedia.org/wiki/Flash_Player>}.
 
 The protocol is a container for data packets which may be
 U{AMF<http://osflash.org/documentation/amf>} or raw audio/video data like
@@ -16,6 +16,7 @@ multiplexing many NetStreams using different channels. Within these channels
 packets are split up into fixed size body chunks.
 
 @see: U{RTMP (external)<http://rtmpy.org/wiki/RTMP>}
+@since: 0.1
 """
 
 from twisted.internet import protocol, defer
@@ -28,7 +29,7 @@ from rtmpy import util
 #: Set this to C{True} to force all rtmp.* instances to log debugging messages
 DEBUG = False
 
-#: The default RTMP port is a registered at U{IANA<http://iana.org>}.
+#: The default RTMP port is a registered port at U{IANA<http://iana.org>}
 RTMP_PORT = 1935
 
 
@@ -72,7 +73,9 @@ class BaseProtocol(protocol.Protocol):
     def buildHandshakeNegotiator(self):
         """
         Builds and returns an object that will handle the handshake phase of
-        the connection. Must be implemented by subclasses.
+        the connection.
+        
+        @raise NotImplementedError:  Must be implemented by subclasses.
         """
         raise NotImplementedError()
 
@@ -159,7 +162,7 @@ class BaseProtocol(protocol.Protocol):
 
         del self.handshaker
 
-        # TODO slot in support for RTMPE
+        # TODO: slot in support for RTMPE
 
     def handshakeFailure(self, reason):
         """
@@ -296,7 +299,6 @@ class ServerProtocol(BaseProtocol):
 
         d = stream.writeEvent(event.ServerBandwidth(2500000L), channelId=2)
         d.addCallback(writeClientBW)
-
 
         return r
 
