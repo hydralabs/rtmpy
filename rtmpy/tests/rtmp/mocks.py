@@ -80,16 +80,12 @@ class Channel(object):
         self.frames = 0
         self.bytes = 0
         self.buffer = ''
-        self.consumer = None
 
     def dataReceived(self, data):
         l = len(data)
         self.bytes += l
 
-        if self.consumer:
-            self.consumer.write(data)
-        else:
-            self.buffer += str(data)
+        self.buffer += str(data)
 
         if l < self.manager.frameSize:
             self.frameRemaining -= l
@@ -131,13 +127,6 @@ class Channel(object):
 
     bodyRemaining = property(bodyRemaining)
 
-    def registerConsumer(self, consumer):
-        self.consumer = consumer
-
-        if len(self.buffer) > 0:
-            self.consumer.write(self.buffer)
-            self.buffer = 0
-
 
 class Header(object):
     """
@@ -153,6 +142,14 @@ class Header(object):
         self.datatype = kwargs.get('datatype', None)
         self.bodyLength = kwargs.get('bodyLength', None)
         self.streamId = kwargs.get('streamId', None)
+
+    def __repr__(self):
+        return '<%s.%s %r at 0x%x>' % (
+            self.__class__.__module__,
+            self.__class__.__name__,
+            self.__dict__,
+            id(self)
+        )
 
 
 class LoopingScheduler(object):

@@ -143,10 +143,10 @@ class Channel(object):
 
             self.manager.initialiseChannel(self, old_header)
         else:
-            if self.observer is not None:
-                self.observer.headerChanged(header)
-
             self.header = _header.mergeHeaders(self.header, header)
+
+            if self.observer is not None:
+                self.observer.headerChanged(self.header)
 
         self.bodyRemaining = self.header.bodyLength - self.bytes
 
@@ -680,14 +680,22 @@ class ChannelContext(object):
     def __init__(self, channel, encoder):
         self.channel = channel
         self.encoder = encoder
-
         self.buffer = util.BufferedByteStream()
-        self.active = False
         self.header = None
-        self.bytes = 0
+
+        self.active = False
 
         self.queue = []
         self.currentPacket = None
+
+    def reset(self, header):
+        """
+        Called to reset the context when the channel has been reappropriated.
+        """
+        self.header = header
+        self.buffer.truncate()
+        self.bytes = 0
+        self.bytesRequired = self.header.bodyLength
 
     def dataReceived(self, data):
         """
@@ -734,7 +742,7 @@ class ChannelContext(object):
             return None
 
         self.buffer.consume()
-        self.bytes += length
+        self.bytes += len(data)
 
         return data
 
@@ -754,9 +762,10 @@ class ChannelContext(object):
     def getMinimumFrameSize(self):
         """
         Returns the minimum number of bytes required to complete a frame.
+
         @rtype: C{int}
         """
-        bytesLeft = self.channel.bodyRemaining - self.bytes
+        bytesLeft = self.bytesRequired - self.bytes
         frameSize = self.encoder.frameSize
 
         available = min(bytesLeft, frameSize)
@@ -773,7 +782,9 @@ class ChannelContext(object):
         self.header = self.channel.getHeader()
 
     def headerChanged(self, header):
-        print 'header changed', header
+        """
+        """
+        self.bytesRequired = header.bodyLength
 
     def bodyComplete(self):
         pass
@@ -854,6 +865,16 @@ class Encoder(BaseCodec):
 
         self.channelContext[channel].active = False
         self.scheduler.deactivateChannel(channel)
+
+    def initialiseChannel(self, channel, oldHeader):
+        """
+        """
+        BaseCodec.initialiseChannel(self, channel, oldHeader)
+
+        header = channel.getHeader()
+        context = self.channelContext[channel]
+
+        context.reset(header)
 
     def _runQueue(self, context):
         """

@@ -18,7 +18,8 @@ class BaseEncoderTestCase(unittest.TestCase):
     """
 
     def setUp(self):
-        self.encoder = codec.Encoder()
+        self.manager = mocks.StreamManager()
+        self.encoder = codec.Encoder(self.manager)
         self.scheduler = mocks.LoopingScheduler()
 
         self.buffer = util.BufferedByteStream()
@@ -35,8 +36,7 @@ class BaseEncoderTestCase(unittest.TestCase):
         h = mocks.Header(channelId=self._channelId, relative=False)
         self._channelId += 1
 
-        c = mocks.Channel()
-        c.registerManager(self.encoder)
+        c = mocks.Channel(self.encoder)
         c.reset()
         c.setHeader(h)
 
@@ -44,6 +44,7 @@ class BaseEncoderTestCase(unittest.TestCase):
 
     def dataReceived(self, data):
         self.buffer.write(data)
+
 
 class ChannelContextTestCase(BaseEncoderTestCase):
     """
@@ -64,10 +65,23 @@ class ChannelContextTestCase(BaseEncoderTestCase):
         self.assertTrue(
             isinstance(self.context.buffer, util.BufferedByteStream))
         self.assertFalse(self.context.active)
+        self.assertEquals(self.context.queue, [])
+        self.assertEquals(self.context.currentPacket, None)
         self.assertEquals(self.context.header, None)
-        self.assertEquals(self.context.bytes, 0)
 
-        self.assertIdentical(self.context, self.channel.consumer)
+        self.assertFalse(hasattr(self.context, 'bytes'))
+        self.assertFalse(hasattr(self.context, 'requiredBytes'))
+
+    def test_reset(self):
+        h = mocks.Header(relative=False, channelId=3, bodyLength=50,
+            timestamp=10)
+
+        self.context.reset(h)
+
+        self.assertIdentical(self.context.header, h)
+        self.assertEquals(self.context.bytesRequired, 50)
+        self.assertEquals(self.context.bytes, 0)
+        self.assertEquals(self.buffer.getvalue(), '')
 
     def test_write(self):
         self.assertFalse(self.context.active)
@@ -76,7 +90,7 @@ class ChannelContextTestCase(BaseEncoderTestCase):
         self.encoder.activeChannels = set([self.channel])
         self.encoder.channelContext = {self.channel: self.context}
 
-        self.context.write('hello')
+        self.context.dataReceived('hello')
         self.assertTrue(self.context.active)
         self.assertEquals(self.buffer.getvalue(), 'hello')
         self.assertEquals(self.buffer.tell(), 5)
@@ -130,6 +144,22 @@ class ChannelContextTestCase(BaseEncoderTestCase):
         self.context.getFrame()
         self.assertTrue(self.executed)
 
+    def test_headerChange(self):
+        """
+        Tests relative header changes.
+        """
+        h = mocks.Header(relative=False, channelId=3, bodyLength=50)
+
+        self.context.reset(h)
+        self.assertEquals(self.context.bytesRequired, 50)
+
+        h = mocks.Header(relative=True, bodyLength=100)
+
+        self.context.headerChanged(h)
+
+        self.assertEquals(self.context.bytesRequired, 100)
+
+
 class MinimumFrameSizeTestCase(BaseEncoderTestCase):
     """
     Tests for L{codec.ChannelContext.getMinimumFrameSize}.
@@ -140,30 +170,27 @@ class MinimumFrameSizeTestCase(BaseEncoderTestCase):
 
         self.channel = self._generateChannel()
         self.context = codec.ChannelContext(self.channel, self.encoder)
+        self.header = self.channel.getHeader()
+
+        self.header.bodyLength = 178
         self.encoder.frameSize = 128
 
-    def test_lessThanFrameSize(self):
-        self.channel.bytes = 50
+        self.context.reset(self.header)
 
-        self.assertEquals(self.context.getMinimumFrameSize(), 50)
+    def test_lessThanFrameSize(self):
+        self.context.bytes = 100
+
+        self.assertEquals(self.context.getMinimumFrameSize(), 78)
 
     def test_lessThanBodyLength(self):
-        self.channel.bytes = 500
+        self.channel.bytes = 10
 
-        self.assertEquals(
-            self.context.getMinimumFrameSize(), self.encoder.frameSize)
+        self.assertEquals(self.context.bytes, 0)
+        self.assertEquals(self.channel.bodyRemaining, 168)
 
-    def test_written(self):
-        self.context.bytes = 128
-        self.channel.bytes = 178
-
-        self.assertEquals(self.context.getMinimumFrameSize(), 50)
+        self.assertEquals(self.context.getMinimumFrameSize(), 128)
 
     def test_bad(self):
-        self.channel.bytes = -10
-
-        self.assertEquals(self.context.getMinimumFrameSize(), 0)
-
         self.channel.bytes = 3445
         self.encoder.frameSize = 0
 
@@ -188,6 +215,8 @@ class GetDataTestCase(BaseEncoderTestCase):
         self.scheduler.activateChannel(self.channel)
         self.header.bodyLength = 150
 
+        self.context.reset(self.header)
+
     def test_empty(self):
         self.assertEquals(self.buffer.getvalue(), '')
         self.assertEquals(self.context.getFrame(), None)
@@ -195,7 +224,7 @@ class GetDataTestCase(BaseEncoderTestCase):
         self.assertEquals(self.scheduler.activeChannels, [])
 
     def test_read(self):
-        self.channel.dataReceived('a' * 150)
+        self.context.dataReceived('a' * 150)
 
         self.assertEquals(self.context.getFrame(), 'a' * 128)
         self.assertEquals(self.buffer.getvalue(), 'a' * 22)
@@ -203,14 +232,12 @@ class GetDataTestCase(BaseEncoderTestCase):
         self.assertEquals(self.scheduler.activeChannels, [self.channel])
 
     def test_under(self):
-        self.buffer.write('a' * 128)
-        self.buffer.seek(10)
+        self.context.dataReceived('a' * 10)
 
         self.assertEquals(self.context.getFrame(), None)
-        self.assertEquals(self.buffer.getvalue(), 'a' * 128)
+        self.assertEquals(self.buffer.getvalue(), 'a' * 10)
         self.assertFalse(self.context.active)
         self.assertEquals(self.scheduler.activeChannels, [])
-        self.assertEquals(self.buffer.tell(), 10)
 
 
 class EncoderTestCase(BaseEncoderTestCase):
@@ -311,6 +338,7 @@ class EncoderTestCase(BaseEncoderTestCase):
 
         return self.encoder.start().addCallback(cb)
 
+
 class FrameWritingTestCase(BaseEncoderTestCase):
     """
     Tests for L{codec.Encoder.writeFrame}
@@ -324,9 +352,11 @@ class FrameWritingTestCase(BaseEncoderTestCase):
         self.encoder.frameSize = 128
 
     def _generateContext(self, bodyLength=1000):
-        channel = self._generateChannel()
-        header = channel.getHeader()
+        channel = self.encoder.createChannel(self._channelId)
 
+        h = mocks.Header(relative=False, bodyLength=bodyLength)
+
+        header = channel.getHeader()
         header.bodyLength = bodyLength
 
         self.encoder.activateChannel(channel)
