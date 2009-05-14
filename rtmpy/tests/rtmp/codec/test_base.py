@@ -181,7 +181,7 @@ class ChannelManagerTestCase(unittest.TestCase):
         channel = c.createChannel(idx)
 
         self.assertTrue(isinstance(channel, mocks.Channel))
-        self.assertEquals(c.channels, {idx: channel})
+        self.assertEquals(c.channels, {idx: channel, channel: idx})
         self.assertIdentical(channel.manager, c)
         self.assertFalse(channel.has_reset)
 
@@ -220,7 +220,7 @@ class ChannelManagerTestCase(unittest.TestCase):
         channel = c.getChannel(10)
         self.assertTrue(isinstance(channel, mocks.Channel))
         self.assertEquals(channel.manager, c)
-        self.assertEquals(c.channels, {10: channel})
+        self.assertEquals(c.channels, {10: channel, channel: 10})
 
         c.createChannel = createChannel
         self.executed = False
@@ -274,15 +274,12 @@ class ChannelManagerTestCase(unittest.TestCase):
         c.channels = {3: channel}
 
         self.assertFalse(3 in c.activeChannels)
-        e = self.assertRaises(ValueError, c.channelComplete, channel)
-        self.assertEquals(str(e), 'list.remove(x): x not in list')
-
         c.activeChannels.append(3)
         c.channelComplete(channel)
 
         self.assertEquals(c.channels, {3: channel})
         self.assertTrue(channel.has_reset)
-        self.assertEquals(c.activeChannels, [])
+        self.assertEquals(c.activeChannels, [3])
 
         # test bodyComplete
         c = codec.BaseCodec(None)
@@ -298,7 +295,7 @@ class ChannelManagerTestCase(unittest.TestCase):
 
         c.channelComplete(channel)
 
-        self.assertEquals(c.activeChannels, [])
+        self.assertEquals(c.activeChannels, [10])
 
     def test_initialiseChannel(self):
         channel = mocks.Channel(None)
@@ -320,7 +317,7 @@ class ChannelManagerTestCase(unittest.TestCase):
         c.initialiseChannel(channel, None)
 
         self.assertTrue(channel.has_reset)
-        self.assertEquals(c.activeChannels, [68])
+        self.assertEquals(c.activeChannels, [])
 
     def test_setFrameSize(self):
         c = codec.BaseCodec(None)
@@ -465,8 +462,9 @@ class ChannelObserverTestCase(unittest.TestCase):
         h = mocks.Header(relative=True, channelId=4, bodyLength=7000)
 
         self.channel.setHeader(h)
+        self.assertNotEquals(h, self.channel.header)
 
-        self.assertEquals(self.observer.events, [('header-changed', h)])
+        self.assertEquals(self.observer.events, [('header-changed', self.channel.header)])
 
     def test_bodyComplete(self):
         h = mocks.Header(relative=False, channelId=4, bodyLength=400)

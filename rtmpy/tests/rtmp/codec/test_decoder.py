@@ -348,7 +348,7 @@ class DecodingTestCase(BaseDecoderTestCase):
             self.assertEquals(self.buffer.tell(), 0)
             self.assertEquals(self.buffer.getvalue(), '')
             self.assertFalse(self.job.running)
-            self.assertEquals(self.decoder.channels.keys(), [3, 5])
+            self.assertEquals(self.decoder.activeChannels, [])
 
             c = self.decoder.channels[3]
             h = c.header
