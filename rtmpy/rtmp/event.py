@@ -68,6 +68,12 @@ class EncodeError(BaseError):
     """
 
 
+class UnknownEventType(BaseError):
+    """
+    Raised if an unknown event type is found.
+    """
+
+
 class BaseEvent(object):
     """
     An abstract class that all event types extend.
@@ -600,7 +606,7 @@ def encode(event, *args, **kwargs):
                 break
 
         if datatype is None:
-            raise EncodeError('Unknown event type for %r' % (event,))
+            raise UnknownEventType('Unknown event type for %r' % (event,))
 
         body = BufferedByteStream()
 
@@ -624,4 +630,7 @@ def get_type_class(datatype):
     @return: The event class that is mapped to C{datatype}.
     @rtype: C{class} implementing L{interfaces.IEvent}
     """
-    return TYPE_MAP[type]
+    try:
+        return TYPE_MAP[datatype]
+    except KeyError:
+        raise UnknownEventType('Unknown event type %r' % (datatype,))

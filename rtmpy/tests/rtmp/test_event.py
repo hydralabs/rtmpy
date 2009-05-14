@@ -226,7 +226,7 @@ class EncodeTestCase(BaseTestCase):
 
         def eb(f):
             self.assertTrue(isinstance(f, Failure))
-            self.assertEquals(f.type, event.EncodeError)
+            self.assertEquals(f.type, event.UnknownEventType)
 
             self.assertEquals(str(f.value), 'Unknown event type for %r' % x)
 
@@ -1214,3 +1214,12 @@ class VideoDataTestCase(BaseTestCase):
         self.assertIdentical(ret, listener)
 
         self.assertEquals(listener.calls, [('video', ('foo',), {})])
+
+
+class HelperTestCase(unittest.TestCase):
+    def test_type_class(self):
+        for k, v in event.TYPE_MAP.iteritems():
+            self.assertEquals(event.get_type_class(k), v)
+
+        self.assertFalse('foo' in event.TYPE_MAP.keys())
+        self.assertRaises(event.UnknownEventType, event.get_type_class, 'foo')
