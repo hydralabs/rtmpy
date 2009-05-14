@@ -22,23 +22,27 @@ FRAME_SIZE = 128
 
 #: Maximum number of channels that can be active per RTMP stream
 MAX_CHANNELS = 64
-#: Maximum number of streams that can be active per RTMP stream
-MAX_STREAMS = 0xffff
 
 
-class DecodeError(Exception):
+class BaseError(Exception):
+    """
+    Base error class for all things `codec`.
+    """
+
+
+class DecodeError(BaseError):
     """
     Raised if there is an error decoding an RTMP bytestream.
     """
 
 
-class EncodeError(Exception):
+class EncodeError(BaseError):
     """
     Raised if there is an error encoding an RTMP bytestream.
     """
 
 
-class ProtocolError(Exception):
+class ProtocolError(BaseError):
     """
     Raised if an error occurs whilst handling the protocol.
     """
@@ -131,7 +135,7 @@ class Channel(object):
         else:
             if header.channelId != self.header.channelId:
                 raise _header.HeaderError('Tried to assign a header from a '
-                    'different channel (original:%d, new:%d)' % (
+                    'different channel (original:%r, new:%r)' % (
                         self.header.channelId, header.channelId))
 
         if header.relative is False:
@@ -214,18 +218,14 @@ class Channel(object):
     def onComplete(self):
         """
         Called when the channel has receieved the correct amount of data.
-        
-        @raise NoManagerError: A registered manager is required to complete a
-            channel.
         """
         if self.debug or rtmp.DEBUG:
             rtmp.log(self, 'body completed')
 
-        if self.manager is None:
-            raise NoManagerError('A registered manager is required to '
-                'complete a channel')
-
         self.manager.channelComplete(self)
+
+        if self.observer:
+            self.observer.bodyComplete()
 
     def __repr__(self):
         s = []
@@ -234,8 +234,8 @@ class Channel(object):
         if self.header is None:
             s.append('header=None')
         else:
-            s.append('channelId=%d' % (self.header.channelId,))
-            s.append('datatype=%d' % (self.header.datatype,))
+            s.append('channelId=%r' % (self.header.channelId,))
+            s.append('datatype=%r' % (self.header.datatype,))
 
         for a in attrs:
             if not hasattr(self, a):
@@ -268,7 +268,7 @@ class BaseCodec(object):
     @type frameSize: C{int}
     """
 
-    implements(interfaces.IChannelManager)
+    implements(interfaces.ICodec, interfaces.IChannelManager)
 
     channel_class = Channel
 
@@ -276,6 +276,7 @@ class BaseCodec(object):
         self.protocol = protocol
         self.channels = {}
         self.activeChannels = []
+        self.observer = None
 
         self.deferred = None
         self.frameSize = FRAME_SIZE
@@ -289,6 +290,14 @@ class BaseCodec(object):
         if hasattr(self, 'job') and self.job.running:
             self.job.stop()
 
+    def registerObserver(self, observer):
+        """
+        Registers an observer to listen to this codec.
+
+        @type observer: L{interfaces.ICodecObserver}
+        """
+        self.observer = observer
+
     def getJob(self):
         """
         Returns the method to be iteratively called to process the codec.
@@ -301,31 +310,35 @@ class BaseCodec(object):
         """
         Starts or resumes the job. If the job is already running (i.e. not
         stopped) then this is a noop.
-
-        @return: The Deferred from starting the job.
-        @rtype: L{Deferred<twisted.internet.defer.Deferred>}
         """
         if self.job.running:
-            return self.deferred
+            return
 
         self.deferred = self.job.start(when, now=False)
 
+        if self.observer is not None:
+            self.observer.started()
+
         if self.debug or rtmp.DEBUG:
             rtmp.log(self, 'Started job')
-
-        return self.deferred
 
     def pause(self):
         """
         Pauses the codec. Called when the buffer is exhausted. If the job is
         already stopped then this is a noop.
         """
-        if self.job.running:
-            self.job.stop()
-            self.deferred = None
+        if not self.job.running:
+            return
 
-            if self.debug or rtmp.DEBUG:
-                rtmp.log(self, 'Stopped job')
+        self.job.stop()
+
+        if self.observer is not None:
+            self.observer.stopped()
+
+        self.deferred = None
+
+        if self.debug or rtmp.DEBUG:
+            rtmp.log(self, 'Stopped job')
 
     # interfaces.IChannelManager
 
@@ -371,7 +384,8 @@ class BaseCodec(object):
         """
         Returns a free channelId.
         """
-        keys = self.activeChannels.sort()
+        keys = self.activeChannels
+        keys.sort()
 
         if len(keys) == MAX_CHANNELS:
             raise OverflowError("No free channel")
@@ -393,9 +407,6 @@ class BaseCodec(object):
             rtmp.log(self, 'channelComplete(%s)' % (channel,))
 
         header = channel.getHeader()
-
-        if channel.observer:
-            channel.observer.bodyComplete()
 
         channel.reset()
         header = channel.getHeader()

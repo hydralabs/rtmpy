@@ -28,6 +28,7 @@ class ChannelManager(object):
 
         self.complete = []
         self.initialised = []
+        self.channel_headers = {}
 
     def getChannel(self, id):
         try:
@@ -42,8 +43,13 @@ class ChannelManager(object):
     def channelComplete(self, channel):
         self.complete.append(channel)
 
-    def initialiseChannel(self, channel):
+    def initialiseChannel(self, channel, oldHeader):
         self.initialised.append(channel)
+
+        try:
+            self.channel_headers[channel].append(oldHeader)
+        except KeyError:
+            self.channel_headers[channel] = [oldHeader]
 
         channel.reset()
 
@@ -61,13 +67,12 @@ class Channel(object):
 
     implements(interfaces.IChannel)
 
-    def __init__(self):
+    def __init__(self, manager):
+        self.manager = manager
+
         self.header = None
         self.has_reset = False
         self.observer = None
-
-    def registerManager(self, manager):
-        self.manager = manager
 
     def reset(self):
         self.has_reset = True
@@ -200,13 +205,16 @@ class ChannelObserver(object):
         self.channel = None
         self.buffer = ''
 
-    def dataReceived(self, channel, data):
-        self.events.append(('data-received', channel, data))
+    def dataReceived(self, data):
+        self.events.append(('data-received', data))
 
         self.buffer += str(data)
 
-    def bodyComplete(self, channel):
-        self.events.append(('body-complete', channel))
+    def bodyComplete(self):
+        self.events.append(('body-complete',))
+
+    def headerChanged(self, header):
+        self.events.append(('header-changed', header))
 
 
 class HandshakeObserver(object):
@@ -237,8 +245,64 @@ class HandshakeObserver(object):
         self.buffer.append(data)
 
 
-class Stream(object):
+class CodecObserver(object):
     """
     """
 
-    implements(interfaces.IStream)
+    implements(interfaces.ICodecObserver)
+
+    def __init__(self):
+        self.events = []
+
+    def started(self, *args, **kwargs):
+        """
+        """
+        self.events.append(('start', args, kwargs))
+
+    def stopped(self, *args, **kwargs):
+        """
+        """
+        self.events.append(('stop', args, kwargs))
+
+
+class StreamManager(object):
+    """
+    """
+
+    implements(interfaces.IStreamManager)
+
+    def __init__(self):
+        self.streams = {}
+
+    def registerStream(self, streamId, stream):
+        """
+        """
+        self.streams[streamId] = stream
+
+    def unregisterStream(self, streamId):
+        """
+        """
+        del self.streams[streamId]
+
+    def getStream(self, streamId):
+        """
+        """
+        return self.streams[streamId]
+
+
+class DecodingStream(object):
+    """
+    """
+
+    implements(interfaces.IConsumingStream)
+
+    def __init__(self):
+        self.channels = []
+
+    def channelRegistered(self, channel):
+        self.channels.append(channel)
+
+    def channelUnregistered(self, channel):
+        self.channels.remove(channel)
+
+        

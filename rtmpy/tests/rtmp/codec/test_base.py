@@ -22,7 +22,6 @@ class ModuleConstTestCase(unittest.TestCase):
 
     def test_constants(self):
         self.assertEquals(codec.MAX_CHANNELS, 64)
-        self.assertEquals(codec.MAX_STREAMS, 0xffff)
         self.assertEquals(codec.FRAME_SIZE, 128)
 
 
@@ -43,12 +42,12 @@ class BaseCodecTestCase(unittest.TestCase):
         codec.BaseCodec.getJob = self._getJob
 
     def test_job(self):
-        c = codec.BaseCodec()
+        c = codec.BaseCodec(None)
 
         self.assertRaises(NotImplementedError, self._getJob, c)
 
     def test_init(self):
-        c = codec.BaseCodec()
+        c = codec.BaseCodec(None)
 
         self.assertEquals(c.deferred, None)
         self.assertTrue(isinstance(c.buffer, util.BufferedByteStream))
@@ -56,17 +55,9 @@ class BaseCodecTestCase(unittest.TestCase):
         self.assertEquals(c.observer, None)
 
     def test_registerObserver(self):
-        c = codec.BaseCodec()
+        c = codec.BaseCodec(None)
 
         self.assertEquals(c.observer, None)
-
-        e = self.assertRaises(TypeError, c.registerObserver, object())
-        self.assertEquals(str(e),
-            "Expected ICodecObserver for observer (got <type 'object'>)")
-        self.assertEquals(c.observer, None)
-
-        self.assertTrue(
-            interfaces.ICodecObserver.implementedBy(mocks.CodecObserver))
 
         m = mocks.CodecObserver()
         c.registerObserver(m)
@@ -74,7 +65,7 @@ class BaseCodecTestCase(unittest.TestCase):
         self.assertIdentical(m, c.observer)
 
     def test_destroy_not_running(self):
-        c = codec.BaseCodec()
+        c = codec.BaseCodec(None)
 
         self.assertFalse(c.job.running)
 
@@ -82,20 +73,21 @@ class BaseCodecTestCase(unittest.TestCase):
 
     def test_destroy_running(self):
         self.executed = False
-        c = codec.BaseCodec()
+        c = codec.BaseCodec(None)
 
         def cb(lc):
             self.assertIdentical(c.job, lc)
             self.executed = True
 
-        c.start().addCallback(cb)
+        c.start()
+        c.deferred.addCallback(cb)
 
         self.assertFalse(self.executed)
         c.__del__()
         self.assertTrue(self.executed)
 
     def test_start(self):
-        c = codec.BaseCodec()
+        c = codec.BaseCodec(None)
 
         job = c.job
 
@@ -104,16 +96,15 @@ class BaseCodecTestCase(unittest.TestCase):
 
         x = c.start()
 
-        self.assertTrue(x, defer.Deferred)
-        self.assertIdentical(c.deferred, x)
+        self.assertEquals(x, None)
         self.assertEquals(job.interval, 0)
         self.assertTrue(job.running)
 
         y = c.start()
-        self.assertIdentical(c.deferred, x, y)
+        self.assertEquals(y, None)
 
     def test_pause(self):
-        c = codec.BaseCodec()
+        c = codec.BaseCodec(None)
         job = c.job
         c.deferred = object()
 
@@ -128,6 +119,26 @@ class BaseCodecTestCase(unittest.TestCase):
         c.pause()
         self.assertFalse(job.running)
         self.assertEquals(c.deferred, None)
+
+    def test_observer(self):
+        c = codec.BaseCodec(None)
+
+        self.assertEquals(c.observer, None)
+
+        o = mocks.CodecObserver()
+        c.registerObserver(o)
+
+        self.assertIdentical(c.observer, o)
+
+        self.assertEquals(o.events, [])
+
+        c.start()
+
+        self.assertEquals(o.events, [('start', tuple(), {})])
+        o.events = []
+
+        c.pause()
+        self.assertEquals(o.events, [('stop', tuple(), {})])
 
 
 class ChannelManagerTestCase(unittest.TestCase):
@@ -156,13 +167,13 @@ class ChannelManagerTestCase(unittest.TestCase):
             interfaces.IChannelManager.implementedBy(codec.BaseCodec))
 
     def test_init(self):
-        c = codec.BaseCodec()
+        c = codec.BaseCodec(None)
 
         self.assertEquals(c.channels, {})
         self.assertEquals(c.frameSize, codec.FRAME_SIZE)
 
     def test_createChannel(self):
-        c = codec.BaseCodec()
+        c = codec.BaseCodec(None)
 
         self.assertEquals(c.channels, {})
 
@@ -186,7 +197,7 @@ class ChannelManagerTestCase(unittest.TestCase):
             codec.MAX_CHANNELS + 1))
 
     def test_getChannel(self):
-        c = codec.BaseCodec()
+        c = codec.BaseCodec(None)
 
         self.assertEquals(c.channels, {})
         self.executed = False
@@ -203,7 +214,7 @@ class ChannelManagerTestCase(unittest.TestCase):
         self.assertTrue(self.executed)
         self.assertEquals(self.channelId, 10)
 
-        c = codec.BaseCodec()
+        c = codec.BaseCodec(None)
         self.assertEquals(c.channels, {})
 
         channel = c.getChannel(10)
@@ -219,112 +230,114 @@ class ChannelManagerTestCase(unittest.TestCase):
         self.assertIdentical(channel, channel2)
 
     def test_getNextAvailableChannelId(self):
-        c = codec.BaseCodec()
+        c = codec.BaseCodec(None)
 
-        channels = {}
+        channels = []
 
         for x in xrange(0, codec.MAX_CHANNELS):
-            channels[x] = None
+            channels.append(x)
 
-        c.channels = channels
-        self.assertEquals(len(channels.keys()), codec.MAX_CHANNELS)
+        c.activeChannels = channels
+        self.assertEquals(len(channels), codec.MAX_CHANNELS)
         e = self.assertRaises(OverflowError, c.getNextAvailableChannelId)
         self.assertEquals(str(e), 'No free channel')
 
-        c = codec.BaseCodec()
+        c = codec.BaseCodec(None)
 
-        self.assertEquals(c.channels, {})
+        self.assertEquals(c.activeChannels, [])
         self.assertEquals(c.getNextAvailableChannelId(), 0)
 
-        c.channels = {0: None}
+        c.activeChannels = [0]
         self.assertEquals(c.getNextAvailableChannelId(), 1)
 
-        c.channels = {0: None, 1: None, 3: None}
+        c.activeChannels = [0, 3, 1]
         self.assertEquals(c.getNextAvailableChannelId(), 2)
-        c.channels[2] = None
+        c.activeChannels.append(2)
         self.assertEquals(c.getNextAvailableChannelId(), 4)
 
-        channels = {}
+        channels = []
 
         for x in xrange(0, codec.MAX_CHANNELS - 1):
-            channels[x] = None
+            channels.append(x)
 
-        c.channels = channels
+        c.activeChannels = channels
         self.assertEquals(c.getNextAvailableChannelId(), codec.MAX_CHANNELS - 1)
 
     def test_channelComplete(self):
-        c = codec.BaseCodec()
+        c = codec.BaseCodec(None)
+        m = mocks.ChannelManager()
 
-        channel = mocks.Channel()
-        channel.manager = mocks.ChannelManager()
+        channel = mocks.Channel(m)
         header = mocks.Header(channelId=3, relative=False)
 
         channel.setHeader(header)
         c.channels = {3: channel}
 
+        self.assertFalse(3 in c.activeChannels)
+        e = self.assertRaises(ValueError, c.channelComplete, channel)
+        self.assertEquals(str(e), 'list.remove(x): x not in list')
+
+        c.activeChannels.append(3)
         c.channelComplete(channel)
 
         self.assertEquals(c.channels, {3: channel})
         self.assertTrue(channel.has_reset)
+        self.assertEquals(c.activeChannels, [])
 
         # test bodyComplete
-        c = codec.BaseCodec()
+        c = codec.BaseCodec(None)
 
-        channel = mocks.Channel()
+        channel = mocks.Channel(None)
         header = mocks.Header(channelId=10, relative=False)
 
-        o = channel.observer = mocks.ChannelObserver()
         channel.manager = mocks.ChannelManager()
 
         channel.setHeader(header)
         c.channels = {10: channel}
+        c.activeChannels = [10]
 
         c.channelComplete(channel)
 
-        self.assertEquals(o.events, [('body-complete', channel)])
+        self.assertEquals(c.activeChannels, [])
 
     def test_initialiseChannel(self):
-        channel = mocks.Channel()
-        channel.manager = None
-        c = codec.BaseCodec()
+        channel = mocks.Channel(None)
+        c = codec.BaseCodec(None)
 
         self.assertNotEquals(channel.manager, c)
-        e = self.assertRaises(ValueError, c.initialiseChannel, channel)
+        e = self.assertRaises(ValueError, c.initialiseChannel, channel, None)
         self.assertEquals(str(e), "Cannot initialise a channel that isn't "
             "registered to this manager")
 
         self.assertFalse(channel.has_reset)
-
-        channel.registerManager(c)
-        c.initialiseChannel(channel)
-
-        self.assertTrue(channel.has_reset)
-
-        # test the codec observer
-
-        c = codec.BaseCodec()
-        o = c.observer = mocks.CodecObserver()
-        channel = mocks.Channel()
+        self.assertEquals(c.activeChannels, [])
 
         channel.manager = c
-        c.initialiseChannel(channel)
 
-        self.assertEquals(o.events, [('channel-start', channel)])
+        channel.header = mocks.Header(channelId=68)
+
+        self.assertEquals(c.activeChannels, [])
+        c.initialiseChannel(channel, None)
+
+        self.assertTrue(channel.has_reset)
+        self.assertEquals(c.activeChannels, [68])
 
     def test_setFrameSize(self):
-        c = codec.BaseCodec()
+        c = codec.BaseCodec(None)
         self.assertNotEquals(c.frameSize, 100)
 
         c.setFrameSize(100)
         self.assertEquals(c.frameSize, 100)
 
-        c = codec.BaseCodec()
-        c.channels = {10: mocks.Channel(), 85: mocks.Channel()}
+        c = codec.BaseCodec(None)
+        c.channels = {10: mocks.Channel(c), 85: mocks.Channel(c)}
         self.assertNotEquals(c.frameSize, 100)
+
+        c.activeChannels.append(85)
 
         c.setFrameSize(100)
 
-        self.assertEquals(c.channels[10].frameRemaining, 100)
+        self.assertFalse(hasattr(c.channels[10], 'frameRemaining'))
         self.assertEquals(c.channels[85].frameRemaining, 100)
 
 
@@ -334,12 +347,12 @@ class ChannelTestCase(unittest.TestCase):
     """
 
     def test_interface(self):
-        c = codec.Channel()
+        c = codec.Channel(None)
 
         self.assertTrue(interfaces.IChannel.providedBy(c))
 
     def test_init(self):
-        c = codec.Channel()
+        c = codec.Channel(None)
 
         self.assertEquals(c.__dict__, {
             'manager': None,
@@ -349,25 +362,8 @@ class ChannelTestCase(unittest.TestCase):
             'debug': rtmp.DEBUG
         })
 
-    def test_registerManager(self):
-        c = codec.Channel()
-
-        e = self.assertRaises(TypeError, c.registerManager, object())
-        self.assertEquals(str(e), 'Expected IChannelManager for manager ' \
-            '(got <type \'object\'>)')
-
-        m = mocks.ChannelManager()
-        self.assertTrue(interfaces.IChannelManager.providedBy(m))
-        c.registerManager(m)
-
-        self.assertIdentical(m, c.manager)
-
     def test_registerObserver(self):
-        c = codec.Channel()
-
-        e = self.assertRaises(TypeError, c.registerObserver, object())
-        self.assertEquals(str(e), 'Expected IChannelObserver for observer ' \
-            '(got <type \'object\'>)')
+        c = codec.Channel(None)
 
         o = mocks.ChannelObserver()
         self.assertTrue(interfaces.IChannelObserver.providedBy(o))
@@ -375,28 +371,9 @@ class ChannelTestCase(unittest.TestCase):
 
         self.assertIdentical(o, c.observer)
 
-        # make sure that the observer gets notified if the channel is
-        # buffering data.
-
-        c = codec.Channel()
-        c.buffer = 'hello'
-
-        o = mocks.ChannelObserver()
-        c.registerObserver(o)
-
-        self.assertEquals(o.events, [('data-received', c, 'hello')])
-        self.assertEquals(o.buffer, 'hello')
-
     def test_reset(self):
-        c = codec.Channel()
-
-        # doing a reset requires a manager
-        e = self.assertRaises(codec.NoManagerError, c.reset)
-        self.assertEquals(str(e),
-            'Resetting a channel requires a registered manager')
-
         m = mocks.ChannelManager()
-        c.manager = m
+        c = codec.Channel(m)
 
         self.assertEquals(c.__dict__, {
             'manager': m,
@@ -420,7 +397,7 @@ class ChannelTestCase(unittest.TestCase):
         })
 
     def test_getHeader(self):
-        c = codec.Channel()
+        c = codec.Channel(None)
 
         self.assertEquals(c.getHeader(), None)
 
@@ -430,7 +407,7 @@ class ChannelTestCase(unittest.TestCase):
         self.assertIdentical(c.getHeader(), o)
 
     def test_repr(self):
-        c = codec.Channel()
+        c = codec.Channel(None)
 
         self.assertEquals(repr(c),
             '<rtmpy.rtmp.codec.Channel header=None at 0x%x>' % (id(c),))
@@ -438,30 +415,70 @@ class ChannelTestCase(unittest.TestCase):
         h = mocks.Header(relative=False, bodyLength=50, datatype=2,
             timestamp=45, channelId=10, streamId=1)
 
-        m = mocks.ChannelManager()
-        c.registerManager(m)
+        m = c.manager = mocks.ChannelManager()
 
         c.setHeader(h)
 
-        self.assertEquals(repr(c),
-            '<rtmpy.rtmp.codec.Channel channelId=10 datatype=2 frameRemaining=128' \
-                ' frames=0 bytes=0 bodyRemaining=50 at 0x%x>' % (id(c),))
+        self.assertEquals(repr(c), '<rtmpy.rtmp.codec.Channel channelId=10 '
+            'datatype=2 frameRemaining=128 frames=0 bytes=0 bodyRemaining=50 '
+            'at 0x%x>' % (id(c),))
 
-    def test_complete(self):
-        c = codec.Channel()
 
-        self.assertEquals(c.manager, None)
-        e = self.assertRaises(codec.NoManagerError, c.onComplete)
-        self.assertEquals(str(e),
-            'A registered manager is required to complete a channel')
+class ChannelObserverTestCase(unittest.TestCase):
+    """
+    """
 
-        c = codec.Channel()
-        m = mocks.ChannelManager()
-        c.manager = m
-        self.assertEquals(c.observer, None)
+    def setUp(self):
+        self.manager = mocks.ChannelManager()
+        self.channel = codec.Channel(self.manager)
+        self.observer = mocks.ChannelObserver()
 
-        c.onComplete()
-        self.assertEquals(m.complete, [c])
+        self.channel.registerObserver(self.observer)
+
+    def test_buffering(self):
+        # make sure that the observer gets notified if the channel is
+        # buffering data.
+
+        c = codec.Channel(None)
+        c.buffer = 'hello'
+
+        o = mocks.ChannelObserver()
+        c.registerObserver(o)
+
+        self.assertEquals(o.events, [('data-received', 'hello')])
+        self.assertEquals(o.buffer, 'hello')
+
+    def test_dataReceived(self):
+        self.channel.setHeader(mocks.Header(relative=False, bodyLength=50))
+        # test dataReceived
+
+        self.channel.dataReceived('foo')
+
+        self.assertEquals(self.observer.events, [('data-received', 'foo')])
+
+    def test_headerChanged(self):
+        h = mocks.Header(relative=False, channelId=4, bodyLength=400)
+        self.channel.setHeader(h)
+
+        self.assertEquals(self.observer.events, [])
+
+        h = mocks.Header(relative=True, channelId=4, bodyLength=7000)
+
+        self.channel.setHeader(h)
+
+        self.assertEquals(self.observer.events, [('header-changed', h)])
+
+    def test_bodyComplete(self):
+        h = mocks.Header(relative=False, channelId=4, bodyLength=400)
+        self.channel.setHeader(h)
+
+        self.assertEquals(self.observer.events, [])
+        self.channel.dataReceived('a' * 400)
+
+        self.assertEquals(self.observer.events, [
+            ('data-received', 'a' * 400),
+            ('body-complete',)
+        ])
 
 
 class ChannelHeaderTestCase(unittest.TestCase):
@@ -470,26 +487,22 @@ class ChannelHeaderTestCase(unittest.TestCase):
     """
 
     def setUp(self):
-        self.channel = codec.Channel()
         self.manager = mocks.ChannelManager()
-
-        self.channel.registerManager(self.manager)
+        self.channel = codec.Channel(self.manager)
 
     def test_interface(self):
-        c = codec.Channel()
+        c = codec.Channel(None)
 
-        e = self.assertRaises(TypeError, c.setHeader, object())
-        self.assertEquals(str(e), 'Expected header to implement IHeader')
+        self.assertTrue(interfaces.IChannel.providedBy(c))
 
     def test_nomanager(self):
-        c = codec.Channel()
-        h = mocks.Header()
-        self.assertTrue(interfaces.IHeader.providedBy(h))
+        c = codec.Channel(None)
+        h = mocks.Header(relative=False)
         self.assertEquals(c.manager, None)
 
-        e = self.assertRaises(codec.NoManagerError, c.setHeader, h)
-        self.assertEquals(str(e), 'Setting the header requires a ' \
-            'registered manager')
+        e = self.assertRaises(AttributeError, c.setHeader, h)
+        self.assertEquals(str(e), "'NoneType' object has no attribute "
+            "'initialiseChannel'")
 
     def test_noHeader_setRelative(self):
         self.assertEquals(self.channel.header, None)
@@ -498,22 +511,30 @@ class ChannelHeaderTestCase(unittest.TestCase):
         self.assertTrue(h.relative)
 
         e = self.assertRaises(header.HeaderError, self.channel.setHeader, h)
-        self.assertEquals(str(e), 'Tried to set a relative header as ' \
+        self.assertEquals(str(e), 'Tried to set a relative header as '
             'absolute')
 
     def test_initialiseChannel(self):
         self.assertEquals(self.channel.header, None)
 
-        h = mocks.Header(relative=False, bodyLength=10)
+        h = mocks.Header(channelId=34, bodyLength=10, relative=False)
         self.assertFalse(h.relative)
 
         self.channel.setHeader(h)
+        self.assertEquals(self.manager.channel_headers, {self.channel: [None]})
 
         self.assertIdentical(self.channel.header, h)
-        # make sure manager.initialiseChannel was callled
+        # make sure manager.initialiseChannel was called
         self.assertEquals(self.manager.initialised, [self.channel])
 
         self.assertEquals(self.channel.bodyRemaining, h.bodyLength)
+
+        oldHeader, h = h, mocks.Header(channelId=34, bodyLength=10, relative=False)
+
+        self.channel.setHeader(h)
+        self.assertEquals(self.manager.channel_headers, {
+            self.channel: [None, oldHeader]
+        })
 
     def test_absoluteHeader(self):
         a = mocks.Header(relative=False, bodyLength=10, datatype=2,
@@ -549,17 +570,16 @@ class ChannelDataTestCase(unittest.TestCase):
     """
 
     def setUp(self):
-        self.channel = codec.Channel()
         self.manager = mocks.ChannelManager()
+        self.channel = codec.Channel(self.manager)
         self.header = mocks.Header(relative=False, bodyLength=50, datatype=2,
             timestamp=45, channelId=10, streamId=1)
 
         self.manager.channels = {10: self.channel}
-        self.channel.registerManager(self.manager)
         self.channel.setHeader(self.header)
 
     def test_noheader(self):
-        c = codec.Channel()
+        c = codec.Channel(None)
 
         e = self.assertRaises(header.HeaderError, c.dataReceived, '')
         self.assertEquals(str(e), 'Cannot write to a channel with no header')
@@ -591,7 +611,7 @@ class ChannelDataTestCase(unittest.TestCase):
         self.channel.dataReceived('foo bar')
 
         self.assertEquals(observer.events,
-            [('data-received', self.channel, 'foo bar')])
+            [('data-received', 'foo bar')])
         self.assertEquals(observer.buffer, 'foo bar')
         self.assertEquals(self.channel.buffer, None)
 
@@ -682,103 +702,3 @@ class ChannelDataTestCase(unittest.TestCase):
         self.assertEquals(self.channel.bodyRemaining, 0)
 
         self.assertTrue(self.executed)
-
-
-class StreamManagerTestCase(unittest.TestCase):
-    """
-    Tests for L{interfaces.IStreamManager} implementation of
-    L{codec.BaseCodec}.
-    """
-
-    @classmethod
-    def _getJob(cls):
-        return lambda: None
-
-    def setUp(self):
-        self._getJob = codec.BaseCodec.getJob
-        codec.BaseCodec.getJob = BaseCodecTestCase._getJob
-
-    def tearDown(self):
-        codec.BaseCodec.getJob = self._getJob
-
-    def test_init(self):
-        c = codec.BaseCodec()
-
-        self.assertEquals(c.streams, {})
-
-    def test_registerStream(self):
-        c = codec.BaseCodec()
-
-        e = self.assertRaises(ValueError, c.registerStream, -1, None)
-        self.assertEquals(str(e), 'streamId is not in range (got:-1)')
-        self.assertEquals(c.streams, {})
-
-        c = codec.BaseCodec()
-
-        e = self.assertRaises(ValueError, c.registerStream, 0x10000, None)
-        self.assertEquals(str(e), 'streamId is not in range (got:65536)')
-        self.assertEquals(c.streams, {})
-
-        c = codec.BaseCodec()
-
-        x = object()
-        self.assertFalse(interfaces.IStream.providedBy(x))
-        e = self.assertRaises(TypeError, c.registerStream, 0, x)
-        self.assertEquals(str(e), "IStream interface expected "
-            "(got:<type 'object'>)")
-        self.assertEquals(c.streams, {})
-
-        c = codec.BaseCodec()
-
-        c.streams = {3: None}
-        s = mocks.Stream()
-
-        self.assertTrue(interfaces.IStream.providedBy(s))
-        e = self.assertRaises(IndexError, c.registerStream, 3, s)
-        self.assertEquals(str(e), 'Stream already registered (streamId:3)')
-        self.assertEquals(c.streams, {3: None})
-
-        # test a successful registration
-
-        c = codec.BaseCodec()
-        s = mocks.Stream()
-
-        self.assertEquals(c.streams, {})
-        c.registerStream(1, s)
-        self.assertEquals(c.streams, {1: s})
-
-        # show that we can add the same stream twice
-        c.registerStream(2, s)
-
-        self.assertEquals(c.streams, {1: s, 2: s})
-
-    def test_removeStream(self):
-        c = codec.BaseCodec()
-        self.assertEquals(c.streams, {})
-
-        e = self.assertRaises(IndexError, c.removeStream, 2)
-        self.assertEquals(str(e), 'Unknown streamId 2')
-        self.assertEquals(c.streams, {})
-
-        e = self.assertRaises(ValueError, c.removeStream, 'foo')
-        self.assertEquals(str(e),
-            "invalid literal for int() with base 10: 'foo'")
-
-        c = codec.BaseCodec()
-        s1, s2 = object(), object()
-
-        c.streams = {3: s1, 56: s2}
-
-        e = self.assertRaises(IndexError, c.removeStream, 2)
-        self.assertEquals(str(e), 'Unknown streamId 2')
-        self.assertEquals(c.streams, {3: s1, 56: s2})
-
-        x = c.removeStream(3)
-        self.assertEquals(c.streams, {56: s2})
-        self.assertIdentical(x, s1)
-
-        y = c.removeStream(56)
-        self.assertEquals(c.streams, {})
-        self.assertIdentical(y, s2)
-
-        

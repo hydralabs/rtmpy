@@ -16,12 +16,12 @@ class BaseDecoderTestCase(unittest.TestCase):
     """
 
     def setUp(self):
-        self.decoder = codec.Decoder()
+        self.manager = mocks.StreamManager()
+        self.decoder = codec.Decoder(self.manager)
         self.buffer = self.decoder.buffer
 
     def _generateChannel(self, header=None):
-        c = mocks.Channel()
-        c.registerManager(self.decoder)
+        c = mocks.Channel(self.decoder)
 
         c.reset()
 
@@ -95,7 +95,9 @@ class DecoderClassTestCase(BaseDecoderTestCase):
             job = self.decoder.job
             self.assertEquals(job.running, False)
 
-        return self.decoder.start().addCallback(cb)
+        self.decoder.start()
+
+        return self.decoder.deferred.addCallback(cb)
 
     def test_noop(self):
         """
@@ -204,8 +206,7 @@ class DecodingTestCase(BaseDecoderTestCase):
         self.deferred.addCallback(self._cb)
 
     def _createMockChannel(self, channelId):
-        channel = self.decoder.channels[channelId] = mocks.Channel()
-        channel.registerManager(self.decoder)
+        channel = self.decoder.channels[channelId] = mocks.Channel(self.decoder)
         channel.reset()
 
         return channel
@@ -326,6 +327,8 @@ class DecodingTestCase(BaseDecoderTestCase):
         return self.deferred.addCallback(cb)
 
     def test_multipleHeaders2channels(self):
+        self.manager.registerStream(1, mocks.DecodingStream())
+
         # a full header channelId 3, datatype 2, bodyLength 500, streamId 1, timestamp 10
         self.buffer.write('\x03\x00\x00\n\x00\x01\xf4\x02\x01\x00\x00\x00')
         # complete the frame
@@ -356,7 +359,7 @@ class DecodingTestCase(BaseDecoderTestCase):
             self.assertEquals(h.streamId, 1)
             self.assertEquals(h.timestamp, 10)
 
-            self.assertEquals(c.buffer, 'a' * self.decoder.frameSize + \
+            self.assertEquals(c.buffer, 'a' * self.decoder.frameSize +
                 'c' * self.decoder.frameSize)
 
             c = self.decoder.channels[5]
@@ -400,7 +403,7 @@ class FrameReadingTestCase(BaseDecoderTestCase):
         self.assertEquals(channel.frames, 0)
 
     def test_negative_availability(self):
-        self.decoder.currentChannel = c = mocks.Channel()
+        self.decoder.currentChannel = c = mocks.Channel(None)
         c.header = mocks.Header(bodyLength=10)
         c.bytes = 0
 

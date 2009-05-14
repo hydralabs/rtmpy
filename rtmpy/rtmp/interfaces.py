@@ -214,6 +214,47 @@ class IChannelScheduler(Interface):
         """
 
 
+class ICodec(Interface):
+    """
+    """
+
+    deferred = Attribute("")
+
+    def getJob(self):
+        """
+        """
+
+    def start(when):
+        """
+        """
+
+    def pause():
+        """
+        """
+
+    def registerObserver(observer):
+        """
+
+        @type observer: L{ICodecObserver}
+        """
+
+
+class ICodecObserver(Interface):
+    """
+    Observes RTMP codec events.
+    """
+
+    def started():
+        """
+        Called when the codec has re/started.
+        """
+
+    def stopped():
+        """
+        Called when encoding has paused.
+        """
+
+
 class IHandshakeObserver(Interface):
     """
     Observes handshake events.
@@ -388,26 +429,62 @@ class IEventListener(Interface):
         """
 
 
-class IStream(Interface):
+class IConsumingStream(Interface):
     """
-    A stream sends or receives RTMP packets.
+    Deals with part of a stream that linked with decoding RTMP events.
     """
 
-    timestamp = Attribute("")
+    def channelRegistered(channel):
+        """
+        Called when a channel has registered itself to this stream.
 
-    def send(packet):
-        """
-        Dispatch packets to the RTMP stream.
-        """
-
-    def receive(packet):
-        """
-        Called when a packet is received from the stream.
+        @type channel: L{IChannel}
         """
 
-    def onChannelRegistered(channel):
+    def channelUnregistered(channel):
         """
-        Called when the decoder has registered a channel with this stream.
+        Called when a channel has unregistered itself from this channel
+
+        @type channel: L{IChannel}
+        """
+
+    def dispatchEvent(event, channel):
+        """
+        Called to dispatch an event to the stream.
+
+        @type event: L{IEvent}
+        @param channel: The channel that the event was generated from.
+        @type channel: L{IChannel}
+        """
+
+
+class IProducingStream(Interface):
+    """
+    Deals with part of a stream that linked with encoding RTMP events.
+    """
+
+    def registerChannel(channel):
+        """
+        Called to register a channel to this stream.
+
+        @type channel: L{IChannel}
+        """
+
+    def unregisterChannel(channel):
+        """
+        Called to unregister a channel from this stream.
+
+        @type channel: L{IChannel}
+        """
+
+    def writeEvent(event, channel=None):
+        """
+        Write an event to the stream. If channel is C{None} then one will be
+        allocated.
+
+        @type event: L{IEvent}
+        @param channel: The channel that the event was generated from.
+        @type channel: L{IChannel}
         """
 
 
@@ -446,4 +523,8 @@ class IStreamManager(Interface):
         @rtype: L{IStream}
         @raise ValueError: C{streamId} is not in the correct range.
         @raise IndexError: C{streamId} does not have a stream registered to it.
+        """
+
+    def getStream(streamId):
+        """
         """

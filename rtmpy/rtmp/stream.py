@@ -111,8 +111,6 @@ class ControlStream(object):
         d.addErrback(self.protocol.logAndDisconnect)
         d.addCallback(self.dispatchEvent, channel)
 
-    # interfaces.IStreamWriter
-
     def writeEvent(self, e, channelId=None):
         """
         """
@@ -130,7 +128,8 @@ class ControlStream(object):
             if channel is None:
                 channel = self.registerChannel(channelId)
 
-            return self.protocol.writePacket(self.streamId, channelId, res[0], res[1], self.timestamp)
+            return self.protocol.writePacket(
+                self.streamId, channelId, res[0], res[1], self.timestamp)
 
         return event.encode(e).addCallback(cb, channelId)
 

@@ -308,3 +308,101 @@ class ServerProtocolTestCase(unittest.TestCase):
         p.handshakeSuccess()
 
         self.assertTrue(self.executed)
+
+
+class StreamManagerTestCase(unittest.TestCase):
+    """
+    Tests for L{interfaces.IStreamManager} implementation of
+    L{codec.BaseCodec}.
+    """
+
+    @classmethod
+    def _getJob(cls):
+        return lambda: None
+
+    def setUp(self):
+        self._getJob = codec.BaseCodec.getJob
+        codec.BaseCodec.getJob = BaseCodecTestCase._getJob
+
+    def tearDown(self):
+        codec.BaseCodec.getJob = self._getJob
+
+    def test_init(self):
+        c = codec.BaseCodec(None)
+
+        self.assertEquals(c.streams, {})
+
+    def test_registerStream(self):
+        c = codec.BaseCodec(None)
+
+        e = self.assertRaises(ValueError, c.registerStream, -1, None)
+        self.assertEquals(str(e), 'streamId is not in range (got:-1)')
+        self.assertEquals(c.streams, {})
+
+        c = codec.BaseCodec(None)
+
+        e = self.assertRaises(ValueError, c.registerStream, 0x10000, None)
+        self.assertEquals(str(e), 'streamId is not in range (got:65536)')
+        self.assertEquals(c.streams, {})
+
+        c = codec.BaseCodec(None)
+
+        x = object()
+        self.assertFalse(interfaces.IStream.providedBy(x))
+        e = self.assertRaises(TypeError, c.registerStream, 0, x)
+        self.assertEquals(str(e), "IStream interface expected "
+            "(got:<type 'object'>)")
+        self.assertEquals(c.streams, {})
+
+        c = codec.BaseCodec(None)
+
+        c.streams = {3: None}
+        s = mocks.Stream()
+
+        self.assertTrue(interfaces.IStream.providedBy(s))
+        e = self.assertRaises(IndexError, c.registerStream, 3, s)
+        self.assertEquals(str(e), 'Stream already registered (streamId:3)')
+        self.assertEquals(c.streams, {3: None})
+
+        # test a successful registration
+
+        c = codec.BaseCodec(None)
+        s = mocks.Stream()
+
+        self.assertEquals(c.streams, {})
+        c.registerStream(1, s)
+        self.assertEquals(c.streams, {1: s})
+
+        # show that we can add the same stream twice
+        c.registerStream(2, s)
+
+        self.assertEquals(c.streams, {1: s, 2: s})
+
+    def test_removeStream(self):
+        c = codec.BaseCodec(None)
+        self.assertEquals(c.streams, {})
+
+        e = self.assertRaises(IndexError, c.removeStream, 2)
+        self.assertEquals(str(e), 'Unknown streamId 2')
+        self.assertEquals(c.streams, {})
+
+        e = self.assertRaises(ValueError, c.removeStream, 'foo')
+        self.assertEquals(str(e),
+            "invalid literal for int() with base 10: 'foo'")
+
+        c = codec.BaseCodec(None)
+        s1, s2 = object(), object()
+
+        c.streams = {3: s1, 56: s2}
+
+        e = self.assertRaises(IndexError, c.removeStream, 2)
+        self.assertEquals(str(e), 'Unknown streamId 2')
+        self.assertEquals(c.streams, {3: s1, 56: s2})
+
+        x = c.removeStream(3)
+        self.assertEquals(c.streams, {56: s2})
+        self.assertIdentical(x, s1)
+
+        y = c.removeStream(56)
+        self.assertEquals(c.streams, {})
+        self.assertIdentical(y, s2)

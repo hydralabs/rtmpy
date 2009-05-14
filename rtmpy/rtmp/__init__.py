@@ -32,6 +32,9 @@ DEBUG = False
 #: The default RTMP port is a registered port at U{IANA<http://iana.org>}
 RTMP_PORT = 1935
 
+#: Maximum number of streams that can be active per RTMP stream
+MAX_STREAMS = 0xffff
+
 
 def log(obj, msg):
     """
@@ -64,11 +67,7 @@ class BaseProtocol(protocol.Protocol):
     STREAM = 'stream'
 
     def __init__(self):
-        self.encrypted = False
         self.debug = DEBUG
-
-        self.decoder = None
-        self.encoder = None
 
     def buildHandshakeNegotiator(self):
         """
@@ -119,9 +118,8 @@ class BaseProtocol(protocol.Protocol):
             self.decoder.start().addErrback(self.logAndDisconnect)
 
     def logAndDisconnect(self, failure=None):
-        if self.debug or DEBUG:
-            log(self, 'error %r' % (failure,))
-            log(self, failure.getBriefTraceback())
+        log(self, 'error %r' % (failure,))
+        log(self, failure.getBriefTraceback())
 
         self.transport.loseConnection()
 
@@ -179,11 +177,15 @@ class BaseProtocol(protocol.Protocol):
         """
         self.transport.write(data)
 
+    def codecStarted(self, d):
+        """
+        """
+        d.addErrback(self.logAndDisconnect)
+
     def writePacket(self, *args, **kwargs):
         d = self.encoder.writePacket(*args, **kwargs)
 
-        if self.encoder.deferred is None:
-            self.encoder.start().addErrback(self.logAndDisconnect)
+        self.encoder.start()
 
         return d
 
