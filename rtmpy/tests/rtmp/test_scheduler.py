@@ -27,9 +27,8 @@ class BaseChannelSchedulerTestCase(unittest.TestCase):
         h = mocks.Header(channelId=self._channelId, relative=False)
         self._channelId += 1
 
-        c = mocks.Channel()
+        c = mocks.Channel(self.manager)
         c.setHeader(h)
-        c.registerManager(self.manager)
         c.reset()
 
         return c
