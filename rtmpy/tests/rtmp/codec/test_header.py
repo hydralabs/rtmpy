@@ -31,8 +31,7 @@ class HeaderTestCase(unittest.TestCase):
             'timestamp': None,
             'datatype': None,
             'bodyLength': None,
-            'streamId': None,
-            'relative': None
+            'streamId': None
         })
 
     def test_kwargs(self):
@@ -42,7 +41,6 @@ class HeaderTestCase(unittest.TestCase):
             'datatype': 20,
             'bodyLength': 2000,
             'streamId': 98,
-            'relative': False
         }
 
         h = header.Header(**d)
@@ -54,7 +52,7 @@ class HeaderTestCase(unittest.TestCase):
 
         self.assertEquals(repr(h), '<rtmpy.rtmp.codec.header.Header '
             'datatype=None timestamp=None bodyLength=None channelId=None '
-            'relative=None streamId=None at 0x%x>' % (id(h),))
+            'streamId=None at 0x%x>' % (id(h),))
 
         d = {
             'channelId': 1,
@@ -69,7 +67,22 @@ class HeaderTestCase(unittest.TestCase):
 
         self.assertEquals(repr(h), '<rtmpy.rtmp.codec.header.Header '
             'datatype=20 timestamp=50 bodyLength=2000 channelId=1 '
-            'relative=False streamId=98 at 0x%x>' % (id(h),))
+            'streamId=98 at 0x%x>' % (id(h),))
+
+    def test_relative(self):
+        h = header.Header()
+        self.assertTrue(h.relative)
+
+        h.channelId = 3
+        self.assertTrue(h.relative)
+        h.streamId = 4
+        self.assertTrue(h.relative)
+        h.bodyLength = 4
+        self.assertTrue(h.relative)
+        h.datatype = 4
+        self.assertTrue(h.relative)
+        h.timestamp = 4
+        self.assertFalse(h.relative)
 
 
 class DecodeHeaderByteTestCase(unittest.TestCase):
@@ -555,7 +568,7 @@ class DiffHeadersTestCase(unittest.TestCase):
         h = header.diffHeaders(old, new)
 
         self.assertTrue(interfaces.IHeader.providedBy(h))
-        self.assertTrue(h.relative)
+        self.assertFalse(h.relative)
         self.assertEquals(h.timestamp, 234234)
         self.assertEquals(h.bodyLength, 2001)
         self.assertEquals(h.datatype, 0)

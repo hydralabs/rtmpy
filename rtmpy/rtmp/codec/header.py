@@ -43,7 +43,12 @@ class Header(object):
         self.streamId = kwargs.get('streamId', None)
 
     def _get_relative(self):
-        return None in [self.timestamp, self.datatype, self.bodyLength, self.streamId]
+        return None in [
+            self.streamId,
+            self.timestamp,
+            self.datatype,
+            self.bodyLength,
+        ]
 
     relative = property(_get_relative)
 
