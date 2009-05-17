@@ -689,8 +689,6 @@ class Decoder(BaseCodec):
         header = channel.getHeader()
         stream = self.protocol.getStream(header.streamId)
 
-        self.deactivateChannel(channel)
-
         stream.channelUnregistered(channel)
 
     def initialiseChannel(self, channel, oldHeader):
@@ -733,10 +731,9 @@ class ChannelContext(object):
         self.buffer = util.BufferedByteStream()
         self.header = None
 
-        self.active = False
-
         self.queue = []
         self.currentPacket = None
+        self.debug = False
 
     def reset(self, header):
         """
@@ -745,21 +742,6 @@ class ChannelContext(object):
         self.buffer.truncate()
         self.bytes = 0
         self.bytesRequired = header.bodyLength
-
-    def dataReceived(self, data):
-        """
-        Called by the channel when data becomes available. Data is appended to
-        the L{buffer} and if the channel is activated if it is not already.
-        """
-        self.buffer.append(data)
-
-        if not self.active:
-            self.encoder.activateChannel(self.channel)
-            self.active = True
-
-    def _deactivate(self):
-        self.encoder.deactivateChannel(self.channel)
-        self.active = False
 
     def getFrame(self):
         """
@@ -774,7 +756,7 @@ class ChannelContext(object):
         length = self.getMinimumFrameSize()
 
         if length == 0:
-            self._deactivate()
+            self.encoder.deactivateChannel(self.channel)
 
             return
 
@@ -783,12 +765,15 @@ class ChannelContext(object):
         try:
             data = self.buffer.read(length)
         except IOError:
-            self._deactivate()
+            self.encoder.deactivateChannel(self.channel)
 
             return None
 
         self.buffer.consume()
         self.bytes += len(data)
+
+        if self.bytes == self.bytesRequired:
+            self.runQueue()
 
         return data
 
@@ -824,17 +809,60 @@ class ChannelContext(object):
 
     def syncHeader(self):
         """
-        Called to syncronise the contexts header with the channels.
+        Called to synchronise the contexts header with the channels.
         """
         self.header = self.channel.getHeader()
 
+    def runQueue(self):
+        """
+        """
+        if self.debug or rtmp.DEBUG:
+            rtmp.log(self, 'runQueue length:%r' % (len(self.queue),))
+
+        channel = self.channel
+
+        if self.currentPacket:
+            self.currentPacket.callback(None)
+            self.currentPacket = None
+
+        try:
+            header, payload, d = self.queue[0]
+            self.currentPacket = d
+            del self.queue[0]
+        except IndexError:
+            pass
+
+    # interfaces.IChannelObserver
+
+    def dataReceived(self, data):
+        """
+        Called by the channel when data becomes available. Data is appended to
+        the L{buffer} and if the channel is activated if it is not already.
+
+        @param data: The chunk of data received.
+        @type data: C{str}
+        """
+        self.buffer.append(data)
+
+        self.encoder.activateChannel(self.channel)
+
     def headerChanged(self, header):
         """
+        Called when the header has changed on the channel. Note that only
+        relative header changes are notified.
+
+        @param header: The new absolute header for the channel.
+        @type header: L{interfaces.IHeader}
         """
         self.bytesRequired = header.bodyLength
 
     def bodyComplete(self):
-        pass
+        """
+        Called by the channel when it's payload requirements have been
+        satisfied.
+
+        @note: This is a noop.
+        """
 
 
 class Encoder(BaseCodec):
@@ -896,8 +924,6 @@ class Encoder(BaseCodec):
         """
         BaseCodec.activateChannel(self, channel)
 
-        context = self.channelContext[channel]
-        context.active = True
         self.scheduler.activateChannel(channel)
 
     def deactivateChannel(self, channel):
@@ -906,7 +932,8 @@ class Encoder(BaseCodec):
         """
         BaseCodec.deactivateChannel(self, channel)
 
-        self.channelContext[channel].active = False
+        context = self.channelContext[channel]
+
         self.scheduler.deactivateChannel(channel)
 
     def initialiseChannel(self, channel, oldHeader):
@@ -953,9 +980,6 @@ class Encoder(BaseCodec):
         @param context: The channel context from which to write a frame.
         @type context: L{ChannelContext}
         """
-        if not context.active:
-            return
-
         channel = context.channel
         bytes = context.getFrame()
 
@@ -1042,10 +1066,14 @@ class Encoder(BaseCodec):
         d = defer.Deferred()
         context = self.channelContext[channel]
 
-        if context.active is False:
+        if context.currentPacket is not None:
+            context.queue.append((header, payload, d))
+            self.activateChannel(channel)
+        else:
             if len(context.queue) > 0:
                 if self.debug or rtmp.DEBUG:
-                    rtmp.log(self, 'Writing to inactive channel but there is a queue', channel)
+                    rtmp.log(self, 'Writing to inactive channel but there is '
+                        'a queue', channel)
                     rtmp.log(self, context.queue)
 
                 raise RuntimeError('Queue is not empty?')
@@ -1053,8 +1081,5 @@ class Encoder(BaseCodec):
             channel.setHeader(header)
             channel.dataReceived(str(payload))
             d.callback(None)
-        else:
-            context.queue.append((header, payload, d))
-            self.activateChannel(channel)
 
         return d

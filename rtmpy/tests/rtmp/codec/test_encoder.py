@@ -65,7 +65,6 @@ class ChannelContextTestCase(BaseEncoderTestCase):
 
         self.assertTrue(
             isinstance(self.context.buffer, util.BufferedByteStream))
-        self.assertFalse(self.context.active)
         self.assertEquals(self.context.queue, [])
         self.assertEquals(self.context.currentPacket, None)
         self.assertEquals(self.context.header, None)
@@ -85,14 +84,12 @@ class ChannelContextTestCase(BaseEncoderTestCase):
         self.assertEquals(self.buffer.getvalue(), '')
 
     def test_write(self):
-        self.assertFalse(self.context.active)
         self.assertEquals(self.buffer.tell(), 0)
 
         self.encoder.activeChannels = [0]
         self.encoder.channelContext = {self.channel: self.context}
 
         self.context.dataReceived('hello')
-        self.assertTrue(self.context.active)
         self.assertEquals(self.buffer.getvalue(), 'hello')
         self.assertEquals(self.buffer.tell(), 5)
 
@@ -238,11 +235,9 @@ class GetDataTestCase(BaseEncoderTestCase):
         self.channel = self._generateChannel()
         self.header = self.channel.getHeader()
         self.context = codec.ChannelContext(self.channel, self.encoder)
-        self.context.active = True
         self.encoder.channelContext = {self.channel: self.context}
         self.buffer = self.context.buffer
 
-        self.scheduler.activateChannel(self.channel)
         self.header.bodyLength = 150
 
         self.context.reset(self.header)
@@ -250,7 +245,6 @@ class GetDataTestCase(BaseEncoderTestCase):
     def test_empty(self):
         self.assertEquals(self.buffer.getvalue(), '')
         self.assertEquals(self.context.getFrame(), None)
-        self.assertFalse(self.context.active)
         self.assertEquals(self.scheduler.activeChannels, [])
 
     def test_read(self):
@@ -258,7 +252,6 @@ class GetDataTestCase(BaseEncoderTestCase):
 
         self.assertEquals(self.context.getFrame(), 'a' * 128)
         self.assertEquals(self.buffer.getvalue(), 'a' * 22)
-        self.assertTrue(self.context.active)
         self.assertEquals(self.scheduler.activeChannels, [self.channel])
 
     def test_under(self):
@@ -266,7 +259,6 @@ class GetDataTestCase(BaseEncoderTestCase):
 
         self.assertEquals(self.context.getFrame(), None)
         self.assertEquals(self.buffer.getvalue(), 'a' * 10)
-        self.assertFalse(self.context.active)
         self.assertEquals(self.scheduler.activeChannels, [])
 
 
@@ -397,7 +389,7 @@ class PacketWritingTestCase(BaseEncoderTestCase):
 
         context.queue = ['foo']
 
-        self.assertFalse(context.active)
+        self.assertEquals(self.encoder.activeChannels, [])
 
         e = self.assertRaises(RuntimeError, self.encoder.writePacket,
             0, '', 0, 0, 0)
@@ -419,7 +411,7 @@ class PacketWritingTestCase(BaseEncoderTestCase):
             channel = self.encoder.getChannel(0)
             context = self.encoder.channelContext[channel]
 
-            self.assertTrue(context.active)
+            self.assertEquals(self.encoder.activeChannels, [0])
             self.assertEquals(context.buffer.getvalue(), 'foobar')
 
             self.executed = True
@@ -432,7 +424,7 @@ class PacketWritingTestCase(BaseEncoderTestCase):
         channel = self.encoder.getChannel(0)
         context = self.encoder.channelContext[channel]
 
-        context.active = True
+        context.currentPacket = 'foo'
         context.queue = ['foo']
 
         d = self.encoder.writePacket(0, 'foobar', 0, 0, 0)
@@ -518,20 +510,18 @@ class FrameWritingTestCase(BaseEncoderTestCase):
         self.buffer.truncate()
 
         self.assertEquals(context.buffer.getvalue(), 'a' * 72)
+        self.assertTrue(0 in self.encoder.activeChannels)
         self.assertIdentical(context.header, header)
-        self.assertTrue(context.active)
         self.assertEquals(context.getMinimumFrameSize(), 128)
 
         self.encoder.writeFrame(context)
 
         self.assertEquals(self.buffer.getvalue(), '')
-        self.assertFalse(context.active)
         self.assertFalse(0 in self.encoder.activeChannels)
 
         channel.dataReceived('b' * 56)
 
         self.assertEquals(self.buffer.getvalue(), '')
-        self.assertTrue(context.active)
         self.assertTrue(0 in self.encoder.activeChannels)
 
         self.encoder.writeFrame(context)
