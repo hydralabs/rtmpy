@@ -12,6 +12,8 @@ from twisted.test.proto_helpers import StringTransportWithDisconnection
 from rtmpy import rtmp
 from rtmpy.rtmp import interfaces, codec, handshake
 
+from rtmpy.tests.rtmp import mocks
+
 
 class Pausable(object):
     """
@@ -35,20 +37,6 @@ class DataReceiver(object):
         self.buffer.append(data)
 
 
-class MockDeferred(object):
-    """
-    """
-
-    def __init__(self):
-        self.callbacks = []
-
-    def addErrback(self, f):
-        self.callbacks.append((None, f))
-
-    def addCallback(self, f):
-        self.callbacks.append((f, None))
-
-
 class BaseProtocolTestCase(unittest.TestCase):
     """
     Tests for L{rtmp.BaseProtocol}
@@ -62,21 +50,15 @@ class BaseProtocolTestCase(unittest.TestCase):
     def test_interface(self):
         self.assertTrue(
             interfaces.IHandshakeObserver.implementedBy(rtmp.BaseProtocol))
-        self.assertTrue(
-            interfaces.ICodecObserver.implementedBy(rtmp.BaseProtocol))
 
         p = rtmp.BaseProtocol()
 
         self.assertTrue(interfaces.IHandshakeObserver.providedBy(p))
-        self.assertTrue(interfaces.ICodecObserver.providedBy(p))
 
     def test_create(self):
         p = rtmp.BaseProtocol()
 
-        self.assertFalse(p.encrypted)
         self.assertEquals(p.debug, rtmp.DEBUG)
-        self.assertEquals(p.decoder, None)
-        self.assertEquals(p.encoder, None)
 
     def test_buildHandshakeNegotiator(self):
         p = rtmp.BaseProtocol()
@@ -144,26 +126,20 @@ class BaseProtocolTestCase(unittest.TestCase):
         p = rtmp.BaseProtocol()
 
         d = p.decoder = DataReceiver()
-        f = MockDeferred()
-
-        d.start = lambda: f
-        d.deferred = None
 
         p.decodeStream('foo')
 
         self.assertEquals(d.buffer, ['foo'])
-        self.assertEquals(f.callbacks, [(None, p.logAndDisconnect)])
-
-        # test that when the deferred is active that the state doesn't change
-        d.deferred = f
-        p.decodeStream('bar')
-        self.assertEquals(d.buffer, ['foo', 'bar'])
-        self.assertEquals(f.callbacks, [(None, p.logAndDisconnect)])
 
     def test_logAndDisconnect(self):
         p = rtmp.BaseProtocol()
         p.transport = StringTransportWithDisconnection()
         p.transport.protocol = p
+
+        try:
+            p.connectionMade()
+        except NotImplementedError:
+            pass
 
         p.logAndDisconnect()
 
@@ -175,6 +151,9 @@ class BaseProtocolTestCase(unittest.TestCase):
         p.transport.protocol = p
 
         buffer = []
+
+        p.buildHandshakeNegotiator = self._buildHandshakeNegotiator
+        p.connectionMade()
 
         def buf(type, data):
             buffer.append((type, data))
@@ -201,9 +180,12 @@ class BaseProtocolTestCase(unittest.TestCase):
         p = rtmp.BaseProtocol()
         p.transport = StringTransportWithDisconnection()
 
+        p.buildHandshakeNegotiator = self._buildHandshakeNegotiator
+        p.connectionMade()
+
         self.assertEquals(p.decoder, None)
         self.assertEquals(p.encoder, None)
-        self.assertFalse(hasattr(p, 'state'))
+        self.assertEquals(p.state, 'handshake')
 
         p.handshaker = 'foo'
 
@@ -211,11 +193,20 @@ class BaseProtocolTestCase(unittest.TestCase):
 
         d = p.decoder
         self.assertTrue(isinstance(d, codec.Decoder))
-        self.assertIdentical(d.observer, p)
+
+        do = p.decoder.observer
+        self.assertTrue(isinstance(do, rtmp.ErrorLoggingCodecObserver))
+        self.assertIdentical(do.protocol, p)
+        self.assertIdentical(do.codec, d)
 
         e = p.encoder
         self.assertTrue(isinstance(e, codec.Encoder))
         self.assertIdentical(e.consumer, p.transport)
+
+        do = e.observer
+        self.assertTrue(isinstance(do, rtmp.ErrorLoggingCodecObserver))
+        self.assertIdentical(do.protocol, p)
+        self.assertIdentical(do.codec, e)
 
         self.assertEquals(p.state, 'stream')
 
@@ -225,6 +216,9 @@ class BaseProtocolTestCase(unittest.TestCase):
         p = rtmp.BaseProtocol()
         p.transport = StringTransportWithDisconnection()
         p.transport.protocol = p
+
+        p.buildHandshakeNegotiator = self._buildHandshakeNegotiator
+        p.connectionMade()
 
         p.connected = True
 
@@ -316,93 +310,62 @@ class StreamManagerTestCase(unittest.TestCase):
     L{codec.BaseCodec}.
     """
 
-    @classmethod
-    def _getJob(cls):
-        return lambda: None
-
     def setUp(self):
-        self._getJob = codec.BaseCodec.getJob
-        codec.BaseCodec.getJob = BaseCodecTestCase._getJob
+        self.protocol = rtmp.BaseProtocol()
 
-    def tearDown(self):
-        codec.BaseCodec.getJob = self._getJob
+        self.protocol.buildHandshakeNegotiator = self._buildHandshakeNegotiator
+
+        self.protocol.connectionMade()
+        self.protocol.handshakeSuccess()
+
+    def _buildHandshakeNegotiator(self):
+        self.handshakeNegotiator = object()
+
+        return self.handshakeNegotiator
 
     def test_init(self):
-        c = codec.BaseCodec(None)
-
-        self.assertEquals(c.streams, {})
+        self.assertEquals(self.protocol.streams, {})
 
     def test_registerStream(self):
-        c = codec.BaseCodec(None)
-
-        e = self.assertRaises(ValueError, c.registerStream, -1, None)
+        e = self.assertRaises(ValueError, self.protocol.registerStream, -1, None)
         self.assertEquals(str(e), 'streamId is not in range (got:-1)')
-        self.assertEquals(c.streams, {})
+        self.assertEquals(self.protocol.streams, {})
 
-        c = codec.BaseCodec(None)
-
-        e = self.assertRaises(ValueError, c.registerStream, 0x10000, None)
+        e = self.assertRaises(ValueError, self.protocol.registerStream, 0x10000, None)
         self.assertEquals(str(e), 'streamId is not in range (got:65536)')
-        self.assertEquals(c.streams, {})
-
-        c = codec.BaseCodec(None)
-
-        x = object()
-        self.assertFalse(interfaces.IStream.providedBy(x))
-        e = self.assertRaises(TypeError, c.registerStream, 0, x)
-        self.assertEquals(str(e), "IStream interface expected "
-            "(got:<type 'object'>)")
-        self.assertEquals(c.streams, {})
-
-        c = codec.BaseCodec(None)
-
-        c.streams = {3: None}
-        s = mocks.Stream()
-
-        self.assertTrue(interfaces.IStream.providedBy(s))
-        e = self.assertRaises(IndexError, c.registerStream, 3, s)
-        self.assertEquals(str(e), 'Stream already registered (streamId:3)')
-        self.assertEquals(c.streams, {3: None})
+        self.assertEquals(self.protocol.streams, {})
 
         # test a successful registration
 
-        c = codec.BaseCodec(None)
         s = mocks.Stream()
 
-        self.assertEquals(c.streams, {})
-        c.registerStream(1, s)
-        self.assertEquals(c.streams, {1: s})
+        self.protocol.registerStream(1, s)
+        self.assertEquals(self.protocol.streams, {1: s})
 
         # show that we can add the same stream twice
-        c.registerStream(2, s)
+        self.protocol.registerStream(2, s)
 
-        self.assertEquals(c.streams, {1: s, 2: s})
+        self.assertEquals(self.protocol.streams, {1: s, 2: s})
 
     def test_removeStream(self):
-        c = codec.BaseCodec(None)
-        self.assertEquals(c.streams, {})
+        self.assertEquals(self.protocol.streams, {})
 
-        e = self.assertRaises(IndexError, c.removeStream, 2)
+        e = self.assertRaises(IndexError, self.protocol.removeStream, 2)
         self.assertEquals(str(e), 'Unknown streamId 2')
-        self.assertEquals(c.streams, {})
+        self.assertEquals(self.protocol.streams, {})
 
-        e = self.assertRaises(ValueError, c.removeStream, 'foo')
-        self.assertEquals(str(e),
-            "invalid literal for int() with base 10: 'foo'")
-
-        c = codec.BaseCodec(None)
         s1, s2 = object(), object()
 
-        c.streams = {3: s1, 56: s2}
+        self.protocol.streams = {3: s1, 56: s2}
 
-        e = self.assertRaises(IndexError, c.removeStream, 2)
+        e = self.assertRaises(IndexError, self.protocol.removeStream, 2)
         self.assertEquals(str(e), 'Unknown streamId 2')
-        self.assertEquals(c.streams, {3: s1, 56: s2})
+        self.assertEquals(self.protocol.streams, {3: s1, 56: s2})
 
-        x = c.removeStream(3)
-        self.assertEquals(c.streams, {56: s2})
+        x = self.protocol.removeStream(3)
+        self.assertEquals(self.protocol.streams, {56: s2})
         self.assertIdentical(x, s1)
 
-        y = c.removeStream(56)
-        self.assertEquals(c.streams, {})
+        y = self.protocol.removeStream(56)
+        self.assertEquals(self.protocol.streams, {})
         self.assertIdentical(y, s2)

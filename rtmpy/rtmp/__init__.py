@@ -49,6 +49,26 @@ class BaseError(Exception):
     """
 
 
+class ErrorLoggingCodecObserver(object):
+    """
+    """
+
+    def __init__(self, protocol, codec):
+        self.protocol = protocol
+        self.codec = codec
+
+        self.codec.registerObserver(self)
+
+    def started(self):
+        """
+        """
+        self.codec.deferred.addErrback(self.protocol.logAndDisconnect)
+
+    def stopped(self):
+        """
+        """
+
+
 class BaseProtocol(protocol.Protocol):
     """
     Provides basic handshaking and RTMP protocol support.
@@ -61,7 +81,10 @@ class BaseProtocol(protocol.Protocol):
     @type encrypted: C{bool}
     """
 
-    implements(interfaces.IHandshakeObserver)
+    implements(
+        interfaces.IHandshakeObserver,
+        interfaces.IStreamManager,
+    )
 
     HANDSHAKE = 'handshake'
     STREAM = 'stream'
@@ -73,16 +96,21 @@ class BaseProtocol(protocol.Protocol):
         """
         Builds and returns an object that will handle the handshake phase of
         the connection.
-        
+
         @raise NotImplementedError:  Must be implemented by subclasses.
         """
         raise NotImplementedError()
 
     def connectionMade(self):
+        """
+        """
         if self.debug or DEBUG:
             log(self, "Connection made")
 
         protocol.Protocol.connectionMade(self)
+
+        self.encoder = None
+        self.decoder = None
 
         self.state = BaseProtocol.HANDSHAKE
         self.handshaker = self.buildHandshakeNegotiator()
@@ -112,14 +140,16 @@ class BaseProtocol(protocol.Protocol):
         self.handshaker.dataReceived(data)
 
     def decodeStream(self, data):
+        """
+        """
         self.decoder.dataReceived(data)
 
-        if self.decoder.deferred is None:
-            self.decoder.start().addErrback(self.logAndDisconnect)
-
     def logAndDisconnect(self, failure=None):
-        log(self, 'error %r' % (failure,))
-        log(self, failure.getBriefTraceback())
+        """
+        """
+        if failure is not None:
+            log(self, 'error %r' % (failure,))
+            log(self, failure.getBriefTraceback())
 
         self.transport.loseConnection()
 
@@ -154,8 +184,9 @@ class BaseProtocol(protocol.Protocol):
         self.decoder = codec.Decoder(self)
         self.encoder = codec.Encoder(self)
 
-        # we only need to register for events on the decoder - the encoder
-        # takes care of itself (at least so far)
+        ErrorLoggingCodecObserver(self, self.decoder)
+        ErrorLoggingCodecObserver(self, self.encoder)
+
         self.encoder.registerConsumer(self.transport)
 
         del self.handshaker
@@ -177,23 +208,19 @@ class BaseProtocol(protocol.Protocol):
         """
         self.transport.write(data)
 
-    def codecStarted(self, d):
-        """
-        """
-        d.addErrback(self.logAndDisconnect)
-
     def writePacket(self, *args, **kwargs):
-        d = self.encoder.writePacket(*args, **kwargs)
-
-        self.encoder.start()
-
-        return d
+        """
+        """
+        return self.encoder.writePacket(*args, **kwargs)
 
     # interfaces.IStreamManager
 
     def registerStream(self, streamId, stream):
         """
         """
+        if streamId < 0 or streamId > MAX_STREAMS:
+            raise ValueError('streamId is not in range (got:%r)' % (streamId,))
+
         self.streams[streamId] = stream
         stream.streamId = streamId
 
@@ -201,6 +228,23 @@ class BaseProtocol(protocol.Protocol):
         """
         """
         return self.streams[streamId]
+
+    def removeStream(self, streamId):
+        """
+        Removes a stream from this connection.
+
+        @param streamId: The id of the stream.
+        @type streamId: C{int}
+        @return: The stream that has been removed from the connection.
+        """
+        try:
+            s = self.streams[streamId]
+        except KeyError:
+            raise IndexError('Unknown streamId %r' % (streamId,))
+
+        del self.streams[streamId]
+
+        return s
 
 
 class ClientProtocol(BaseProtocol):

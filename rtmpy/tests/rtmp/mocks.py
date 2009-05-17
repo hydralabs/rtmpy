@@ -305,4 +305,7 @@ class DecodingStream(object):
     def channelUnregistered(self, channel):
         self.channels.remove(channel)
 
-        
+
+class Stream(DecodingStream):
+    """
+    """
