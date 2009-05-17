@@ -819,18 +819,21 @@ class ChannelContext(object):
         if self.debug or rtmp.DEBUG:
             rtmp.log(self, 'runQueue length:%r' % (len(self.queue),))
 
-        channel = self.channel
-
         if self.currentPacket:
             self.currentPacket.callback(None)
             self.currentPacket = None
+
+        header, payload = None, None
 
         try:
             header, payload, d = self.queue[0]
             self.currentPacket = d
             del self.queue[0]
         except IndexError:
-            pass
+            return
+
+        self.channel.setHeader(header)
+        self.channel.dataReceived(payload)
 
     # interfaces.IChannelObserver
 
@@ -946,32 +949,6 @@ class Encoder(BaseCodec):
 
         context.reset(header)
 
-    def _runQueue(self, context):
-        """
-        """
-        if self.debug or rtmp.DEBUG:
-            rtmp.log(self, 'runQueue(%s)' % (context,))
-            rtmp.log(self, 'channel = %r' % (context.channel,))
-
-        channel = context.channel
-
-        if context.currentPacket:
-            context.currentPacket.callback(None)
-            context.currentPacket = None
-
-        try:
-            header, payload, d = context.queue[0]
-            context.currentPacket = d
-            del context.queue[0]
-        except IndexError:
-            if len(context.buffer) == 0:
-                self.deactivateChannel(channel)
-
-            return
-
-        channel.setHeader(header)
-        channel.dataReceived(payload)
-
     def writeFrame(self, context):
         """
         Writes an RTMP header and body to L{buffer}, if there is enough data
@@ -1012,12 +989,6 @@ class Encoder(BaseCodec):
             self.consumer.write(self.buffer.getvalue())
 
             self.buffer.truncate(0)
-
-    def channelComplete(self, channel):
-        BaseCodec.channelComplete(self, channel)
-
-        context = self.channelContext[channel]
-        self._runQueue(context)
 
     def writePacket(self, channelId, payload, streamId=None, datatype=None,
         timestamp=None):

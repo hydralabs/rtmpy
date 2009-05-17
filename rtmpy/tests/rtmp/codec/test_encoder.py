@@ -551,3 +551,64 @@ class EncodingTestCase(BaseEncoderTestCase):
 
         self.assertEquals(self.encoder.deferred, None)
         self.assertEquals(self.buffer.getvalue(), '')
+
+
+class ContextQueueTestCase(BaseEncoderTestCase):
+    """
+    Tests for ensuring queue integrity when dealing with packets and
+        L{codec.ChannelContext}.
+    """
+
+    def setUp(self):
+        BaseEncoderTestCase.setUp(self)
+
+        self.channel = self.encoder.getChannel(0)
+        self.context = self.encoder.channelContext[self.channel]
+        self.buffer = self.context.buffer
+
+    def test_callback(self):
+        """
+        Ensure that the currentPacket's callback is called when executing the
+        L{runQueue}.
+        """
+        self.executed = False
+
+        def cb(res):
+            self.assertEquals(res, None)
+            self.assertEquals(self.context.currentPacket, None)
+            self.assertEquals(self.context.queue, [])
+
+            self.executed = True
+
+        d = self.context.currentPacket = defer.Deferred()
+
+        self.assertEquals(self.context.queue, [])
+
+        self.context.runQueue()
+
+        d.addCallback(cb)
+
+        return d.addCallback(lambda _: self.assertTrue(self.executed))
+
+    def test_pop(self):
+        """
+        Ensure that the queue operates a FIFO policy
+        """
+        d1, d2 = defer.Deferred(), defer.Deferred()
+        h1 = mocks.Header(relative=False, channelId=0, streamId=0, datatype=2,
+            bodyLength=3, timestamp=0)
+        h2 = mocks.Header(relative=False, channelId=0, streamId=8, datatype=6,
+            bodyLength=4, timestamp=2000)
+
+        self.context.queue = [(h1, 'foo', d1), (h2, 'spam', d2)]
+
+        self.assertEquals(self.context.currentPacket, None)
+
+        self.context.runQueue()
+
+        self.assertEquals(self.context.queue, [(h2, 'spam', d2)])
+        self.assertEquals(self.context.currentPacket, d1)
+
+        self.assertIdentical(self.channel.getHeader(), h1)
+
+        d1.callback(None), d2.callback(None)
