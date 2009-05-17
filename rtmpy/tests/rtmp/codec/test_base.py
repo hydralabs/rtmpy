@@ -437,7 +437,7 @@ class ChannelManagerTestCase(unittest.TestCase):
         self.assertNotEquals(c.deferred, None)
         self.assertTrue(c.job.running)
 
-        c.deactivateChannel(channel)
+        c.deactivateChannel(channel0)
 
         self.assertNotEquals(c.deferred, None)
         self.assertTrue(c.job.running)
