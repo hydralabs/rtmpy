@@ -306,7 +306,7 @@ class BaseCodec(object):
         """
         raise NotImplementedError()
 
-    def start(self, when=0):
+    def start(self):
         """
         Starts or resumes the job. If the job is already running (i.e. not
         stopped) then this is a noop.
@@ -314,7 +314,7 @@ class BaseCodec(object):
         if self.job.running:
             return
 
-        self.deferred = self.job.start(when, now=False)
+        self.deferred = self.job.start(0, now=False)
 
         if self.observer is not None:
             self.observer.started()
@@ -402,6 +402,12 @@ class BaseCodec(object):
 
     def deactivateChannel(self, channel):
         """
+        Flags a channel as inactive. If the channel is already inactive then
+        this is a noop. If the codec has no other active channels it will
+        L{pause} itself.
+
+        @param channel: The channel registered to this codec.
+        @type channel: L{IChannel}
         """
         try:
             channelId = self.channels[channel]
@@ -413,8 +419,17 @@ class BaseCodec(object):
         except ValueError:
             pass
 
+        if len(self.activeChannels) == 0:
+            self.pause()
+
     def activateChannel(self, channel):
         """
+        Flags a channel as active. If the channel is already active then this
+        is a noop. If the codec has no other active channels it will L{start}
+        itself.
+
+        @param channel: The channel registered to this codec.
+        @type channel: L{IChannel}
         """
         try:
             channelId = self.channels[channel]
@@ -425,6 +440,9 @@ class BaseCodec(object):
             return
 
         self.activeChannels.append(channelId)
+
+        if self.deferred is None:
+            self.start()
 
     def channelComplete(self, channel):
         """
@@ -734,9 +752,6 @@ class ChannelContext(object):
             self.active = True
 
     def _deactivate(self):
-        if len(self.queue) > 0:
-            return
-
         self.encoder.deactivateChannel(self.channel)
         self.active = False
 

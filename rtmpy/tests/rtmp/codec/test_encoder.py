@@ -165,6 +165,25 @@ class ChannelContextTestCase(BaseEncoderTestCase):
 
         self.assertEquals(self.context.bytesRequired, 100)
 
+    def test_deactivateWithQueue(self):
+        """
+        Test to ensure that a L{ChannelContext} does not deactivate itself
+        if there are items in the queue.
+        """
+        self.encoder.activateChannel(self.channel)
+
+        self.assertEquals(self.encoder.activeChannels, [0])
+        self.context.queue = [None]
+        h = mocks.Header(relative=False, channelId=3, bodyLength=50)
+
+        self.context.reset(h)
+
+        self.assertEquals(self.context.getFrame(), None)
+        self.assertEquals(self.context.queue, [None])
+
+        self.assertEquals(self.encoder.deferred, None)
+        self.assertFalse(self.encoder.job.running)
+
 
 class MinimumFrameSizeTestCase(BaseEncoderTestCase):
     """
