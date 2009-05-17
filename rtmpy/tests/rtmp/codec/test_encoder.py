@@ -218,6 +218,13 @@ class MinimumFrameSizeTestCase(BaseEncoderTestCase):
 
         self.assertEquals(self.context.getMinimumFrameSize(), 0)
 
+    def test_negative(self):
+        self.context.bytesRequired = -100
+        self.context.bytes = 0
+
+        e = self.assertRaises(RuntimeError, self.context.getMinimumFrameSize)
+        self.assertEquals(str(e), 'getMinimumFrameSize wanted to return -100')
+
 
 class GetDataTestCase(BaseEncoderTestCase):
     """
@@ -437,3 +444,26 @@ class FrameWritingTestCase(BaseEncoderTestCase):
 
         self.assertEquals(self.buffer.getvalue(),
             '\xc0' + ('a' * 72) + ('b' * 56))
+
+
+class EncodingTestCase(BaseEncoderTestCase):
+    """
+    General encoding test cases.
+    """
+
+    def test_noActiveChannels(self):
+        """
+        Test to ensure that a call to L{self.encoder.encode} when the call to
+        scheduler.getNextChannel() returns C{None} pauses itself.
+        """
+        self.assertEquals(self.scheduler.getNextChannel(), None)
+
+        self.encoder.start()
+
+        self.assertEquals(self.buffer.getvalue(), '')
+        self.assertNotEquals(self.encoder.deferred, None)
+
+        self.encoder.encode()
+
+        self.assertEquals(self.encoder.deferred, None)
+        self.assertEquals(self.buffer.getvalue(), '')

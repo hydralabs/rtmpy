@@ -370,7 +370,7 @@ class ChannelManagerTestCase(unittest.TestCase):
         channel = mocks.Channel(None)
 
         self.assertFalse(channel in c.channels)
-        e = self.assertRaises(RuntimeError, c.activateChannel, channel)
+        e = self.assertRaises(RuntimeError, c.deactivateChannel, channel)
         self.assertEquals(str(e), 'Channel is not registered to this codec')
 
         c.channels = {channel: 0, 0: channel}

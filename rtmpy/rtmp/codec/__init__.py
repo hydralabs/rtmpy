@@ -811,7 +811,8 @@ class ChannelContext(object):
         available = min(bytesLeft, frameSize)
 
         if available < 0:
-            available = 0
+            raise RuntimeError('getMinimumFrameSize wanted to return %r' % (
+                available,))
 
         return available
 
