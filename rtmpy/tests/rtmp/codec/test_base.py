@@ -337,6 +337,51 @@ class ChannelManagerTestCase(unittest.TestCase):
         self.assertFalse(hasattr(c.channels[10], 'frameRemaining'))
         self.assertEquals(c.channels[85].frameRemaining, 100)
 
+    def test_activateChannel(self):
+        c = codec.BaseCodec(None)
+
+        channel = mocks.Channel(None)
+
+        self.assertFalse(channel in c.channels)
+        e = self.assertRaises(RuntimeError, c.activateChannel, channel)
+        self.assertEquals(str(e), 'Channel is not registered to this codec')
+
+        c.channels = {channel: 0, 0: channel}
+        c.activeChannels = []
+
+        c.activateChannel(channel)
+
+        self.assertEquals(c.activeChannels, [0])
+        self.assertEquals(c.channels, {channel: 0, 0: channel})
+
+        c.activateChannel(channel)
+
+        self.assertEquals(c.activeChannels, [0])
+        self.assertEquals(c.channels, {channel: 0, 0: channel})
+
+    def test_deactivateChannel(self):
+        c = codec.BaseCodec(None)
+
+        channel = mocks.Channel(None)
+
+        self.assertFalse(channel in c.channels)
+        e = self.assertRaises(RuntimeError, c.activateChannel, channel)
+        self.assertEquals(str(e), 'Channel is not registered to this codec')
+
+        c.channels = {channel: 0, 0: channel}
+        c.activeChannels = []
+
+        c.deactivateChannel(channel)
+
+        self.assertEquals(c.activeChannels, [])
+        self.assertEquals(c.channels, {channel: 0, 0: channel})
+
+        c.activeChannels = [0]
+        c.deactivateChannel(channel)
+
+        self.assertEquals(c.activeChannels, [])
+        self.assertEquals(c.channels, {channel: 0, 0: channel})
+
 
 class ChannelTestCase(unittest.TestCase):
     """
