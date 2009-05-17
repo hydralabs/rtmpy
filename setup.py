@@ -7,29 +7,6 @@ use_setuptools()
 
 import sys
 from setuptools import setup, find_packages
-from setuptools.command import test
-
-class TestCommand(test.test):
-    def run_twisted(self):
-        from twisted.trial import runner
-        from twisted.trial import reporter
-
-        from pyamf.tests import suite
-
-        r = runner.TrialRunner(reporter.VerboseTextReporter)
-        return r.run(suite())
-
-    def run_tests(self):
-        import logging
-        logging.basicConfig()
-        logging.getLogger().setLevel(logging.CRITICAL)
-
-        try:
-            import twisted
-
-            return self.run_twisted()
-        except ImportError:
-            return test.test.run_tests(self)
 
 def get_version():
     """
@@ -63,7 +40,7 @@ def get_install_requirements():
     Returns a list of dependencies for RTMPy to function correctly on the
     target platform.
     """
-    install_requires = ['Twisted>=2.5.0', 'PyAMF>=0.4.1']
+    install_requires = ['Twisted>=2.5.0', 'PyAMF>=0.4.2']
 
     if sys.platform.startswith('win'):
         install_requires.append('PyWin32')
@@ -85,13 +62,9 @@ setup(name = "RTMPy",
     keywords = keyw,
     packages = find_packages(exclude=["*.tests"]),
     install_requires = get_install_requirements(),
-    test_suite = "rtmpy.tests.suite",
     zip_safe = True,
     license = "MIT License",
     platforms = ["any"],
-    cmdclass = {
-        'test': TestCommand,
-    },
     classifiers = [
         "Development Status :: 2 - Pre-Alpha",
         "Framework :: Twisted",
