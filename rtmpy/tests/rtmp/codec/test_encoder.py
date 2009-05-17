@@ -6,6 +6,7 @@ Encoding tests for L{rtmpy.rtmp.codec}.
 """
 
 from twisted.trial import unittest
+from twisted.internet import defer
 
 from rtmpy.rtmp import codec, interfaces
 from rtmpy import util
@@ -364,6 +365,99 @@ class EncoderTestCase(BaseEncoderTestCase):
         self.encoder.start()
 
         return self.encoder.deferred.addCallback(cb)
+
+
+class PacketWritingTestCase(BaseEncoderTestCase):
+    """
+    Tests for L{codec.Encoder.writePacket}
+    """
+
+    def test_uninitialisedChannel(self):
+        """
+        Test to confirm that writing a packet with an incomplete header raises
+        L{codec.ChannelError}
+        """
+        channel = self.encoder.getChannel(0)
+        header = channel.getHeader()
+
+        self.assertEquals(header, None)
+
+        e = self.assertRaises(codec.ChannelError, self.encoder.writePacket,
+            0, '')
+        self.assertTrue(str(e).startswith(
+            'Tried to write a relative header to an initialised channel'))
+
+    def test_inactiveWithQueue(self):
+        """
+        Test to ensure that C{RuntimeError} is raised if a packet is written
+        to an inactive channel but the queue for that channel is not empty.
+        """
+        channel = self.encoder.getChannel(0)
+        context = self.encoder.channelContext[channel]
+
+        context.queue = ['foo']
+
+        self.assertFalse(context.active)
+
+        e = self.assertRaises(RuntimeError, self.encoder.writePacket,
+            0, '', 0, 0, 0)
+        self.assertEquals(str(e), 'Queue is not empty?')
+
+    def test_noQueue(self):
+        self.executed = False
+        self.assertEquals(self.encoder.channels, {})
+        self.assertEquals(self.encoder.activeChannels, [])
+        self.assertEquals(self.encoder.channelContext, {})
+
+        d = self.encoder.writePacket(0, 'foobar', 0, 0, 0)
+
+        self.assertTrue(isinstance(d, defer.Deferred))
+        self.assertTrue(d.called)
+
+        def cb(r):
+            self.assertEquals(r, None)
+            channel = self.encoder.getChannel(0)
+            context = self.encoder.channelContext[channel]
+
+            self.assertTrue(context.active)
+            self.assertEquals(context.buffer.getvalue(), 'foobar')
+
+            self.executed = True
+
+        d.addCallback(cb)
+
+        return d.addCallback(lambda _: self.assertTrue(self.executed))
+
+    def test_active(self):
+        channel = self.encoder.getChannel(0)
+        context = self.encoder.channelContext[channel]
+
+        context.active = True
+        context.queue = ['foo']
+
+        d = self.encoder.writePacket(0, 'foobar', 0, 0, 0)
+
+        self.assertTrue(isinstance(d, defer.Deferred))
+        self.assertFalse(d.called)
+
+        self.assertEquals(len(context.queue), 2)
+
+        n = context.queue[1]
+
+        self.assertTrue(isinstance(n, tuple))
+        self.assertEquals(len(n), 3)
+
+        h, p, d2 = n
+
+        self.assertTrue(interfaces.IHeader.providedBy(h))
+        self.assertEquals(h.channelId, 0)
+        self.assertEquals(h.streamId, 0)
+        self.assertEquals(h.datatype, 0)
+        self.assertEquals(h.timestamp, 0)
+        self.assertEquals(h.bodyLength, 6)
+
+        self.assertEquals(p, 'foobar')
+        self.assertIdentical(d, d2)
 
 
 class FrameWritingTestCase(BaseEncoderTestCase):

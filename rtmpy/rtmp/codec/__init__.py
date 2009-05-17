@@ -48,6 +48,12 @@ class ProtocolError(BaseError):
     """
 
 
+class ChannelError(BaseError):
+    """
+    Raised when a channel operation goes wrong.
+    """
+
+
 class Channel(object):
     """
     Acts as a container for an RTMP channel. Does not know anything of
@@ -919,7 +925,6 @@ class Encoder(BaseCodec):
         if self.debug or rtmp.DEBUG:
             rtmp.log(self, 'runQueue(%s)' % (context,))
             rtmp.log(self, 'channel = %r' % (context.channel,))
-            print context.queue, len(context.buffer)
 
         channel = context.channel
 
@@ -990,7 +995,35 @@ class Encoder(BaseCodec):
         context = self.channelContext[channel]
         self._runQueue(context)
 
-    def writePacket(self, streamId, channelId, datatype, payload, timestamp=None):
+    def writePacket(self, channelId, payload, streamId=None, datatype=None,
+        timestamp=None):
+        """
+        Writes or queues a packet of data to the relevant channel.
+
+        @param channelId: The channel id to write the payload to.
+        @type channelId: C{int}
+        @param payload: The payload to write to the channel.
+        @type payload: C{str}
+        @param streamId: The stream id to write the payload to.
+        @type streamId: C{int} or C{None} to use the stream already assigned
+            to the channel.
+        @param datatype: The type of data the payload represents. See
+            L{rtmpy.rtmp.event} for a list of possible values
+        @type datatype: C{int} or C{None} to use the datatype already assigned
+            to the channel.
+        @param timestamp: The timestamp to assign to the channel.
+        @type timestamp: C{int} or C{None} to use the timestamp already
+            assigned to the channel.
+        @raise ChannelError: An attempt to write relative values (C{None}) to
+            the channel when there was no previous value.
+        @return: A deferred whose callback will be fired when the complete
+            packet is written to the channel buffer. This is not a guarantee
+            that the data has been written to the consumer.
+        @rtype: L{defer.Deferred}
+        """
+        channel = self.getChannel(channelId)
+        oldHeader = channel.getHeader()
+
         kwargs = {
             'channelId': channelId,
             'streamId': streamId,
@@ -1000,14 +1033,25 @@ class Encoder(BaseCodec):
         }
 
         header = _header.Header(**kwargs)
-        d = defer.Deferred()
 
-        channel = self.getChannel(channelId)
+        if oldHeader is None and header.relative:
+            raise ChannelError('Tried to write a relative header to an '
+                'initialised channel (header:%r, channel:%r)' % (
+                    header, channel))
+
+        d = defer.Deferred()
         context = self.channelContext[channel]
 
-        if len(context.queue) == 0 and context.active is False:
+        if context.active is False:
+            if len(context.queue) > 0:
+                if self.debug or rtmp.DEBUG:
+                    rtmp.log(self, 'Writing to inactive channel but there is a queue', channel)
+                    rtmp.log(self, context.queue)
+
+                raise RuntimeError('Queue is not empty?')
+
             channel.setHeader(header)
-            context.dataReceived(payload)
+            channel.dataReceived(str(payload))
             d.callback(None)
         else:
             context.queue.append((header, payload, d))
