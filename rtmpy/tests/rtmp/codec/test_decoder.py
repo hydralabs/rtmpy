@@ -16,9 +16,15 @@ class BaseDecoderTestCase(unittest.TestCase):
     """
 
     def setUp(self):
+        self.oldChannelClass = codec.Decoder.channel_class
+        codec.Decoder.channel_class = mocks.Channel
+
         self.manager = mocks.StreamManager()
         self.decoder = codec.Decoder(self.manager)
         self.buffer = self.decoder.buffer
+
+    def tearDown(self):
+        codec.Decoder.channel_class = self.oldChannelClass
 
     def _generateChannel(self, header=None):
         c = mocks.Channel(self.decoder)
@@ -120,6 +126,48 @@ class DecoderClassTestCase(BaseDecoderTestCase):
         self.assertEquals(self.buffer.getvalue(), 'foo')
         self.assertEquals(self.decoder.currentChannel, None)
         self.assertFalse(job.running)
+
+    def test_completeChannel(self):
+        stream = mocks.DecodingStream()
+        self.manager.registerStream(0, stream)
+
+        channel = self.decoder.getChannel(0)
+        header = mocks.Header(streamId=0, relative=False, bodyLength=0)
+        channel.setHeader(header)
+        stream.channels = [channel]
+
+        self.decoder.activateChannel(channel)
+        self.assertTrue(0 in self.decoder.activeChannels)
+
+        self.decoder.channelComplete(channel)
+
+        self.assertFalse(0 in self.decoder.activeChannels)
+        self.assertFalse(channel in stream.channels)
+        self.assertEquals(self.decoder.currentChannel, None)
+        self.assertTrue(channel.has_reset)
+
+    def test_initialiseChannel_newStream(self):
+        """
+        tests to ensure that L{stream.channelUnregistered} is called when a
+        channel is reappropriated to a different stream
+        """
+        channel0 = self.decoder.getChannel(0)
+        stream0 = mocks.DecodingStream()
+        stream1 = mocks.DecodingStream()
+
+        self.manager.registerStream(0, stream0)
+        self.manager.registerStream(1, stream1)
+
+        channel0.setHeader(mocks.Header(relative=False, streamId=1, bodyLength=0))
+
+        stream0.channels = [channel0]
+        stream1.channels = []
+
+        self.decoder.initialiseChannel(
+            channel0, mocks.Header(relative=False, streamId=0, bodyLength=0))
+
+        self.assertFalse(channel0 in stream0.channels)
+        self.assertTrue(channel0 in stream1.channels)
 
 
 class GetBytesAvailableForChannelTestCase(BaseDecoderTestCase):
@@ -327,6 +375,8 @@ class DecodingTestCase(BaseDecoderTestCase):
         return self.deferred.addCallback(cb)
 
     def test_multipleHeaders2channels(self):
+        codec.Decoder.channel_class = self.oldChannelClass
+
         self.manager.registerStream(1, mocks.DecodingStream())
 
         # a full header channelId 3, datatype 2, bodyLength 500, streamId 1, timestamp 10
@@ -376,6 +426,7 @@ class DecodingTestCase(BaseDecoderTestCase):
             self.assertEquals(self.decoder.currentChannel, None)
 
         return self.deferred.addCallback(cb)
+
 
 class FrameReadingTestCase(BaseDecoderTestCase):
     """

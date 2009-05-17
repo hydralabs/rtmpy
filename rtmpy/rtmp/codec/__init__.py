@@ -666,6 +666,7 @@ class Decoder(BaseCodec):
         stream = self.protocol.getStream(header.streamId)
 
         self.deactivateChannel(channel)
+
         stream.channelUnregistered(channel)
 
     def initialiseChannel(self, channel, oldHeader):
