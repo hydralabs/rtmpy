@@ -423,6 +423,25 @@ class ChannelManagerTestCase(unittest.TestCase):
         self.assertEquals(c.deferred, None)
         self.assertFalse(c.job.running)
 
+        # test to ensure that deactivating a channel with 2 active channels
+        # DOES NOT pause the codec
+        c = codec.BaseCodec(None)
+        channel0 = mocks.Channel(None)
+        channel1 = mocks.Channel(None)
+
+        c.start()
+
+        c.channels = {channel0: 0, 0: channel0, channel1: 1, 1: channel1}
+        c.activeChannels = [0, 1]
+
+        self.assertNotEquals(c.deferred, None)
+        self.assertTrue(c.job.running)
+
+        c.deactivateChannel(channel)
+
+        self.assertNotEquals(c.deferred, None)
+        self.assertTrue(c.job.running)
+
 
 class ChannelTestCase(unittest.TestCase):
     """
