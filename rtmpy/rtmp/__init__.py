@@ -21,7 +21,6 @@ packets are split up into fixed size body chunks.
 
 from twisted.internet import protocol, defer
 from zope.interface import implements
-from odict import odict
 
 from rtmpy.rtmp import interfaces, stream, scheduler, status
 from rtmpy import util

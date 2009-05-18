@@ -165,26 +165,30 @@ class ServerControlStream(ControlStream):
             d.addCallback(cb)
 
             return d
+        else:
+            print 'unhandled call', invoke
+            return event.Invoke('_result', invoke.id, None)
 
     def onDownstreamBandwidth(self, bandwidth):
         """
         """
 
 
-class Stream(object):
+class Stream(ControlStream):
     """
     """
 
-    def __init__(self, protocol):
-        self.protocol = protocol
-
-    def eventReceived(self, channel, data):
+    def onInvoke(self, invoke):
         """
         """
-        header = channel.getHeader()
-        kls = event.get_type_class(header.datatype)
+        print invoke
 
-        d = event.decode(header.datatype, data)
+        c = getattr(self, invoke.name)
 
-        d.addErrback(self.protocol.logAndDisconnect)
-        d.addCallback(self.dispatchEvent, channel)
+        args = invoke.argv[1:]
+
+        return c(*args)
+
+    def publish(self, *args):
+        print args
+        pass
