@@ -149,6 +149,9 @@ class ServerControlStream(ControlStream):
         """
         """
         def cb(res):
+            if not isinstance(res, (tuple, list)):
+                res = (None, res)
+
             return event.Invoke('_result', invoke.id, *res)
 
         if invoke.name == u'connect':
@@ -156,6 +159,32 @@ class ServerControlStream(ControlStream):
             d.addCallback(cb)
 
             return d
+        elif invoke.name == u'createStream':
+            d = defer.maybeDeferred(self.protocol.createStream)
+
+            d.addCallback(cb)
+
+            return d
 
     def onDownstreamBandwidth(self, bandwidth):
-        print bandwidth
+        """
+        """
+
+
+class Stream(object):
+    """
+    """
+
+    def __init__(self, protocol):
+        self.protocol = protocol
+
+    def eventReceived(self, channel, data):
+        """
+        """
+        header = channel.getHeader()
+        kls = event.get_type_class(header.datatype)
+
+        d = event.decode(header.datatype, data)
+
+        d.addErrback(self.protocol.logAndDisconnect)
+        d.addCallback(self.dispatchEvent, channel)

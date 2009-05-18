@@ -436,8 +436,6 @@ class Notify(BaseEvent):
             for e in [self.name, self.id]:
                 encoder.writeElement(e)
 
-            print repr(encoder.stream.getvalue())
-
             for e in self.argv:
                 encoder.writeElement(e)
 

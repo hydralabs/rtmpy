@@ -180,6 +180,7 @@ class BaseProtocol(protocol.Protocol):
 
         self.state = self.STREAM
         self.streams = {}
+        self.activeStreams = []
 
         self.decoder = codec.Decoder(self)
         self.encoder = codec.Encoder(self)
@@ -222,6 +223,7 @@ class BaseProtocol(protocol.Protocol):
             raise ValueError('streamId is not in range (got:%r)' % (streamId,))
 
         self.streams[streamId] = stream
+        self.activeStreams.append(streamId)
         stream.streamId = streamId
 
     def getStream(self, streamId):
@@ -243,8 +245,26 @@ class BaseProtocol(protocol.Protocol):
             raise IndexError('Unknown streamId %r' % (streamId,))
 
         del self.streams[streamId]
+        self.activeStreams.remove(streamId)
 
         return s
+
+    def getNextAvailableStreamId(self):
+        """
+        """
+        if len(self.activeStreams) == MAX_STREAMS:
+            return None
+
+        self.activeStreams.sort()
+        i = 0
+
+        for j, streamId in enumerate(self.activeStreams):
+            if j != i:
+                return i
+
+            i += 1
+
+        return i
 
 
 class ClientProtocol(BaseProtocol):
@@ -316,44 +336,32 @@ class ServerProtocol(BaseProtocol):
 
         self.encoder.registerScheduler(scheduler.LoopingChannelScheduler())
 
-        self.registerStream(0, stream.ServerControlStream(self))
+        s = stream.ServerControlStream(self)
+
+        self.registerStream(0, s)
         self.client = None
 
         if len(b) > 0:
             self.dataReceived(b)
 
+        s.writeEvent(event.DownstreamBandwidth(2500000L), channelId=2)
+        s.writeEvent(event.UpstreamBandwidth(2500000L, 2), channelId=2)
+        s.writeEvent(event.ControlEvent(0, 0), channelId=2)
+
     def onConnect(self, *args):
         """
         Called when a 'connect' packet is received from the endpoint.
         """
-        stream = self.getStream(0)
-        r = defer.Deferred()
+        x = {'fmsVer': u'FMS/3,5,1,516', 'capabilities': 31, 'mode': 1}
 
-        def cb(res):
-            # connection always succeeds
-            r.callback((
-                {
-                    'fmsVer': u'FMS/3,5,1,516',
-                    'capabilities': 31,
-                    'mode': 1
-                },
-                status.success(objectEncoding=0)
-            ))
+        return x, status.success(objectEncoding=0)
 
-        def writeControlMessage(res):
-            d = stream.writeEvent(event.ControlEvent(0, 0), channelId=2)
+    def createStream(self):
+        streamId = self.getNextAvailableStreamId()
 
-            d.addCallback(cb)
+        self.registerStream(streamId, stream.Stream(self))
 
-        def writeClientBW(res):
-            d = stream.writeEvent(event.UpstreamBandwidth(2500000L, 2), channelId=2)
-
-            d.addCallback(writeControlMessage)
-
-        d = stream.writeEvent(event.DownstreamBandwidth(2500000L), channelId=2)
-        d.addCallback(writeClientBW)
-
-        return r
+        return None, streamId
 
 
 class ServerFactory(protocol.Factory):

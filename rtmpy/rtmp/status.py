@@ -14,13 +14,14 @@ class Status(object):
 pyamf.register_class(Status, attrs=['level', 'code', 'description'])
 
 
-def success(**kwargs):
-    s = Status(
-        level='status', code=u'NetConnection.Connect.Success',
-        description=u'Connection succeeded.'
-    )
+def status(**kwargs):
+    s = Status(level='status')
 
     for k, v in kwargs.iteritems():
         setattr(s, k, v)
 
     return s
+
+def success(**kwargs):
+    return status(code=u'NetConnection.Connect.Success',
+        description=u'Connection succeeded.', **kwargs)

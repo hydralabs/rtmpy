@@ -425,8 +425,11 @@ class BaseCodec(object):
         except ValueError:
             pass
 
-        if len(self.activeChannels) == 0:
+        if len(self.activeChannels) == 0 and self.shouldPause():
             self.pause()
+
+    def shouldPause(self):
+        return True
 
     def activateChannel(self, channel):
         """
@@ -502,6 +505,27 @@ class Decoder(BaseCodec):
 
     def getJob(self):
         return self.decode
+
+    def pause(self):
+        """
+        Pauses the codec. Called when the buffer is exhausted. If the job is
+        already stopped then this is a noop.
+        """
+        if not self.job.running:
+            return
+
+        self.job.stop()
+
+        if self.observer is not None:
+            self.observer.stopped()
+
+        self.deferred = None
+
+        if self.debug or rtmp.DEBUG:
+            rtmp.log(self, 'Stopped job')
+
+    def shouldPause(self):
+        return len(self.buffer) == 0
 
     def readHeader(self):
         """
