@@ -76,8 +76,7 @@ def decodeHeaderByte(byte):
     @return: The header length and the channel id.
     @rtype: C{tuple}
     """
-    if not isinstance(byte, int):
-        raise TypeError('Expected an int (got %s)' % (type(byte),))
+    byte = int(byte)
 
     if byte > 255 or byte < 0:
         raise OverflowError('Byte must be between 0 and 255 (got %d)' % (
@@ -98,14 +97,6 @@ def encodeHeaderByte(headerLength, channelId):
     @param channelId: The channel id for the header.
     @type channelId: C{int}
     """
-    if not isinstance(headerLength, int):
-        raise TypeError('Expected an int for headerLength (got %s)' % (
-            type(headerLength),))
-
-    if not isinstance(channelId, int):
-        raise TypeError('Expected an int for channelId (got %s)' % (
-            type(channelId),))
-
     try:
         index = HEADER_SIZES.index(headerLength)
     except ValueError:
@@ -129,10 +120,6 @@ def getHeaderSizeIndex(header):
     @return: An index relating to L{HEADER_SIZES}.
     @rtype: C{int}
     """
-    if not interfaces.IHeader.providedBy(header):
-        raise TypeError('IHeader interface expected (got:%s)' % (
-            type(header),))
-
     if header.channelId is None:
         raise HeaderError('Header channelId cannot be None')
 
@@ -181,14 +168,6 @@ def encodeHeader(stream, header):
     @param header: An I{interfaces.IHeader} object.
     @raise TypeError: If L{interfaces.IHeader} is not provided by C{header}.
     """
-    if not interfaces.IHeader.providedBy(header):
-        raise TypeError('IHeader interface expected (got %s)' % (
-            type(header),))
-
-    if not isinstance(stream, util.BufferedByteStream):
-        raise TypeError('BufferedByteStream expected (got %s)' % (
-            type(stream),))
-
     def _encode():
         size = getHeaderSize(header)
         stream.write_uchar(encodeHeaderByte(size, header.channelId))
@@ -285,24 +264,18 @@ def diffHeaders(old, new):
     @return: A header with the computed differences between old & new.
     @rtype: L{Header}
     """
-    if not interfaces.IHeader.providedBy(old):
-        raise TypeError("Expected IHeader for old (got %r)" % (old,))
-
-    if not interfaces.IHeader.providedBy(new):
-        raise TypeError("Expected IHeader for new (got %r)" % (new,))
-
     if old.relative is not False:
-        raise HeaderError("Received a non-absolute header for old " \
+        raise HeaderError("Received a non-absolute header for old "
             "(relative = %r)" % (old.relative))
 
     if new.relative is not False:
-        raise HeaderError("Received a non-absolute header for new " \
+        raise HeaderError("Received a non-absolute header for new "
             "(relative = %r)" % (new.relative))
 
     if old.channelId != new.channelId:
         raise HeaderError("The two headers are not for the same channel")
 
-    header = Header(channelId=old.channelId, relative=True)
+    header = Header(channelId=old.channelId)
 
     if new.timestamp != old.timestamp:
         header.timestamp = new.timestamp
@@ -333,12 +306,6 @@ def mergeHeaders(old, new):
     @return: A header with the merged values of old & new.
     @rtype: L{Header}
     """
-    if not interfaces.IHeader.providedBy(old):
-        raise TypeError("Expected IHeader for old (got %r)" % (old,))
-
-    if not interfaces.IHeader.providedBy(new):
-        raise TypeError("Expected IHeader for new (got %r)" % (new,))
-
     if old.relative is not False:
         raise HeaderError("Received a non-absolute header for old " \
             "(relative = %r)" % (old.relative))

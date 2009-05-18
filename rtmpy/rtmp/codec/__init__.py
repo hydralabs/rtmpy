@@ -9,7 +9,7 @@ RTMP codecs. Encoders and decoders for rtmp streams.
 @since: 0.1
 """
 
-from twisted.internet import task, defer
+from twisted.internet import reactor, task, defer
 from zope.interface import implements
 
 from rtmpy import rtmp, util
@@ -676,6 +676,8 @@ class Decoder(BaseCodec):
         self.buffer.seek(0, 2)
         self.buffer.write(data)
 
+        self.start()
+
     def channelComplete(self, channel):
         """
         Called when the body of the channel has been satisfied.
@@ -733,12 +735,16 @@ class ChannelContext(object):
 
         self.queue = []
         self.currentPacket = None
-        self.debug = False
+        self.debug = rtmp.DEBUG
 
     def reset(self, header):
         """
         Called to reset the context when the channel has been reappropriated.
         """
+        if self.debug or rtmp.DEBUG:
+            rtmp.log(self, 'reset, bufferlen:%d, header:%r' % (
+                len(self.buffer), header))
+
         self.buffer.truncate()
         self.bytes = 0
         self.bytesRequired = header.bodyLength
@@ -755,25 +761,32 @@ class ChannelContext(object):
         """
         length = self.getMinimumFrameSize()
 
-        if length == 0:
-            self.encoder.deactivateChannel(self.channel)
+        if self.debug or rtmp.DEBUG:
+            rtmp.log(self, 'length expected:%d, buffer length:%d' % (
+                length, len(self.buffer)))
 
-            return
+        if length == 0:
+            return None
 
         self.buffer.seek(0)
 
         try:
             data = self.buffer.read(length)
         except IOError:
-            self.encoder.deactivateChannel(self.channel)
-
             return None
 
         self.buffer.consume()
         self.bytes += len(data)
 
         if self.bytes == self.bytesRequired:
-            self.runQueue()
+            if self.debug or rtmp.DEBUG:
+                rtmp.log(self, 'complete body')
+
+            if self.currentPacket:
+                d, self.currentPacket = self.currentPacket, None
+                d.addCallback(self.runQueue)
+
+                reactor.callLater(0, d.callback, None)
 
         return data
 
@@ -788,7 +801,7 @@ class ChannelContext(object):
         if self.header is None:
             return self.channel.getHeader()
 
-        return _header.diffHeaders(self.channel.getHeader(), self.header)
+        return _header.diffHeaders(self.header, self.channel.getHeader())
 
     def getMinimumFrameSize(self):
         """
@@ -800,6 +813,9 @@ class ChannelContext(object):
         frameSize = self.encoder.frameSize
 
         available = min(bytesLeft, frameSize)
+
+        if self.debug or rtmp.DEBUG:
+            rtmp.log(self, 'minimum frame = %d' % (available,))
 
         if available < 0:
             raise RuntimeError('getMinimumFrameSize wanted to return %r' % (
@@ -813,15 +829,12 @@ class ChannelContext(object):
         """
         self.header = self.channel.getHeader()
 
-    def runQueue(self):
+    def runQueue(self, result):
         """
         """
         if self.debug or rtmp.DEBUG:
-            rtmp.log(self, 'runQueue length:%r' % (len(self.queue),))
-
-        if self.currentPacket:
-            self.currentPacket.callback(None)
-            self.currentPacket = None
+            rtmp.log(self, 'runQueue length:%r, currentPacket:%r' % (
+                len(self.queue), self.currentPacket))
 
         header, payload = None, None
 
@@ -830,10 +843,13 @@ class ChannelContext(object):
             self.currentPacket = d
             del self.queue[0]
         except IndexError:
-            return
+            pass
 
-        self.channel.setHeader(header)
-        self.channel.dataReceived(payload)
+        if header is not None:
+            self.channel.setHeader(header)
+            self.channel.dataReceived(payload)
+
+        return result
 
     # interfaces.IChannelObserver
 
@@ -866,6 +882,7 @@ class ChannelContext(object):
 
         @note: This is a noop.
         """
+        self.header = None
 
 
 class Encoder(BaseCodec):
@@ -886,6 +903,7 @@ class Encoder(BaseCodec):
         self.channelContext = {}
         self.consumer = None
         self.scheduler = None
+        self.debug = rtmp.DEBUG
 
     def registerScheduler(self, scheduler):
         """
@@ -895,9 +913,6 @@ class Encoder(BaseCodec):
         @param scheduler: The scheduler to register.
         @type scheduler: L{IChannelScheduler}
         """
-        if not interfaces.IChannelScheduler.providedBy(scheduler):
-            raise TypeError('Expected IChannelScheduler interface')
-
         self.scheduler = scheduler
 
     def getJob(self):
@@ -914,6 +929,8 @@ class Encoder(BaseCodec):
         self.consumer = consumer
 
     def createChannel(self, channelId):
+        """
+        """
         channel = BaseCodec.createChannel(self, channelId)
 
         context = self.channelContext[channel] = ChannelContext(channel, self)
@@ -927,7 +944,16 @@ class Encoder(BaseCodec):
         """
         BaseCodec.activateChannel(self, channel)
 
-        self.scheduler.activateChannel(channel)
+        channelId = self.channels[channel]
+
+        if self.debug or rtmp.DEBUG:
+            rtmp.log(self, 'Activating channel %d' % (channelId,))
+
+        try:
+            self.scheduler.activateChannel(channel)
+        except IndexError:
+            if self.debug or rtmp.DEBUG:
+                rtmp.log(self, 'Scheduler reports already active')
 
     def deactivateChannel(self, channel):
         """
@@ -935,8 +961,13 @@ class Encoder(BaseCodec):
         """
         BaseCodec.deactivateChannel(self, channel)
 
-        context = self.channelContext[channel]
+        channelId = self.channels[channel]
 
+        if self.debug or rtmp.DEBUG:
+            rtmp.log(self, 'Dectivating channel %d' % (channelId,))
+
+
+        context = self.channelContext[channel]
         self.scheduler.deactivateChannel(channel)
 
     def initialiseChannel(self, channel, oldHeader):
@@ -961,9 +992,15 @@ class Encoder(BaseCodec):
         bytes = context.getFrame()
 
         if bytes is None:
+            self.deactivateChannel(channel)
+
             return
 
         _header.encodeHeader(self.buffer, context.getRelativeHeader())
+
+        if self.debug or rtmp.DEBUG:
+            rtmp.log(self, 'Writing %d bytes to the buffer' % (len(bytes),))
+
         self.buffer.write(bytes)
 
         # reset the context to the latest absolute header from the channel
@@ -977,6 +1014,9 @@ class Encoder(BaseCodec):
         called.
         """
         channel = self.scheduler.getNextChannel()
+
+        if self.debug or rtmp.DEBUG:
+            rtmp.log(self, 'Encode: next channel %r' % (channel,))
 
         if channel is None:
             self.pause()
@@ -1037,20 +1077,31 @@ class Encoder(BaseCodec):
         d = defer.Deferred()
         context = self.channelContext[channel]
 
+        if self.debug or rtmp.DEBUG:
+            rtmp.log(self, 'Writing packet header:%r' % (header,))
+            rtmp.log(self, 'queue length:%d, currentPacket:%r' % (
+                len(context.queue), context.currentPacket))
+
         if context.currentPacket is not None:
+            if self.debug or rtmp.DEBUG:
+                rtmp.log(self, 'Queuing packet')
+
             context.queue.append((header, payload, d))
-            self.activateChannel(channel)
         else:
             if len(context.queue) > 0:
                 if self.debug or rtmp.DEBUG:
-                    rtmp.log(self, 'Writing to inactive channel but there is '
-                        'a queue', channel)
-                    rtmp.log(self, context.queue)
+                    rtmp.log(self, 'Queue not empty', context.queue)
 
                 raise RuntimeError('Queue is not empty?')
 
+            if self.debug or rtmp.DEBUG:
+                rtmp.log(self, 'Writing packet immediately')
+
             channel.setHeader(header)
             channel.dataReceived(str(payload))
-            d.callback(None)
+
+            context.currentPacket = d
+
+        self.activateChannel(channel)
 
         return d

@@ -336,7 +336,6 @@ class StreamManagerTestCase(unittest.TestCase):
         self.assertEquals(self.protocol.streams, {})
 
         # test a successful registration
-
         s = mocks.Stream()
 
         self.protocol.registerStream(1, s)

@@ -23,7 +23,7 @@ from twisted.internet import protocol, defer
 from zope.interface import implements
 from odict import odict
 
-from rtmpy.rtmp import interfaces, stream, scheduler
+from rtmpy.rtmp import interfaces, stream, scheduler, status
 from rtmpy import util
 
 #: Set this to C{True} to force all rtmp.* instances to log debugging messages
@@ -330,20 +330,27 @@ class ServerProtocol(BaseProtocol):
         r = defer.Deferred()
 
         def cb(res):
-            print 'sending response'
             # connection always succeeds
             r.callback((
-                odict([('capabilities', 31), ('fmsVer', u'FMS/3,0,1,123')]),
-                odict([('code', u'NetConnection.Connect.Success'), ('objectEncoding', 0), ('description', u'Connection succeeded.'), ('level', u'status')])
+                {
+                    'fmsVer': u'FMS/3,5,1,516',
+                    'capabilities': 31,
+                    'mode': 1
+                },
+                status.success(objectEncoding=0)
             ))
 
-        def writeClientBW(res):
-            print 'writing client bw'
-            d = stream.writeEvent(event.ClientBandwidth(2500000L, 2), channelId=2)
+        def writeControlMessage(res):
+            d = stream.writeEvent(event.ControlEvent(0, 0), channelId=2)
 
             d.addCallback(cb)
 
-        d = stream.writeEvent(event.ServerBandwidth(2500000L), channelId=2)
+        def writeClientBW(res):
+            d = stream.writeEvent(event.UpstreamBandwidth(2500000L, 2), channelId=2)
+
+            d.addCallback(writeControlMessage)
+
+        d = stream.writeEvent(event.DownstreamBandwidth(2500000L), channelId=2)
         d.addCallback(writeClientBW)
 
         return r

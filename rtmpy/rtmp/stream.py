@@ -129,7 +129,7 @@ class ControlStream(object):
                 channel = self.registerChannel(channelId)
 
             return self.protocol.writePacket(
-                self.streamId, channelId, res[0], res[1], self.timestamp)
+                channelId, res[1], self.streamId, res[0], self.timestamp)
 
         return event.encode(e).addCallback(cb, channelId)
 
@@ -156,3 +156,6 @@ class ServerControlStream(ControlStream):
             d.addCallback(cb)
 
             return d
+
+    def onDownstreamBandwidth(self, bandwidth):
+        print bandwidth

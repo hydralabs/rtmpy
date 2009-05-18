@@ -197,7 +197,7 @@ class ControlEvent(BaseEvent):
     PING = 6
     PONG = 7
 
-    def __init__(self, type=None, value1=0, value2=UNDEFINED, value3=UNDEFINED):
+    def __init__(self, type=None, value1=0, value2=None, value3=None):
         self.type = type
         self.value1 = value1
         self.value2 = value2
@@ -243,17 +243,19 @@ class ControlEvent(BaseEvent):
             raise EncodeError('TypeError encoding value1 '
                 '(expected int, got %r)' % (type(self.value1),))
 
-        try:
-            buf.write_long(self.value2)
-        except TypeError:
-            raise EncodeError('TypeError encoding value2 '
-                '(expected int, got %r)' % (type(self.value2),))
+        if self.value2 is not None:
+            try:
+                buf.write_long(self.value2)
+            except TypeError:
+                raise EncodeError('TypeError encoding value2 '
+                    '(expected int, got %r)' % (type(self.value2),))
 
-        try:
-            buf.write_long(self.value3)
-        except TypeError:
-            raise EncodeError('TypeError encoding value3 '
-                '(expected int, got %r)' % (type(self.value3),))
+        if self.value3 is not None:
+            try:
+                buf.write_long(self.value3)
+            except TypeError:
+                raise EncodeError('TypeError encoding value3 '
+                    '(expected int, got %r)' % (type(self.value3),))
 
     def dispatch(self, listener):
         """
@@ -433,6 +435,8 @@ class Notify(BaseEvent):
 
             for e in [self.name, self.id]:
                 encoder.writeElement(e)
+
+            print repr(encoder.stream.getvalue())
 
             for e in self.argv:
                 encoder.writeElement(e)

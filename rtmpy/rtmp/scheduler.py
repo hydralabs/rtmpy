@@ -104,16 +104,16 @@ class LoopingChannelScheduler(BaseChannelScheduler):
 
         self._incrementIndex()
 
-        channel = self.activeChannels[self.index]
+        channel = self.activeChannels[self.index - 1]
         i = self.index
 
         while channel is None:
             self._incrementIndex()
 
+            channel = self.activeChannels[self.index]
+
             if self.index == i:
                 break
-
-            channel = self.activeChannels[self.index]
 
         if channel is None:
             self.activeChannels = []
