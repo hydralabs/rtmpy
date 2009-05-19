@@ -9,9 +9,9 @@ RTMP Stream implementation.
 """
 
 from zope.interface import implements
-from twisted.internet import defer
+from twisted.internet import defer, reactor
 
-from rtmpy.rtmp import interfaces, event
+from rtmpy.rtmp import interfaces, event, status
 
 
 class BufferingChannelObserver(object):
@@ -30,6 +30,7 @@ class BufferingChannelObserver(object):
         self.stream.eventReceived(self.channel, self.buffer)
 
     def headerChanged(self, header):
+        print 'header changed', header
         if header.timestamp is not None:
             self.stream.timestamp = header.timestamp
 
@@ -43,11 +44,15 @@ class StreamingChannelObserver(object):
         self.channel = channel
 
     def dataReceived(self, data):
-        self.stream.dataReceived(self.channel, data)
+        self.stream.dataReceived(data)
 
     def bodyComplete(self):
         self.stream.channelComplete(self.channel)
 
+    def headerChanged(self, header):
+        print 'streaming header changed', header
+
+        self.stream.timestamp = header.timestamp
 
 class ControlStream(object):
     """
@@ -74,10 +79,10 @@ class ControlStream(object):
         header = channel.getHeader()
         kls = event.get_type_class(header.datatype)
 
-        if interfaces.IStreamable.providedBy(kls):
+        '''if interfaces.IStreamable.implementedBy(kls):
             channel.registerObserver(StreamingChannelObserver(self, channel))
-        else:
-            channel.registerObserver(BufferingChannelObserver(self, channel))
+        else:'''
+        channel.registerObserver(BufferingChannelObserver(self, channel))
 
         self.decodingChannels[header.channelId] = channel
 
@@ -86,7 +91,10 @@ class ControlStream(object):
         """
         header = channel.getHeader()
 
-        del self.decodingChannels[header.channelId]
+        try:
+            del self.decodingChannels[header.channelId]
+        except KeyError:
+            pass
 
     def dispatchEvent(self, e, channel):
         """
@@ -133,13 +141,6 @@ class ControlStream(object):
 
         return event.encode(e).addCallback(cb, channelId)
 
-    # interfaces.IEventListener
-
-    def onInvoke(self, invoke):
-        """
-        """
-        pass
-
 
 class ServerControlStream(ControlStream):
     """
@@ -152,11 +153,29 @@ class ServerControlStream(ControlStream):
             if not isinstance(res, (tuple, list)):
                 res = (None, res)
 
+            s = res[1]
+
+            if isinstance(s, status.Status):
+                if s.level == 'error':
+                    return event.Invoke('_error', invoke.id, *res)
+
             return event.Invoke('_result', invoke.id, *res)
 
         if invoke.name == u'connect':
+            def check_error(res):
+                if not isinstance(res, event.Invoke):
+                    return res
+
+                if res.name == '_error':
+                    self.writeEvent(res, channelId=2)
+                    self.writeEvent(event.Invoke('close', 0, None), channelId=2)
+
+                    return
+
+                return res
+
             d = defer.maybeDeferred(self.protocol.onConnect, *invoke.argv)
-            d.addCallback(cb)
+            d.addCallback(cb).addCallback(check_error)
 
             return d
         elif invoke.name == u'createStream':
@@ -165,18 +184,47 @@ class ServerControlStream(ControlStream):
             d.addCallback(cb)
 
             return d
-        else:
-            print 'unhandled call', invoke
-            return event.Invoke('_result', invoke.id, None)
+        elif invoke.name == u'deleteStream':
+            d = defer.maybeDeferred(self.protocol.deleteStream, *invoke.argv[1:])
+
+            d.addCallback(cb)
+
+            return d
+
+        print 'client invoke', invoke
+
+        d = defer.maybeDeferred(getattr(self.protocol.client, invoke.name), *invoke.argv[1:])
+
+        d.addCallback(cb)
+
+        return d
 
     def onDownstreamBandwidth(self, bandwidth):
         """
         """
+        self.protocol.onDownstreamBandwidth(bandwidth)
+
+    def onFrameSize(self, size):
+        print 'frame size', size
+
+        self.protocol.decoder.setFrameSize(size)
+        print self.protocol.decoder.__dict__
 
 
 class Stream(ControlStream):
     """
     """
+
+    def sendStatus(self, code, description=None, **kwargs):
+        """
+        """
+        kwargs['code'] = code
+        kwargs['description'] = description
+
+        s = status.status(**kwargs)
+        e = event.Invoke('onStatus', 0, None, s)
+
+        return self.writeEvent(e, channelId=4)
 
     def onInvoke(self, invoke):
         """
@@ -189,6 +237,42 @@ class Stream(ControlStream):
 
         return c(*args)
 
-    def publish(self, *args):
-        print args
-        pass
+    def publish(self, stream, app):
+        """
+        """
+        d = defer.Deferred()
+
+        self.stream = stream
+
+        def doStatus(res):
+            print self.protocol.client
+            f = self.sendStatus('NetStream.Publish.Start', '%s is now published.' % (stream,), clientid='B.EAgg^4G.')
+
+            print '-' * 80
+
+            f.addCallback(lambda _: d.callback(None))
+
+        s = self.protocol.getStream(0)
+
+        f = s.writeEvent(event.ControlEvent(0, 1), channelId=2)
+        f.addCallback(doStatus)
+
+        return d
+
+    def closeStream(self):
+        d = defer.Deferred()
+
+        f = self.sendStatus('NetStream.Unpublish.Success', '%s is now unpublished.' % (self.stream,), clientid='B.EAgg^4G.')
+
+        f.addCallback(lambda _: d.callback(None))
+
+        return d
+
+    def onNotify(self, notify):
+        print 'notify', notify
+
+    def onAudioData(self, data):
+        print 'audio data', self.timestamp
+
+    def onVideoData(self, data):
+        print 'video data', self.timestamp

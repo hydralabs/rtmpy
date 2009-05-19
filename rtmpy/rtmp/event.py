@@ -27,9 +27,9 @@ DOWNSTREAM_BANDWIDTH = 0x05
 #: The clients upstream bandwidth
 UPSTREAM_BANDWIDTH = 0x06
 #: Packet containing audio
-AUDIO_DATA = 0x07
+AUDIO_DATA = 0x08
 #: Packet containing video data
-VIDEO_DATA = 0x08
+VIDEO_DATA = 0x09
 # 0x0a - 0x0e is unknown
 #: Shared object with variable length
 FLEX_SHARED_OBJECT = 0x10
@@ -535,7 +535,8 @@ class VideoData(BaseStreamingEvent):
         """
         return listener.onVideoData(self.data)
 
-#: Type map.
+
+#: Map event types to event classes
 TYPE_MAP = {
     FRAME_SIZE: FrameSize,
     BYTES_READ: BytesRead,

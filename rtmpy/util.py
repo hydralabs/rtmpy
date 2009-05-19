@@ -9,7 +9,7 @@ RTMPy Utilities.
 @since: 0.1
 """
 
-import os.path, sys, time
+import os.path, sys, time, random
 
 from pyamf.util import BufferedByteStream as BBS, DataTypeMixIn
 
@@ -174,10 +174,26 @@ def uptime():
     return now - boottime
 
 
-def debug(obj, msg):
-    from rtmpy import rtmp
+def generateBytes(length):
+    """
+    Generates a string of C{length} bytes of pseudo-random data. Used for 
+    filling in the gaps in unknown sections of the handshake.
 
-    if rtmp.DEBUG:
-        from twisted.python import log
+    This function is going to to called a lot and is ripe for moving into C.
 
-        log.msg('%r %s' % (obj, str(msg)))
+    @param length: The number of bytes to generate.
+    @type length: C{int}
+    @return: A random string of bytes, length C{length}.
+    @rtype: C{str}
+    @raise TypeError: C{int} expected for C{length}.
+    """
+    # FIXME: sloooow
+    if not isinstance(length, (int, long)):
+        raise TypeError('int expected for length (got:%s)' % (type(length),))
+
+    bytes = ''
+
+    for x in xrange(0, length):
+        bytes += chr(random.randint(0, 0xff))
+
+    return bytes

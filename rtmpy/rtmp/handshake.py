@@ -10,7 +10,7 @@ RTMP handshake support.
 @since: 0.1
 """
 
-import random, hmac, hashlib
+import hmac, hashlib
 from zope.interface import implements
 from twisted.python.failure import Failure
 
@@ -127,7 +127,7 @@ class ClientToken(Token):
 
         self._payload.write_ulong(self.uptime)
         self._payload.write_ulong(int(self.version))
-        self._payload.write(generateBytes(HANDSHAKE_LENGTH - 8))
+        self._payload.write(util.generateBytes(HANDSHAKE_LENGTH - 8))
         self._payload.seek(0)
 
     def getDigest(self):
@@ -189,19 +189,19 @@ class ServerToken(Token):
         self._payload.write_ulong(int(self.version))
 
         if self.client.getDigest() is None:
-            self._payload.write(generateBytes(HANDSHAKE_LENGTH - 8))
+            self._payload.write(util.generateBytes(HANDSHAKE_LENGTH - 8))
             self._payload.write(self.client.encode())
             self._payload.seek(0)
 
             return
 
-        self._payload.write(generateBytes(
+        self._payload.write(util.generateBytes(
             HANDSHAKE_LENGTH - 8 - SHA256_DIGEST_LENGTH))
 
         digest = self.getDigest()
 
         if digest is None:
-            digest = generateBytes(SHA256_DIGEST_LENGTH)
+            digest = util.generateBytes(SHA256_DIGEST_LENGTH)
 
         client = self.client.encode()
         self._payload.seek(0, 2)
@@ -591,31 +591,6 @@ def decodeServerHandshake(client, data):
         raise HandshakeError('Not enough data to decode a full server token')
 
     return ServerToken(client, uptime=uptime, version=version, payload=payload)
-
-
-def generateBytes(length):
-    """
-    Generates a string of C{length} bytes of pseudo-random data. Used for 
-    filling in the gaps in unknown sections of the handshake.
-
-    This function is going to to called a lot and is ripe for moving into C.
-
-    @param length: The number of bytes to generate.
-    @type length: C{int}
-    @return: A random string of bytes, length C{length}.
-    @rtype: C{str}
-    @raise TypeError: C{int} expected for C{length}.
-    """
-    # FIXME: sloooow
-    if not isinstance(length, (int, long)):
-        raise TypeError('int expected for length (got:%s)' % (type(length),))
-
-    bytes = ''
-
-    for x in xrange(0, length):
-        bytes += chr(random.randint(0, 0xff))
-
-    return bytes
 
 
 def _digest(key, payload):

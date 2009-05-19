@@ -135,6 +135,7 @@ class Channel(object):
             rtmp.log(self, 'setHeader(%s)' % (header,))
 
         if self.header is None:
+            print header
             if header.relative is True:
                 raise _header.HeaderError(
                     'Tried to set a relative header as absolute')
@@ -484,8 +485,9 @@ class BaseCodec(object):
     def setFrameSize(self, size):
         self.frameSize = size
 
-        for channelId in self.activeChannels:
-            self.channels[channelId].frameRemaining = size
+        for channelId, channel in self.channels.iteritems():
+            if isinstance(channel, Channel):
+                channel.frameRemaining = size
 
 
 class Decoder(BaseCodec):
@@ -692,10 +694,11 @@ class Decoder(BaseCodec):
 
     def dataReceived(self, data):
         """
-        Adds data to the end of the stream. 
+        Adds data to the end of the stream.
         """
         if self.debug or rtmp.DEBUG:
             rtmp.log(self, 'Received %d bytes' % (len(data),))
+            rtmp.log(self, repr(data))
 
         self.buffer.seek(0, 2)
         self.buffer.write(data)
@@ -1106,18 +1109,7 @@ class Encoder(BaseCodec):
             rtmp.log(self, 'queue length:%d, currentPacket:%r' % (
                 len(context.queue), context.currentPacket))
 
-        if context.currentPacket is not None:
-            if self.debug or rtmp.DEBUG:
-                rtmp.log(self, 'Queuing packet')
-
-            context.queue.append((header, payload, d))
-        else:
-            if len(context.queue) > 0:
-                if self.debug or rtmp.DEBUG:
-                    rtmp.log(self, 'Queue not empty', context.queue)
-
-                raise RuntimeError('Queue is not empty?')
-
+        if len(context.queue) == 0 and context.currentPacket is None:
             if self.debug or rtmp.DEBUG:
                 rtmp.log(self, 'Writing packet immediately')
 
@@ -1125,6 +1117,16 @@ class Encoder(BaseCodec):
             channel.dataReceived(str(payload))
 
             context.currentPacket = d
+
+            return
+        else:
+            if self.debug or rtmp.DEBUG:
+                rtmp.log(self, 'Queuing packet')
+
+            context.queue.append((header, payload, d))
+
+            if context.currentPacket is None:
+                context.runQueue(None)
 
         self.activateChannel(channel)
 

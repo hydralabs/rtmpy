@@ -10,8 +10,11 @@ class Status(object):
         self.code = code
         self.description = description
 
+    @staticmethod
+    def _get_attrs(obj):
+        return obj.__dict__
 
-pyamf.register_class(Status, attrs=['level', 'code', 'description'])
+pyamf.register_class(Status, attrs=['level', 'code', 'description'], attr_func=Status._get_attrs)
 
 
 def status(**kwargs):
@@ -22,6 +25,11 @@ def status(**kwargs):
 
     return s
 
-def success(**kwargs):
-    return status(code=u'NetConnection.Connect.Success',
-        description=u'Connection succeeded.', **kwargs)
+
+def error(**kwargs):
+    s = Status(level='error')
+
+    for k, v in kwargs.iteritems():
+        setattr(s, k, v)
+
+    return s
