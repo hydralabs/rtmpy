@@ -135,7 +135,6 @@ class Channel(object):
             rtmp.log(self, 'setHeader(%s)' % (header,))
 
         if self.header is None:
-            print header
             if header.relative is True:
                 raise _header.HeaderError(
                     'Tried to set a relative header as absolute')
@@ -153,7 +152,7 @@ class Channel(object):
             self.header = _header.mergeHeaders(self.header, header)
 
             if self.observer is not None:
-                self.observer.headerChanged(self.header)
+                self.observer.headerChanged(header)
 
         self.bodyRemaining = self.header.bodyLength - self.bytes
 

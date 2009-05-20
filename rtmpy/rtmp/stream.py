@@ -30,9 +30,14 @@ class BufferingChannelObserver(object):
         self.stream.eventReceived(self.channel, self.buffer)
 
     def headerChanged(self, header):
-        print 'header changed', header
-        if header.timestamp is not None:
-            self.stream.timestamp = header.timestamp
+        if header.relative:
+            absHeader = self.channel.getHeader()
+            datatype = absHeader.datatype
+
+            if header.timestamp is not None:
+                self.stream.setTimestamp(datatype, header.timestamp, header.relative)
+        else:
+            self.stream.setTimestamp(header.datatype, header.timestamp, header.relative)
 
 
 class StreamingChannelObserver(object):
@@ -50,9 +55,8 @@ class StreamingChannelObserver(object):
         self.stream.channelComplete(self.channel)
 
     def headerChanged(self, header):
-        print 'streaming header changed', header
-
         self.stream.timestamp = header.timestamp
+
 
 class ControlStream(object):
     """
@@ -61,9 +65,35 @@ class ControlStream(object):
     def __init__(self, protocol):
         self.protocol = protocol
         self.decodingChannels = {}
-        #: a list of channels that are encoding stuff
         self.encodingChannels = {}
-        self.timestamp = 0
+        self.timestamps = {
+            'data': 0,
+            'video': 0,
+            'audio': 0
+        }
+
+    def _getTSKey(self, datatype):
+        if datatype == event.AUDIO_DATA:
+            return 'audio'
+        elif datatype == event.VIDEO_DATA:
+            return 'video'
+
+        return'data'
+
+    def getTimestamp(self, datatype):
+        """
+        """
+        return self.timestamps[self._getTSKey(datatype)]
+
+    def setTimestamp(self, datatype, time, relative=False):
+        """
+        """
+        key = self._getTSKey(datatype)
+
+        if relative:
+            self.timestamps[key] += time
+        else:
+            self.timestamps[key] = time
 
     def registerChannel(self, channelId):
         """
@@ -137,7 +167,7 @@ class ControlStream(object):
                 channel = self.registerChannel(channelId)
 
             return self.protocol.writePacket(
-                channelId, res[1], self.streamId, res[0], self.timestamp)
+                channelId, res[1], self.streamId, res[0], self.getTimestamp(res[0]))
 
         return event.encode(e).addCallback(cb, channelId)
 
@@ -205,10 +235,7 @@ class ServerControlStream(ControlStream):
         self.protocol.onDownstreamBandwidth(bandwidth)
 
     def onFrameSize(self, size):
-        print 'frame size', size
-
         self.protocol.decoder.setFrameSize(size)
-        print self.protocol.decoder.__dict__
 
 
 class Stream(ControlStream):
@@ -245,10 +272,7 @@ class Stream(ControlStream):
         self.stream = stream
 
         def doStatus(res):
-            print self.protocol.client
             f = self.sendStatus('NetStream.Publish.Start', '%s is now published.' % (stream,), clientid='B.EAgg^4G.')
-
-            print '-' * 80
 
             f.addCallback(lambda _: d.callback(None))
 
@@ -272,7 +296,7 @@ class Stream(ControlStream):
         print 'notify', notify
 
     def onAudioData(self, data):
-        print 'audio data', self.timestamp
+        print 'audio data', self.timestamps['audio']
 
     def onVideoData(self, data):
-        print 'video data', self.timestamp
+        print 'video data', self.timestamps['video']
