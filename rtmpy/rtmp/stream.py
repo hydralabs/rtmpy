@@ -30,14 +30,8 @@ class BufferingChannelObserver(object):
         self.stream.eventReceived(self.channel, self.buffer)
 
     def headerChanged(self, header):
-        if header.relative:
-            absHeader = self.channel.getHeader()
-            datatype = absHeader.datatype
-
-            if header.timestamp is not None:
-                self.stream.setTimestamp(datatype, header.timestamp, header.relative)
-        else:
-            self.stream.setTimestamp(header.datatype, header.timestamp, header.relative)
+        if header.timestamp is not None:
+            self.stream.setTimestamp(header.timestamp, header.relative)
 
 
 class StreamingChannelObserver(object):
@@ -66,11 +60,7 @@ class ControlStream(object):
         self.protocol = protocol
         self.decodingChannels = {}
         self.encodingChannels = {}
-        self.timestamps = {
-            'data': 0,
-            'video': 0,
-            'audio': 0
-        }
+        self.timestamp = 0
 
     def _getTSKey(self, datatype):
         if datatype == event.AUDIO_DATA:
@@ -80,20 +70,13 @@ class ControlStream(object):
 
         return'data'
 
-    def getTimestamp(self, datatype):
+    def setTimestamp(self, time, relative=False):
         """
         """
-        return self.timestamps[self._getTSKey(datatype)]
-
-    def setTimestamp(self, datatype, time, relative=False):
-        """
-        """
-        key = self._getTSKey(datatype)
-
         if relative:
-            self.timestamps[key] += time
+            self.timestamp += time
         else:
-            self.timestamps[key] = time
+            self.timestamp = time
 
     def registerChannel(self, channelId):
         """
@@ -167,7 +150,7 @@ class ControlStream(object):
                 channel = self.registerChannel(channelId)
 
             return self.protocol.writePacket(
-                channelId, res[1], self.streamId, res[0], self.getTimestamp(res[0]))
+                channelId, res[1], self.streamId, res[0], self.timestamp)
 
         return event.encode(e).addCallback(cb, channelId)
 
@@ -296,7 +279,11 @@ class Stream(ControlStream):
         print 'notify', notify
 
     def onAudioData(self, data):
-        print 'audio data', self.timestamps['audio']
+        s = self.protocol.application.getStream(self.stream)
+
+        print s
+
+        print 'audio data', self.timestamp
 
     def onVideoData(self, data):
-        print 'video data', self.timestamps['video']
+        print 'video data', self.timestamp
