@@ -8,10 +8,12 @@ RTMP Stream implementation.
 @since: 0.1
 """
 
+from urlparse import urlparse
 from zope.interface import implements
 from twisted.internet import defer, reactor
 
 from rtmpy.rtmp import interfaces, event, status
+from rtmpy import util
 
 
 class BufferingChannelObserver(object):
@@ -21,38 +23,27 @@ class BufferingChannelObserver(object):
     def __init__(self, stream, channel):
         self.stream = stream
         self.channel = channel
-        self.buffer = ''
+        self.buffer = util.BufferedByteStream()
 
     def dataReceived(self, data):
-        self.buffer += data
+        """
+        """
+        self.buffer.write(data)
 
     def bodyComplete(self):
-        self.stream.eventReceived(self.channel, self.buffer)
+        """
+        """
+        self.stream.eventReceived(self.channel, self.buffer.getvalue())
+        self.buffer.truncate()
 
     def headerChanged(self, header):
+        """
+        """
         if header.timestamp is not None:
             self.stream.setTimestamp(header.timestamp, header.relative)
 
 
-class StreamingChannelObserver(object):
-    """
-    """
-
-    def __init__(self, stream, channel):
-        self.stream = stream
-        self.channel = channel
-
-    def dataReceived(self, data):
-        self.stream.dataReceived(data)
-
-    def bodyComplete(self):
-        self.stream.channelComplete(self.channel)
-
-    def headerChanged(self, header):
-        self.stream.timestamp = header.timestamp
-
-
-class ControlStream(object):
+class BaseStream(object):
     """
     """
 
@@ -62,13 +53,16 @@ class ControlStream(object):
         self.encodingChannels = {}
         self.timestamp = 0
 
-    def _getTSKey(self, datatype):
-        if datatype == event.AUDIO_DATA:
-            return 'audio'
-        elif datatype == event.VIDEO_DATA:
-            return 'video'
+    def sendStatus(self, code, description=None, **kwargs):
+        """
+        """
+        kwargs['code'] = code
+        kwargs['description'] = description
 
-        return'data'
+        s = status.status(**kwargs)
+        e = event.Invoke('onStatus', 0, None, s)
+
+        return self.writeEvent(e, channelId=4)
 
     def setTimestamp(self, time, relative=False):
         """
@@ -92,9 +86,6 @@ class ControlStream(object):
         header = channel.getHeader()
         kls = event.get_type_class(header.datatype)
 
-        '''if interfaces.IStreamable.implementedBy(kls):
-            channel.registerObserver(StreamingChannelObserver(self, channel))
-        else:'''
         channel.registerObserver(BufferingChannelObserver(self, channel))
 
         self.decodingChannels[header.channelId] = channel
@@ -155,86 +146,14 @@ class ControlStream(object):
         return event.encode(e).addCallback(cb, channelId)
 
 
-class ServerControlStream(ControlStream):
+class ExtendedBaseStream(BaseStream):
     """
     """
 
-    def onInvoke(self, invoke):
-        """
-        """
-        def cb(res):
-            if not isinstance(res, (tuple, list)):
-                res = (None, res)
+    def __init__(self, *args, **kwargs):
+        BaseStream.__init__(self, *args, **kwargs)
 
-            s = res[1]
-
-            if isinstance(s, status.Status):
-                if s.level == 'error':
-                    return event.Invoke('_error', invoke.id, *res)
-
-            return event.Invoke('_result', invoke.id, *res)
-
-        if invoke.name == u'connect':
-            def check_error(res):
-                if not isinstance(res, event.Invoke):
-                    return res
-
-                if res.name == '_error':
-                    self.writeEvent(res, channelId=2)
-                    self.writeEvent(event.Invoke('close', 0, None), channelId=2)
-
-                    return
-
-                return res
-
-            d = defer.maybeDeferred(self.protocol.onConnect, *invoke.argv)
-            d.addCallback(cb).addCallback(check_error)
-
-            return d
-        elif invoke.name == u'createStream':
-            d = defer.maybeDeferred(self.protocol.createStream)
-
-            d.addCallback(cb)
-
-            return d
-        elif invoke.name == u'deleteStream':
-            d = defer.maybeDeferred(self.protocol.deleteStream, *invoke.argv[1:])
-
-            d.addCallback(cb)
-
-            return d
-
-        print 'client invoke', invoke
-
-        d = defer.maybeDeferred(getattr(self.protocol.client, invoke.name), *invoke.argv[1:])
-
-        d.addCallback(cb)
-
-        return d
-
-    def onDownstreamBandwidth(self, bandwidth):
-        """
-        """
-        self.protocol.onDownstreamBandwidth(bandwidth)
-
-    def onFrameSize(self, size):
-        self.protocol.decoder.setFrameSize(size)
-
-
-class Stream(ControlStream):
-    """
-    """
-
-    def sendStatus(self, code, description=None, **kwargs):
-        """
-        """
-        kwargs['code'] = code
-        kwargs['description'] = description
-
-        s = status.status(**kwargs)
-        e = event.Invoke('onStatus', 0, None, s)
-
-        return self.writeEvent(e, channelId=4)
+        self.published = False
 
     def onInvoke(self, invoke):
         """
@@ -247,15 +166,61 @@ class Stream(ControlStream):
 
         return c(*args)
 
+    def onNotify(self, notify):
+        """
+        """
+        if notify.name == '@setDataFrame' and notify.id == 'onMetaData':
+            # hacky
+            self.onMetaData(notify.argv[0])
+
+            return
+
+        print 'notify', notify
+
+    def onAudioData(self, data):
+        """
+        """
+        self.stream.audioDataReceived(data)
+
+    def onVideoData(self, data):
+        self.stream.videoDataReceived(data)
+
+    def _getStreamName(self, stream):
+        """
+        """
+        x = urlparse(stream)
+
+        try:
+            return x[2]
+        except:
+            return None
+
+
+class Stream(ExtendedBaseStream):
+    """
+    """
+
+    def __init__(self, *args, **kwargs):
+        ExtendedBaseStream.__init__(self, *args, **kwargs)
+
+        self.stream = None
+
     def publish(self, stream, app):
         """
         """
         d = defer.Deferred()
 
-        self.stream = stream
+        self.application = self.protocol.factory.getApplication(app)
+        streamName = self._getStreamName(stream)
+
+        self.stream = self.application.getStream(streamName)
 
         def doStatus(res):
-            f = self.sendStatus('NetStream.Publish.Start', '%s is now published.' % (stream,), clientid='B.EAgg^4G.')
+            f = self.sendStatus('NetStream.Publish.Start',
+                '%s is now published.' % (stream,), clientid='B.EAgg^4G.')
+
+            self.stream.setPublisher(self)
+            self.published = True
 
             f.addCallback(lambda _: d.callback(None))
 
@@ -267,23 +232,68 @@ class Stream(ControlStream):
         return d
 
     def closeStream(self):
-        d = defer.Deferred()
+        """
+        """
+        self.stream.removePublisher(self)
 
-        f = self.sendStatus('NetStream.Unpublish.Success', '%s is now unpublished.' % (self.stream,), clientid='B.EAgg^4G.')
+        self.published = False
 
-        f.addCallback(lambda _: d.callback(None))
+        d = self.sendStatus('NetStream.Unpublish.Success',
+            '%s is now unpublished.' % (self.stream,), clientid='B.EAgg^4G.')
+
+        d.addCallback(lambda _: None)
 
         return d
 
-    def onNotify(self, notify):
-        print 'notify', notify
+    def onMetaData(self, data):
+        self.stream.onMetaData(data)
 
-    def onAudioData(self, data):
-        s = self.protocol.application.getStream(self.stream)
 
-        print s
+class SubscriberStream(object):
+    """
+    """
 
-        print 'audio data', self.timestamp
+    def __init__(self):
+        self.subscribers = []
 
-    def onVideoData(self, data):
-        print 'video data', self.timestamp
+    def addSubscriber(self, subscriber):
+        """
+        """
+        if subscriber in self.subscribers:
+            raise ValueError('subscriber %r already exists' % (subscriber,))
+
+        self.subscribers.append(subscriber)
+
+    def removeSubscriber(self, subscriber):
+        """
+        """
+        self.subscribers.remove(subscriber)
+
+    def _notify(self, attr, *args, **kwargs):
+        for s in self.subscribers:
+            m = getattr(s, attr)
+
+            m(*args, **kwargs)
+
+    def setPublisher(self, publisher):
+        """
+        """
+        self.publisher = publisher
+
+        self._notify('streamPublished')
+
+    def removePublisher(self, publisher):
+        """
+        """
+        self.publisher = None
+
+        self._notify('streamUnpublished')
+
+    def videoDataReceived(self, data):
+        self._notify('videoDataReceived', data, self.publisher.timestamp)
+
+    def audioDataReceived(self, data):
+        self._notify('audioDataReceived', data, self.publisher.timestamp)
+
+    def onMetaData(self, properties):
+        self._notify('onMetaData', properties)

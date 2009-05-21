@@ -17,12 +17,109 @@ from rtmpy import rtmp, util
 from rtmpy.rtmp import handshake, scheduler, stream, event, status
 
 
+class ServerControlStream(stream.BaseStream):
+    """
+    """
+
+    def _fatal(self, f):
+        """
+        If we ever get here then a pathological error occurred and the only
+        thing left to do is to log the error and kill the connection.
+
+        Only to be used as part of a deferred call/errback chain.
+        """
+        self.protocol.logAndDisconnect(f)
+
+    def onInvoke(self, invoke):
+        """
+        """
+        d = None
+
+        def cb(res):
+            if not isinstance(res, (tuple, list)):
+                res = (None, res)
+
+            s = res[1]
+
+            if isinstance(s, status.Status):
+                if s.level == 'error':
+                    return event.Invoke('_error', invoke.id, *res)
+
+            return event.Invoke('_result', invoke.id, *res)
+
+        if invoke.name == u'connect':
+            def eb(f):
+                # TODO: log the error
+                print f
+                return status.error(
+                    code='NetConnection.Connect.Failed',
+                    description='Internal Server Error'
+                )
+
+            def check_error(res):
+                if not isinstance(res, event.Invoke):
+                    return res
+
+                if res.name == '_error':
+                    self.writeEvent(res, channelId=2)
+                    self.writeEvent(event.Invoke('close', 0, None), channelId=2)
+
+                    return
+
+                return res
+
+            d = defer.maybeDeferred(self.protocol.onConnect, *invoke.argv)
+            d.addErrback(eb).addCallback(cb).addCallback(check_error)
+        elif invoke.name == u'createStream':
+            d = defer.maybeDeferred(self.protocol.createStream)
+
+            d.addCallback(cb)
+        elif invoke.name == u'deleteStream':
+            d = defer.maybeDeferred(self.protocol.deleteStream, *invoke.argv[1:])
+
+            d.addCallback(cb)
+        else:
+            def eb(f):
+                # TODO: log the error
+                print f
+                return status.error(
+                    code='NetConnection.Call.Failed',
+                    description='Internal Server Error'
+                )
+
+            kls = self.protocol.client.__class__
+
+            if not hasattr(kls, invoke.name):
+                return status.error(
+                    code='NetConnection.Call.Failed',
+                    description="Unknown method '%s'" % (invoke.name,)
+                )
+
+            method = getattr(self.protocol.client, invoke.name)
+
+            d = defer.maybeDeferred(method, *invoke.argv[1:])
+
+            d.addErrback(eb).addCallback(cb)
+
+        return d.addErrback(self._fatal)
+
+    def onDownstreamBandwidth(self, bandwidth):
+        """
+        """
+        self.protocol.onDownstreamBandwidth(bandwidth)
+
+    def onFrameSize(self, size):
+        self.protocol.decoder.setFrameSize(size)
+
+
 class IApplication(Interface):
     """
     """
 
-    clients = Attribute("A list of all clients connected to the application.")
+    clients = Attribute("A collection of clients connected to this application.")
     name = Attribute("The name of the application instance.")
+    factory = Attribute("The Factory instance that this application is"
+        "attached to.")
 
     def startup():
         """
@@ -46,10 +143,11 @@ class IApplication(Interface):
 
     def acceptConnection(client):
         """
-        Called when the client has been accepted by this application.
+        Called when the client connection request has been accepted by this
+        application.
         """
 
-    def disconnect(client):
+    def disconnect(client, reason=None):
         """
         Disconnects a client from the application. Returns a deferred that is
         called when the disconnection was successful.
@@ -60,8 +158,8 @@ class Client(object):
     """
     """
 
-    def __init__(self, protocol):
-        self.protocol = protocol
+    def __init__(self):
+        self.protocol = None
         self.application = None
 
         self.pendingCalls = []
@@ -103,10 +201,10 @@ class Application(object):
 
     implements(IApplication)
 
-    client_class = Client
+    client = Client
 
     def __init__(self):
-        self.clients = []
+        self.clients = {}
         self.streams = {}
 
     def startup(self):
@@ -123,23 +221,33 @@ class Application(object):
         """
         Called when this application has accepted the client connection.
         """
-        client.id = util.generateBytes(9)
+        clientId = util.generateBytes(9)
+        client.id = clientId
 
-        self.clients.append(client)
+        self.clients[client] = clientId
+        self.clients[clientId] = client
 
     def disconnect(self, client):
         """
         Removes the C{client} from this application.
         """
         try:
-            self.clients.remove(client)
-        except ValueError:
+            del self.clients[client]
+            del self.clients[client.id]
+        except KeyError:
             pass
 
     def buildClient(self, protocol):
         """
+        Create an instance of a subclass of L{Client}. Override this method to
+        alter how L{Client} instances are created.
+
+        @param protocol: The L{rtmp.ServerProtocol} instance.
         """
-        return self.client_class(protocol)
+        c = self.client()
+        c.protocol = protocol
+
+        return c
 
     def onConnect(self, client, **kwargs):
         """
@@ -164,18 +272,10 @@ class Application(object):
         try:
             return self.streams[name]
         except KeyError:
-            self.streams[name] = object()
+            s = self.streams[name] = stream.SubscriberStream()
+            s.application = self
 
         return self.streams[name]
-
-
-class ApplicationContext(object):
-    """
-    """
-
-    def __init__(self, factory, application):
-        self.factory = factory
-        self.application = application
 
 
 class ServerProtocol(rtmp.BaseProtocol):
@@ -199,6 +299,9 @@ class ServerProtocol(rtmp.BaseProtocol):
         rtmp.BaseProtocol.connectionMade(self)
 
         self.handshaker.start(version=0)
+        self.client = None
+        self.application = None
+        self.pendingConnection = None
 
     def handshakeSuccess(self):
         """
@@ -210,34 +313,47 @@ class ServerProtocol(rtmp.BaseProtocol):
 
         rtmp.BaseProtocol.handshakeSuccess(self)
 
-        self.encoder.registerScheduler(scheduler.LoopingChannelScheduler())
-
-        s = stream.ServerControlStream(self)
+        s = ServerControlStream(self)
 
         self.registerStream(0, s)
-        self.client = None
-        self.application = None
+
+        self.encoder.registerScheduler(scheduler.LoopingChannelScheduler())
 
         if len(b) > 0:
             self.dataReceived(b)
 
     def connectionLost(self, reason):
         """
+        The connection to the client has been lost.
         """
         rtmp.BaseProtocol.connectionLost(self, reason)
 
-        if hasattr(self, 'client') and hasattr(self, 'application'):
-            if self.client and self.application:
-                self.application.disconnect(self.client)
+        if self.client and self.application:
+            self.application.disconnect(self.client)
+
+        if self.pendingConnection:
+            self.pendingConnection.errback(reason)
+
+            self.pendingConnection = None
 
     def onConnect(self, args):
         """
         Called when a 'connect' packet is received from the client.
         """
+        if self.application:
+            # This protocol has already successfully completed a connection
+            # request.
+
+            # TODO, kill the connection
+            return status.status(
+                code='NetConnection.Connect.Closed',
+                description='Already connected.'
+            )
+
         try:
             appName = args['app']
         except KeyError:
-            return None, status.status(
+            return status.status(
                 code='NetConnection.Connect.Failed',
                 description='Bad connect packet (missing `app` key)'
             )
@@ -245,13 +361,12 @@ class ServerProtocol(rtmp.BaseProtocol):
         self.application = self.factory.getApplication(appName)
 
         if self.application is None:
-            return None, status.error(
-                code='NetConnection.Connect.Failed',
-                description='Unknown application'
+            return status.error(
+                code='NetConnection.Connect.InvalidApp',
+                description='Unknown application \'%s\'' % (appName,)
             )
 
         self.client = self.application.buildClient(self)
-
         self.pendingConnection = defer.Deferred()
 
         def cb(res):
@@ -266,8 +381,17 @@ class ServerProtocol(rtmp.BaseProtocol):
 
             s = self.getStream(0)
 
-            s.writeEvent(event.DownstreamBandwidth(2500000L), channelId=2)
-            s.writeEvent(event.UpstreamBandwidth(2500000L, 2), channelId=2)
+            s.writeEvent(event.DownstreamBandwidth(self.factory.downstreamBandwidth), channelId=2)
+            s.writeEvent(event.UpstreamBandwidth(self.factory.upstreamBandwidth, 2), channelId=2)
+
+            # TODO: A timeout for the pendingConnection
+
+        def eb(f):
+            print 'failed app.onConnect', f
+            return status.status(
+                code='NetConnection.Connect.Failed',
+                description='Internal Server Error'
+            )
 
         d = defer.maybeDeferred(self.application.onConnect, self.client, **args)
 
@@ -276,12 +400,13 @@ class ServerProtocol(rtmp.BaseProtocol):
         return self.pendingConnection
 
     def createStream(self):
+        """
+        """
         streamId = self.getNextAvailableStreamId()
 
         self.registerStream(streamId, stream.Stream(self))
 
-        print 'createStream', streamId
-        return None, streamId
+        return streamId
 
     def deleteStream(self, streamId):
         """
@@ -294,12 +419,12 @@ class ServerProtocol(rtmp.BaseProtocol):
     def onDownstreamBandwidth(self, bandwidth):
         self.clientBandwidth = bandwidth
 
-        if hasattr(self, 'pendingConnection'):
+        if self.pendingConnection:
             s = self.getStream(0)
 
             s.writeEvent(event.ControlEvent(0, 0), channelId=2)
 
-            x = {'fmsVer': u'FMS/3,5,1,516', 'capabilities': 31, 'mode': 1}
+            x = {'fmsVer': self.factory.fmsVer, 'capabilities': 31, 'mode': 1}
 
             def y(res):
                 self.client.registerApplication(self.application)
@@ -314,7 +439,7 @@ class ServerProtocol(rtmp.BaseProtocol):
                 objectEncoding=0
             )))
 
-            del self.pendingConnection
+            self.pendingConnection = None
 
 
 class ServerFactory(protocol.ServerFactory):
@@ -324,11 +449,15 @@ class ServerFactory(protocol.ServerFactory):
 
     protocol = ServerProtocol
 
-    def __init__(self, applications={}):
-        self.applications = applications
-        self.applicationContext = {}
+    upstreamBandwidth = 2500000L
+    downstreamBandwidth = 2500000L
+    fmsVer = u'FMS/3,5,1,516'
 
-        for name, app in self.applications.iteritems():
+    def __init__(self, applications={}):
+        self.applications = {}
+        self._pendingApplications = {}
+
+        for name, app in applications.iteritems():
             self.registerApplication(name, app)
 
     def getApplication(self, name):
@@ -340,52 +469,42 @@ class ServerFactory(protocol.ServerFactory):
     def registerApplication(self, name, app):
         """
         """
-        self.applications[name] = app
-
-        app.name = name
+        self._pendingApplications[name] = app
 
         d = defer.maybeDeferred(app.startup)
 
         def eb(f):
-            self.unregisterApplication(app)
+            del self._pendingApplications[name]
 
             return f
 
         def cb(res):
-            self.applicationContext[app] = ApplicationContext(self, app)
-            app.context = self.applicationContext[app]
+            self.applications[name] = app
             app.factory = self
+            app.name = name
 
             return res
 
-        d.addErrback(eb).addCallback(cb)
+        d.addBoth(eb).addCallback(cb)
 
         return d
 
     def unregisterApplication(self, nameOrApp):
         """
         """
-        name = None
+        name = nameOrApp
 
         if IApplication.implementedBy(nameOrApp):
             name = app.name
-        else:
-            name = nameOrApp
 
         app = self.applications[name]
 
-        # if the app exists in the applicationContext then it has successfully
-        # completed its `startup` and is considered active.
-        if app in self.applicationContext:
-            d = defer.maybeDeferred(app.shutdown)
-        else:
-            d = defer.succeed()
+        d = defer.maybeDeferred(app.shutdown)
 
         def cb(res):
-            if app in self.applicationContext:
-                del self.applicationContext[app]
-
             del self.applications[name]
+            app.factory = None
+            app.name = None
 
             return res
 
