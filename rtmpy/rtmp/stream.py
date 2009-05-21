@@ -214,10 +214,11 @@ class Stream(ExtendedBaseStream):
         streamName = self._getStreamName(stream)
 
         self.stream = self.application.getStream(streamName)
+        self.streamName = streamName
 
         def doStatus(res):
             f = self.sendStatus('NetStream.Publish.Start',
-                '%s is now published.' % (stream,), clientid='B.EAgg^4G.')
+                '%s is now published.' % (stream,), clientid=self.protocol.client.id)
 
             self.stream.setPublisher(self)
             self.published = True
@@ -239,7 +240,7 @@ class Stream(ExtendedBaseStream):
         self.published = False
 
         d = self.sendStatus('NetStream.Unpublish.Success',
-            '%s is now unpublished.' % (self.stream,), clientid='B.EAgg^4G.')
+            '%s is now unpublished.' % (self.streamName,), clientid=self.protocol.client.id)
 
         d.addCallback(lambda _: None)
 

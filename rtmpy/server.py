@@ -75,7 +75,7 @@ class ServerControlStream(stream.BaseStream):
 
             d.addCallback(cb)
         elif invoke.name == u'deleteStream':
-            d = defer.maybeDeferred(self.protocol.deleteStream, *invoke.argv[1:])
+            d = defer.maybeDeferred(self.protocol.removeStream, *invoke.argv[1:])
 
             d.addCallback(cb)
         else:
@@ -407,14 +407,6 @@ class ServerProtocol(rtmp.BaseProtocol):
         self.registerStream(streamId, stream.Stream(self))
 
         return streamId
-
-    def deleteStream(self, streamId):
-        """
-        """
-        try:
-            del self.streams[streamId]
-        except:
-            pass
 
     def onDownstreamBandwidth(self, bandwidth):
         self.clientBandwidth = bandwidth
