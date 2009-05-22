@@ -77,7 +77,7 @@ class ServerControlStream(stream.BaseStream):
         elif invoke.name == u'deleteStream':
             d = defer.maybeDeferred(self.protocol.removeStream, *invoke.argv[1:])
 
-            d.addCallback(cb)
+            d.addCallback(cb).addCallback(lambda _: None)
         else:
             def eb(f):
                 # TODO: log the error

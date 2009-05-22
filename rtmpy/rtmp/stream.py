@@ -40,7 +40,9 @@ class BufferingChannelObserver(object):
         """
         """
         if header.timestamp is not None:
-            self.stream.setTimestamp(header.timestamp, header.relative)
+            absHeader = self.channel.getHeader()
+
+            self.stream.setTimestamp(absHeader.datatype, header.timestamp, header.relative)
 
 
 class BaseStream(object):
@@ -51,7 +53,11 @@ class BaseStream(object):
         self.protocol = protocol
         self.decodingChannels = {}
         self.encodingChannels = {}
-        self.timestamp = 0
+        self.timestamp = {
+            'audio': 0,
+            'video': 0,
+            'data': 0
+        }
 
     def sendStatus(self, code, description=None, **kwargs):
         """
@@ -64,13 +70,23 @@ class BaseStream(object):
 
         return self.writeEvent(e, channelId=4)
 
-    def setTimestamp(self, time, relative=False):
+    def _getTSKey(self, type):
+        if type == event.AUDIO_DATA:
+            return 'audio'
+        elif type == event.VIDEO_DATA:
+            return 'video'
+
+        return 'data'
+
+    def setTimestamp(self, datatype, time, relative=False):
         """
         """
+        key = self._getTSKey(datatype)
+
         if relative:
-            self.timestamp += time
+            self.timestamp[key] += time
         else:
-            self.timestamp = time
+            self.timestamp[key] = time
 
     def registerChannel(self, channelId):
         """
@@ -141,7 +157,7 @@ class BaseStream(object):
                 channel = self.registerChannel(channelId)
 
             return self.protocol.writePacket(
-                channelId, res[1], self.streamId, res[0], self.timestamp)
+                channelId, res[1], self.streamId, res[0], self.timestamp[self._getTSKey(res[0])])
 
         return event.encode(e).addCallback(cb, channelId)
 
@@ -158,9 +174,14 @@ class ExtendedBaseStream(BaseStream):
     def onInvoke(self, invoke):
         """
         """
-        print invoke
-
-        c = getattr(self, invoke.name)
+        try:
+            c = getattr(self, invoke.name)
+        except AttributeError:
+            print 'invoke', invoke.name
+            return status.error(
+                code='NetStream.Failed',
+                description='Unknown method %s' % (invoke.name,)
+            )
 
         args = invoke.argv[1:]
 
@@ -175,15 +196,13 @@ class ExtendedBaseStream(BaseStream):
 
             return
 
-        print 'notify', notify
-
     def onAudioData(self, data):
         """
         """
-        self.stream.audioDataReceived(data)
+        self.stream.audioDataReceived(data, self.timestamp['audio'])
 
     def onVideoData(self, data):
-        self.stream.videoDataReceived(data)
+        self.stream.videoDataReceived(data, self.timestamp['video'])
 
     def _getStreamName(self, stream):
         """
@@ -214,11 +233,17 @@ class Stream(ExtendedBaseStream):
         streamName = self._getStreamName(stream)
 
         self.stream = self.application.getStream(streamName)
+
+        if self.stream.publisher:
+            return status.error(
+                code='NetStream.Publish.BadName',
+                description='%s is already published' % (streamName,)
+            )
         self.streamName = streamName
 
         def doStatus(res):
             f = self.sendStatus('NetStream.Publish.Start',
-                '%s is now published.' % (stream,), clientid=self.protocol.client.id)
+                '%s is now published.' % (streamName,), clientid=self.protocol.client.id)
 
             self.stream.setPublisher(self)
             self.published = True
@@ -256,6 +281,7 @@ class SubscriberStream(object):
 
     def __init__(self):
         self.subscribers = []
+        self.publisher = None
 
     def addSubscriber(self, subscriber):
         """
@@ -290,11 +316,11 @@ class SubscriberStream(object):
 
         self._notify('streamUnpublished')
 
-    def videoDataReceived(self, data):
-        self._notify('videoDataReceived', data, self.publisher.timestamp)
+    def videoDataReceived(self, data, time):
+        self._notify('videoDataReceived', data, time)
 
-    def audioDataReceived(self, data):
-        self._notify('audioDataReceived', data, self.publisher.timestamp)
+    def audioDataReceived(self, data, time):
+        self._notify('audioDataReceived', data, time)
 
     def onMetaData(self, properties):
         self._notify('onMetaData', properties)

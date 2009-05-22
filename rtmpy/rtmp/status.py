@@ -14,6 +14,14 @@ class Status(object):
     def _get_attrs(obj):
         return obj.__dict__
 
+    def __repr__(self):
+        return '<%s.%s %r at 0x%x>' % (
+            self.__class__.__module__,
+            self.__class__.__name__,
+            self.__dict__,
+            id(self)
+        )
+
 pyamf.register_class(Status, attrs=['level', 'code', 'description'], attr_func=Status._get_attrs)
 
 
