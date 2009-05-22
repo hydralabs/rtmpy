@@ -235,10 +235,11 @@ class Stream(ExtendedBaseStream):
         self.stream = self.application.getStream(streamName)
 
         if self.stream.publisher:
-            return status.error(
-                code='NetStream.Publish.BadName',
-                description='%s is already published' % (streamName,)
-            )
+            f = self.sendStatus('NetStream.Publish.BadName',
+                'Failed to publish %s.' % (streamName,), clientid=self.protocol.client.id)
+
+            f.addCallback(lambda _: d.callback(None))
+
         self.streamName = streamName
 
         def doStatus(res):
