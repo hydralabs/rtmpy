@@ -371,11 +371,12 @@ class ServerProtocol(rtmp.BaseProtocol):
 
         def cb(res):
             if res is False:
-                self.pendingConnection.callback((None, status.error(
-                    code='NetConnection.Connect.Rejected',
-                )))
+                self.pendingConnection = None
 
-                return
+                return status.error(
+                    code='NetConnection.Connect.Rejected',
+                    description='Authorization is required'
+                )
 
             self.application.acceptConnection(self.client)
 
@@ -385,6 +386,7 @@ class ServerProtocol(rtmp.BaseProtocol):
             s.writeEvent(event.UpstreamBandwidth(self.factory.upstreamBandwidth, 2), channelId=2)
 
             # TODO: A timeout for the pendingConnection
+            return self.pendingConnection
 
         def eb(f):
             print 'failed app.onConnect', f
@@ -396,6 +398,9 @@ class ServerProtocol(rtmp.BaseProtocol):
         d = defer.maybeDeferred(self.application.onConnect, self.client, **args)
 
         d.addCallback(cb)
+
+        if d.called:
+            return d
 
         return self.pendingConnection
 
