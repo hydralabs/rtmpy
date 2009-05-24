@@ -48,9 +48,9 @@ def get_install_requirements():
     return install_requires
 
 keyw = """\
-rtmp flv rtmps rtmpe amf amf0 amf3 flex flash http https
-streaming video audio sharedobject webcam record playback
-flashplayer air actionscript decoder encoder gateway"""
+rtmp flv rtmps rtmpe rtmpt rtmpte amf amf0 amf3 flex flash http https
+streaming video audio sharedobject webcam record playback pyamf client
+flashplayer air actionscript decoder encoder gateway server"""
 
 setup(name = "RTMPy",
     version = get_version(),
