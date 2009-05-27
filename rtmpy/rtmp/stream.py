@@ -241,7 +241,7 @@ class Stream(ExtendedBaseStream):
             f = defer.maybeDeferred(self.application.onPublish, self.stream)
 
             f.chainDeferred(self.sendStatus('NetStream.Publish.Start',
-                '%s is now published.' % (streamName,), clientid=self.protocol.client.id)
+                '%s is now published.' % (streamName,), clientid=self.protocol.client.id))
 
             self.stream.setPublisher(self)
             self.published = True
