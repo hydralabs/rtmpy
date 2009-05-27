@@ -377,6 +377,8 @@ class ServerProtocol(rtmp.BaseProtocol):
         self.pendingConnection = defer.Deferred()
 
         def cb(res):
+            self.objectEncoding = args.get('objectEncoding', pyamf.AMF0)
+
             if res is False:
                 self.pendingConnection = None
 

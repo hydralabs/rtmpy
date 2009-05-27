@@ -149,7 +149,7 @@ class BaseStream(object):
             return self.protocol.writePacket(
                 channelId, res[1], self.streamId, res[0], self.timestamp)
 
-        return event.encode(e).addErrback(self._eb).addCallback(cb, channelId)
+        return event.encode(e, encoding=self.protocol.objectEncoding).addErrback(self._eb).addCallback(cb, channelId)
 
 
 class ExtendedBaseStream(BaseStream):

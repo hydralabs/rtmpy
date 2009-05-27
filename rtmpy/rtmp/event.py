@@ -83,10 +83,10 @@ class BaseEvent(object):
 
     implements(interfaces.IEvent)
 
-    def encode(self, buf):
+    def encode(self, buf, *args, **kwargs):
         raise NotImplementedError()
 
-    def decode(self, buf):
+    def decode(self, buf, *args, **kwargs):
         raise NotImplementedError()
 
     def dispatch(self, listener):
@@ -105,7 +105,7 @@ class FrameSize(BaseEvent):
     def __init__(self, size=None):
         self.size = size
 
-    def decode(self, buf):
+    def decode(self, buf, *args, **kwargs):
         """
         Decode a frame size event.
 
@@ -114,7 +114,7 @@ class FrameSize(BaseEvent):
         """
         self.size = buf.read_ulong()
 
-    def encode(self, buf):
+    def encode(self, buf, *args, **kwargs):
         """
         Encode a frame size event.
 
@@ -152,7 +152,7 @@ class BytesRead(BaseEvent):
     def __init__(self, bytes=None):
         self.bytes = bytes
 
-    def decode(self, buf):
+    def decode(self, buf, *args, **kwargs):
         """
         Decode a bytes read event.
 
@@ -161,7 +161,7 @@ class BytesRead(BaseEvent):
         """
         self.bytes = buf.read_ulong()
 
-    def encode(self, buf):
+    def encode(self, buf, *args, **kwargs):
         """
         Encode a bytes read event.
 
@@ -208,7 +208,7 @@ class ControlEvent(BaseEvent):
             self.__class__.__name__, self.type, self.value1, self.value2,
             self.value3, id(self))
 
-    def decode(self, buf):
+    def decode(self, buf, *args, **kwargs):
         """
         Decode a control message event.
 
@@ -220,7 +220,7 @@ class ControlEvent(BaseEvent):
         self.value2 = buf.read_long()
         self.value3 = buf.read_long()
 
-    def encode(self, buf):
+    def encode(self, buf, *args, **kwargs):
         """
         Encode a control message event.
 
@@ -275,7 +275,7 @@ class DownstreamBandwidth(BaseEvent):
     def __init__(self, bandwidth=None):
         self.bandwidth = bandwidth
 
-    def decode(self, buf):
+    def decode(self, buf, *args, **kwargs):
         """
         Decode a downstream bandwidth event.
 
@@ -284,7 +284,7 @@ class DownstreamBandwidth(BaseEvent):
         """
         self.bandwidth = buf.read_ulong()
 
-    def encode(self, buf):
+    def encode(self, buf, *args, **kwargs):
         """
         Encode a downstream bandwidth event.
 
@@ -325,7 +325,7 @@ class UpstreamBandwidth(BaseEvent):
         self.bandwidth = bandwidth
         self.extra = extra
 
-    def decode(self, buf):
+    def decode(self, buf, *args, **kwargs):
         """
         Decode an upstream bandwidth event.
 
@@ -335,7 +335,7 @@ class UpstreamBandwidth(BaseEvent):
         self.bandwidth = buf.read_ulong()
         self.extra = buf.read_uchar()
 
-    def encode(self, buf):
+    def encode(self, buf, *args, **kwargs):
         """
         Encode an upstream bandwidth event.
 
@@ -479,7 +479,7 @@ class BaseStreamingEvent(BaseEvent):
     def __init__(self, data=None):
         self.data = data
 
-    def decode(self, buf):
+    def decode(self, buf, *args, **kwargs):
         """
         Decode a streaming event.
 
@@ -488,7 +488,7 @@ class BaseStreamingEvent(BaseEvent):
         """
         self.data = buf.read()
 
-    def encode(self, buf):
+    def encode(self, buf, *args, **kwargs):
         """
         Encode a streaming event.
 
