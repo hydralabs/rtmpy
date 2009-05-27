@@ -221,7 +221,7 @@ class Application(object):
         """
         Called when this application has accepted the client connection.
         """
-        clientId = util.generateBytes(9)
+        clientId = util.generateBytes(9, readable=True)
         client.id = clientId
 
         self.clients[client] = clientId
@@ -276,6 +276,10 @@ class Application(object):
             s.application = self
 
         return self.streams[name]
+
+    def onPublish(self, stream):
+        """
+        """
 
 
 class ServerProtocol(rtmp.BaseProtocol):

@@ -174,7 +174,7 @@ def uptime():
     return now - boottime
 
 
-def generateBytes(length):
+def generateBytes(length, readable=False):
     """
     Generates a string of C{length} bytes of pseudo-random data. Used for 
     filling in the gaps in unknown sections of the handshake.
@@ -193,7 +193,12 @@ def generateBytes(length):
 
     bytes = ''
 
+    i, j = 0, 0xff
+
+    if readable:
+        i, j = 0x41, 0x7a
+
     for x in xrange(0, length):
-        bytes += chr(random.randint(0, 0xff))
+        bytes += chr(random.randint(i, j))
 
     return bytes
