@@ -18,6 +18,8 @@ from rtmpy import util
 
 class BufferingChannelObserver(object):
     """
+    Buffers the raw data from the decoder. Once the packet is complete, the
+    stream will be notified.
     """
 
     def __init__(self, stream, channel):
@@ -27,22 +29,28 @@ class BufferingChannelObserver(object):
 
     def dataReceived(self, data):
         """
+        Called when the RTMP channel has received some data.
+
+        @param data: The raw bytes.
+        @type data: C{str}
         """
         self.buffer.write(data)
 
     def bodyComplete(self):
         """
+        Called when the channel has completed is body content requirements.
         """
         self.stream.eventReceived(self.channel, self.buffer.getvalue())
         self.buffer.truncate()
 
     def headerChanged(self, header):
         """
+        Called when the channel has received a new header.
+
+        Used to update the stream timestamp.
         """
         if header.timestamp is not None:
-            absHeader = self.channel.getHeader()
-
-            self.stream.setTimestamp(absHeader.datatype, header.timestamp, header.relative)
+            self.stream.setTimestamp(header.timestamp, header.relative)
 
 
 class BaseStream(object):
@@ -53,14 +61,11 @@ class BaseStream(object):
         self.protocol = protocol
         self.decodingChannels = {}
         self.encodingChannels = {}
-        self.timestamp = {
-            'audio': 0,
-            'video': 0,
-            'data': 0
-        }
+        self.timestamp = 0
 
     def sendStatus(self, code, description=None, **kwargs):
         """
+        Send stream status object.
         """
         kwargs['code'] = code
         kwargs['description'] = description
@@ -70,23 +75,13 @@ class BaseStream(object):
 
         return self.writeEvent(e, channelId=4)
 
-    def _getTSKey(self, type):
-        if type == event.AUDIO_DATA:
-            return 'audio'
-        elif type == event.VIDEO_DATA:
-            return 'video'
-
-        return 'data'
-
-    def setTimestamp(self, datatype, time, relative=False):
+    def setTimestamp(self, datatype, time, relative=True):
         """
         """
-        key = self._getTSKey(datatype)
-
         if relative:
-            self.timestamp[key] += time
+            self.timestamp += time
         else:
-            self.timestamp[key] = time
+            self.timestamp = time
 
     def registerChannel(self, channelId):
         """
@@ -157,7 +152,7 @@ class BaseStream(object):
                 channel = self.registerChannel(channelId)
 
             return self.protocol.writePacket(
-                channelId, res[1], self.streamId, res[0], self.timestamp[self._getTSKey(res[0])])
+                channelId, res[1], self.streamId, res[0], self.timestamp)
 
         return event.encode(e).addCallback(cb, channelId)
 
@@ -199,10 +194,10 @@ class ExtendedBaseStream(BaseStream):
     def onAudioData(self, data):
         """
         """
-        self.stream.audioDataReceived(data, self.timestamp['audio'])
+        self.stream.audioDataReceived(data, self.timestamp)
 
     def onVideoData(self, data):
-        self.stream.videoDataReceived(data, self.timestamp['video'])
+        self.stream.videoDataReceived(data, self.timestamp)
 
     def _getStreamName(self, stream):
         """
@@ -243,7 +238,7 @@ class Stream(ExtendedBaseStream):
         self.streamName = streamName
 
         def doStatus(res):
-            f = defer.maybeDeferred(self.application.onPublish, self.stream))
+            f = defer.maybeDeferred(self.application.onPublish, self.stream)
 
             f.chainDeferred(self.sendStatus('NetStream.Publish.Start',
                 '%s is now published.' % (streamName,), clientid=self.protocol.client.id)
