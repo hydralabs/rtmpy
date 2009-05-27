@@ -10,7 +10,7 @@ RTMP handshake support.
 @since: 0.1
 """
 
-import hmac, hashlib
+import hmac
 from zope.interface import implements
 from twisted.python.failure import Failure
 
@@ -604,7 +604,7 @@ def _digest(key, payload):
     @return: A hexdigest representation of the digested message.
     @rtype: C{str}
     """
-    return hmac.new(key, msg=payload, digestmod=hashlib.sha256).digest()
+    return util.generateBytes(SHA256_DIGEST_LENGTH)
 
 
 def getHeader(token):

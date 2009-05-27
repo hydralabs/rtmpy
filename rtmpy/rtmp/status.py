@@ -1,7 +1,5 @@
-# Copyright (c) 2009 The RTMPy Project.
-# See LICENSE for details.
-
 import pyamf
+
 
 class Status(object):
     """

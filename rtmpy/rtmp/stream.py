@@ -18,8 +18,6 @@ from rtmpy import util
 
 class BufferingChannelObserver(object):
     """
-    Buffers the raw data from the decoder. Once the packet is complete, the
-    stream will be notified.
     """
 
     def __init__(self, stream, channel):
@@ -29,28 +27,18 @@ class BufferingChannelObserver(object):
 
     def dataReceived(self, data):
         """
-        Called when the RTMP channel has received some data.
-
-        @param data: The raw bytes.
-        @type data: C{str}
         """
         self.buffer.write(data)
 
     def bodyComplete(self):
         """
-        Called when the channel has completed is body content requirements.
         """
         self.stream.eventReceived(self.channel, self.buffer.getvalue())
         self.buffer.truncate()
 
     def headerChanged(self, header):
         """
-        Called when the channel has received a new header.
-
-        Used to update the stream timestamp.
         """
-        if header.timestamp is not None:
-            self.stream.setTimestamp(header.timestamp, header.relative)
 
 
 class BaseStream(object):
@@ -63,9 +51,13 @@ class BaseStream(object):
         self.encodingChannels = {}
         self.timestamp = 0
 
+    def _eb(self, f):
+        print f
+
+        return f
+
     def sendStatus(self, code, description=None, **kwargs):
         """
-        Send stream status object.
         """
         kwargs['code'] = code
         kwargs['description'] = description
@@ -75,7 +67,7 @@ class BaseStream(object):
 
         return self.writeEvent(e, channelId=4)
 
-    def setTimestamp(self, datatype, time, relative=True):
+    def setTimestamp(self, time, relative=True):
         """
         """
         if relative:
@@ -121,12 +113,15 @@ class BaseStream(object):
             header = channel.getHeader()
             self.writeEvent(res, header.channelId)
 
-        d = defer.maybeDeferred(e.dispatch, self).addCallback(cb)
+        d = defer.maybeDeferred(e.dispatch, self).addErrback(self._eb).addCallback(cb)
 
     def eventReceived(self, channel, data):
         """
         """
         header = channel.getHeader()
+
+        self.setTimestamp(header.timestamp)
+
         kls = event.get_type_class(header.datatype)
 
         d = event.decode(header.datatype, data)
@@ -154,7 +149,7 @@ class BaseStream(object):
             return self.protocol.writePacket(
                 channelId, res[1], self.streamId, res[0], self.timestamp)
 
-        return event.encode(e).addCallback(cb, channelId)
+        return event.encode(e).addErrback(self._eb).addCallback(cb, channelId)
 
 
 class ExtendedBaseStream(BaseStream):
@@ -225,6 +220,7 @@ class Stream(ExtendedBaseStream):
         d = defer.Deferred()
 
         self.application = self.protocol.factory.getApplication(app)
+
         streamName = self._getStreamName(stream)
 
         self.stream = self.application.getStream(streamName)
@@ -236,12 +232,11 @@ class Stream(ExtendedBaseStream):
             f.addCallback(lambda _: d.callback(None))
 
         self.streamName = streamName
+        self.application.onPublish(self.stream)
 
         def doStatus(res):
-            f = defer.maybeDeferred(self.application.onPublish, self.stream)
-
-            f.chainDeferred(self.sendStatus('NetStream.Publish.Start',
-                '%s is now published.' % (streamName,), clientid=self.protocol.client.id))
+            f = self.sendStatus('NetStream.Publish.Start',
+                '%s is now published.' % (streamName,), clientid=self.protocol.client.id)
 
             self.stream.setPublisher(self)
             self.published = True

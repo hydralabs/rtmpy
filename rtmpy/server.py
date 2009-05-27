@@ -169,6 +169,9 @@ class Client(object):
         """
         d = defer.Deferred()
 
+        if args == ():
+            args = (None,)
+
         if self.application is None:
             self.pendingCalls.append((name, args, d))
 
@@ -389,6 +392,29 @@ class ServerProtocol(rtmp.BaseProtocol):
             s.writeEvent(event.DownstreamBandwidth(self.factory.downstreamBandwidth), channelId=2)
             s.writeEvent(event.UpstreamBandwidth(self.factory.upstreamBandwidth, 2), channelId=2)
 
+            # clear the stream
+            d = s.writeEvent(event.ControlEvent(0, 0), channelId=2)
+
+            def sendStatus(res):
+                x = {'fmsVer': self.factory.fmsVer, 'capabilities': 31}
+
+                def y(res):
+                    self.client.registerApplication(self.application)
+
+                    return res
+
+                self.pendingConnection.addCallback(y)
+
+                self.pendingConnection.callback((x, status.status(
+                    code=u'NetConnection.Connect.Success',
+                    description=u'Connection succeeded.',
+                    objectEncoding=0
+                )))
+
+                self.pendingConnection = None
+
+            d.addCallback(sendStatus)
+
             # TODO: A timeout for the pendingConnection
             return self.pendingConnection
 
@@ -418,29 +444,7 @@ class ServerProtocol(rtmp.BaseProtocol):
         return streamId
 
     def onDownstreamBandwidth(self, bandwidth):
-        self.clientBandwidth = bandwidth
-
-        if self.pendingConnection:
-            s = self.getStream(0)
-
-            s.writeEvent(event.ControlEvent(0, 0), channelId=2)
-
-            x = {'fmsVer': self.factory.fmsVer, 'capabilities': 31, 'mode': 1}
-
-            def y(res):
-                self.client.registerApplication(self.application)
-
-                return res
-
-            self.pendingConnection.addCallback(y)
-
-            self.pendingConnection.callback((x, status.status(
-                code=u'NetConnection.Connect.Success',
-                description=u'Connection succeeded.',
-                objectEncoding=0
-            )))
-
-            self.pendingConnection = None
+        self.client.upstreamBandwidth = bandwidth
 
 
 class ServerFactory(protocol.ServerFactory):

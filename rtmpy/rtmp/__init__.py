@@ -22,7 +22,7 @@ packets are split up into fixed size body chunks.
 from twisted.internet import protocol, defer
 from zope.interface import implements
 
-from rtmpy.rtmp import interfaces, stream, scheduler, status
+from rtmpy.rtmp import interfaces, stream, scheduler, status, event
 from rtmpy import util
 
 #: Set this to C{True} to force all rtmp.* instances to log debugging messages
@@ -87,6 +87,8 @@ class BaseProtocol(protocol.Protocol):
 
     HANDSHAKE = 'handshake'
     STREAM = 'stream'
+
+    bytesReadInterval = 128 * 1024
 
     def __init__(self):
         self.debug = DEBUG
@@ -264,6 +266,13 @@ class BaseProtocol(protocol.Protocol):
             i += 1
 
         return i
+
+    def bytesRead(self, bytes):
+        """
+        """
+        s = self.getStream(0)
+
+        s.writeEvent(event.BytesRead(bytes), channelId=2)
 
 
 class ClientProtocol(BaseProtocol):

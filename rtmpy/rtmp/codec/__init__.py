@@ -272,6 +272,10 @@ class BaseCodec(object):
     @type channels: C{dict} of C{id: L{Channel}}
     @ivar frameSize: The number of bytes for each frame content.
     @type frameSize: C{int}
+    @ivar bytes: The number of raw bytes that has been en/decoded.
+    @type bytes: C{int}
+    @ivar bytesInterval: The number of bytes that must be en/decoded before
+        L{ICodecObserver.onBytesInterval} will be called.
     """
 
     implements(interfaces.ICodec, interfaces.IChannelManager)
@@ -283,6 +287,7 @@ class BaseCodec(object):
         self.channels = {}
         self.activeChannels = []
         self.observer = None
+        self.bytes = 0
 
         self.deferred = None
         self.frameSize = FRAME_SIZE
@@ -503,6 +508,7 @@ class Decoder(BaseCodec):
         BaseCodec.__init__(self, protocol)
 
         self.currentChannel = None
+        self.nextBytesRead = self.protocol.bytesReadInterval
 
     def getJob(self):
         return self.decode
@@ -662,6 +668,14 @@ class Decoder(BaseCodec):
 
         self.readFrame()
 
+    def checkBytesRead(self):
+        if self.bytes < self.nextBytesRead:
+            return
+
+        self.nextBytesRead += self.protocol.bytesReadInterval
+
+        self.protocol.bytesRead(self.bytes)
+
     def decode(self):
         """
         Attempt to decode the buffer. If a successful frame was decoded from
@@ -684,6 +698,10 @@ class Decoder(BaseCodec):
 
         self._decode()
 
+        self.bytes += self.buffer.tell()
+
+        self.checkBytesRead()
+
         # delete the bytes that have already been decoded
         self.buffer.consume()
 
@@ -697,7 +715,6 @@ class Decoder(BaseCodec):
         """
         if self.debug or rtmp.DEBUG:
             rtmp.log(self, 'Received %d bytes' % (len(data),))
-            rtmp.log(self, repr(data))
 
         self.buffer.seek(0, 2)
         self.buffer.write(data)
