@@ -197,6 +197,25 @@ class Client(object):
 
         self.pendingCalls = []
 
+    def disconnect(self):
+        """
+        Disconnects the client. Returns a deferred to signal when this client
+        has disconnected.
+        """
+        def cb(_):
+            self.application.onDisconnect(self)
+            self.protocol.transport.loseConnection()
+            self.protocol = None
+            self.application = None
+
+        s = self.protocol.getStream(0)
+        d = s.sendStatus(code='NetConnection.Connection.Closed',
+            description='Client disconnected.')
+
+        d.addCallback(cb)
+
+        return d
+
 
 class Application(object):
     """
@@ -240,6 +259,8 @@ class Application(object):
         except KeyError:
             pass
 
+        client.id = None
+
     def buildClient(self, protocol):
         """
         Create an instance of a subclass of L{Client}. Override this method to
@@ -277,12 +298,20 @@ class Application(object):
         except KeyError:
             s = self.streams[name] = stream.SubscriberStream()
             s.application = self
+            s.name = name
 
         return self.streams[name]
 
-    def onPublish(self, stream):
+    def onPublish(self, client, stream):
         """
+        Called when a client attempts to publish to a stream.
         """
+
+    def onDisconnect(self, client):
+        """
+        Called when a client disconnects.
+        """
+        self.disconnect(client)
 
 
 class ServerProtocol(rtmp.BaseProtocol):
@@ -377,8 +406,6 @@ class ServerProtocol(rtmp.BaseProtocol):
         self.pendingConnection = defer.Deferred()
 
         def cb(res):
-            self.objectEncoding = args.get('objectEncoding', pyamf.AMF0)
-
             if res is False:
                 self.pendingConnection = None
 
@@ -447,6 +474,8 @@ class ServerProtocol(rtmp.BaseProtocol):
 
     def onDownstreamBandwidth(self, bandwidth):
         self.client.upstreamBandwidth = bandwidth
+
+        self.client.checkBandwidth()
 
 
 class ServerFactory(protocol.ServerFactory):
