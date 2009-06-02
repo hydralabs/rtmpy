@@ -10,7 +10,7 @@ RTMP Stream implementation.
 
 from urlparse import urlparse
 from zope.interface import implements
-from twisted.internet import defer, reactor
+from twisted.internet import defer, reactor, error
 
 from rtmpy.rtmp import interfaces, event, status
 from rtmpy import util
@@ -151,6 +151,11 @@ class BaseStream(object):
 
         return event.encode(e).addErrback(self._eb).addCallback(cb, channelId)
 
+    def connectionLost(self, reason):
+        """
+        Called when the connection has been lost for some reason.
+        """
+
 
 class ExtendedBaseStream(BaseStream):
     """
@@ -255,10 +260,12 @@ class Stream(ExtendedBaseStream):
     def closeStream(self):
         """
         """
-        self.stream.removePublisher(self)
+        self.stream.removePublisher(self.protocol.client)
 
         self.published = False
         self.timestamp = 0
+
+        self.application.onUnpublish(self.protocol.client, self.stream)
 
         d = self.sendStatus('NetStream.Unpublish.Success',
             '%s is now unpublished.' % (self.streamName,), clientid=self.protocol.client.id)
@@ -269,6 +276,13 @@ class Stream(ExtendedBaseStream):
 
     def onMetaData(self, data):
         self.stream.onMetaData(data)
+
+    def connectionLost(self, reason):
+        if reason.check(error.ConnectionLost):
+            self.stream.removePublisher(self.protocol.client)
+
+            self.published = False
+            self.timestamp = 0
 
 
 class SubscriberStream(object):

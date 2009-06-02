@@ -307,6 +307,11 @@ class Application(object):
         Called when a client attempts to publish to a stream.
         """
 
+    def onUnpublish(self, client, stream):
+        """
+        Called when a client unpublishes a stream.
+        """
+
     def onDisconnect(self, client):
         """
         Called when a client disconnects.
@@ -371,6 +376,11 @@ class ServerProtocol(rtmp.BaseProtocol):
             self.pendingConnection.errback(reason)
 
             self.pendingConnection = None
+
+        for x in self.activeStreams:
+            s = self.streams[x]
+
+            s.connectionLost(reason)
 
     def onConnect(self, args):
         """

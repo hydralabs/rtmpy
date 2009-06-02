@@ -19,7 +19,7 @@ packets are split up into fixed size body chunks.
 @since: 0.1
 """
 
-from twisted.internet import protocol, defer
+from twisted.internet import protocol, defer, error
 from zope.interface import implements
 
 from rtmpy.rtmp import interfaces, stream, scheduler, status, event
