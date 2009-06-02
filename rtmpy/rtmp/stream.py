@@ -149,7 +149,7 @@ class BaseStream(object):
             return self.protocol.writePacket(
                 channelId, res[1], self.streamId, res[0], self.timestamp)
 
-        return event.encode(e, encoding=self.protocol.objectEncoding).addErrback(self._eb).addCallback(cb, channelId)
+        return event.encode(e).addErrback(self._eb).addCallback(cb, channelId)
 
 
 class ExtendedBaseStream(BaseStream):
@@ -231,14 +231,16 @@ class Stream(ExtendedBaseStream):
 
             f.addCallback(lambda _: d.callback(None))
 
+            return
+
         self.streamName = streamName
-        self.application.onPublish(self.stream)
+        self.application.onPublish(self.protocol.client, self.stream)
 
         def doStatus(res):
             f = self.sendStatus('NetStream.Publish.Start',
                 '%s is now published.' % (streamName,), clientid=self.protocol.client.id)
 
-            self.stream.setPublisher(self)
+            self.stream.setPublisher(self.protocol.client)
             self.published = True
 
             f.addCallback(lambda _: d.callback(None))
@@ -256,6 +258,7 @@ class Stream(ExtendedBaseStream):
         self.stream.removePublisher(self)
 
         self.published = False
+        self.timestamp = 0
 
         d = self.sendStatus('NetStream.Unpublish.Success',
             '%s is now unpublished.' % (self.streamName,), clientid=self.protocol.client.id)
