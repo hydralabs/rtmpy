@@ -236,10 +236,9 @@ class Stream(ExtendedBaseStream):
 
             f.addCallback(lambda _: d.callback(None))
 
-            return
+            return d
 
         self.streamName = streamName
-        self.application.onPublish(self.protocol.client, self.stream)
 
         def doStatus(res):
             f = self.sendStatus('NetStream.Publish.Start',
@@ -250,10 +249,22 @@ class Stream(ExtendedBaseStream):
 
             f.addCallback(lambda _: d.callback(None))
 
-        s = self.protocol.getStream(0)
+        def checkPublishRequest(res):
+            if res is False:
+                f = self.sendStatus('NetStream.Publish.BadName',
+                    'Failed to publish %s.' % (streamName,), clientid=self.protocol.client.id)
 
-        f = s.writeEvent(event.ControlEvent(0, 1), channelId=2)
-        f.addCallback(doStatus)
+                f.addCallback(lambda _: d.callback(None))
+
+                return
+
+            s = self.protocol.getStream(0)
+
+            f = s.writeEvent(event.ControlEvent(0, 1), channelId=2)
+            f.addCallback(doStatus)
+
+        x = defer.maybeDeferred(self.application.onPublish, self.protocol.client, self.stream)
+        x.addCallback(checkPublishRequest)
 
         return d
 
