@@ -272,7 +272,11 @@ class BaseProtocol(protocol.Protocol):
         """
         s = self.getStream(0)
 
-        s.writeEvent(event.BytesRead(bytes), channelId=2)
+        # we send 0 here because if the value overflows then the keepalive is
+        # not sent and the client application will silently stop streaming.
+        # TODO: work out the default behaviour of FMS to see what happens when
+        # this value overflows.
+        s.writeEvent(event.BytesRead(0), channelId=2)
 
 
 class ClientProtocol(BaseProtocol):
