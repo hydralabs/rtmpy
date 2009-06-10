@@ -568,6 +568,11 @@ def decode(datatype, body, *args, **kwargs):
     @note: This function doesn't actually raise the exceptions, they are
         wrapped by the L{defer.Deferred}.
     """
+    def eb(f):
+        print f.printBriefTraceback()
+
+        return f
+
     def _decode():
         try:
             event = TYPE_MAP[datatype]()
@@ -583,7 +588,7 @@ def decode(datatype, body, *args, **kwargs):
 
             return event
 
-        d = defer.maybeDeferred(event.decode, buf, *args, **kwargs)
+        d = defer.maybeDeferred(event.decode, buf, *args, **kwargs).addErrback(eb)
 
         return d.addCallback(cb)
 

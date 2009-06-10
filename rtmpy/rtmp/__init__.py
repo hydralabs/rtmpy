@@ -88,7 +88,7 @@ class BaseProtocol(protocol.Protocol):
     HANDSHAKE = 'handshake'
     STREAM = 'stream'
 
-    bytesReadInterval = 128 * 1024
+    bytesReadInterval = 512 * 1024
 
     def __init__(self):
         self.debug = DEBUG
@@ -272,11 +272,18 @@ class BaseProtocol(protocol.Protocol):
         """
         s = self.getStream(0)
 
-        # we send 0 here because if the value overflows then the keepalive is
-        # not sent and the client application will silently stop streaming.
-        # TODO: work out the default behaviour of FMS to see what happens when
-        # this value overflows.
-        s.writeEvent(event.BytesRead(0), channelId=2)
+        # XXX: hack we force the timestamp to 0 - see #55
+        s.timestamp = 0
+
+        # The maximum number of bytes read is 2 ** 32. After that the counter
+        # is reset back to 0. See #54 for further analysis
+
+        max = 2 ** 32
+
+        while bytes > max:
+            bytes -= max
+
+        s.writeEvent(event.BytesRead(bytes), channelId=2)
 
 
 class ClientProtocol(BaseProtocol):

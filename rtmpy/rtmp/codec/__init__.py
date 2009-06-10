@@ -527,6 +527,8 @@ class Decoder(BaseCodec):
             self.observer.stopped()
 
         self.deferred = None
+        # delete the bytes that have already been decoded
+        self.buffer.consume()
 
         if self.debug or rtmp.DEBUG:
             rtmp.log(self, 'Stopped job')
@@ -681,9 +683,6 @@ class Decoder(BaseCodec):
         Attempt to decode the buffer. If a successful frame was decoded from
         the stream then the decoded bytes are removed.
         """
-        # start from the beginning of the buffer
-        self.buffer.seek(0)
-
         if self.debug or rtmp.DEBUG:
             rtmp.log(self, 'Decode (tell:%d, length:%d)' % (
                 self.buffer.tell(), len(self.buffer),))
@@ -698,13 +697,6 @@ class Decoder(BaseCodec):
 
         self._decode()
 
-        self.bytes += self.buffer.tell()
-
-        self.checkBytesRead()
-
-        # delete the bytes that have already been decoded
-        self.buffer.consume()
-
         if self.debug or rtmp.DEBUG:
             rtmp.log(self, 'Complete decode (buffer: length:%d)' % (
                 len(self.buffer)))
@@ -716,10 +708,17 @@ class Decoder(BaseCodec):
         if self.debug or rtmp.DEBUG:
             rtmp.log(self, 'Received %d bytes' % (len(data),))
 
+        t = self.buffer.tell()
+
         self.buffer.seek(0, 2)
         self.buffer.write(data)
+        self.buffer.seek(t)
 
         self.start()
+
+        self.bytes += len(data)
+
+        self.checkBytesRead()
 
     def channelComplete(self, channel):
         """
