@@ -282,12 +282,15 @@ class BaseCodec(object):
 
     channel_class = Channel
 
+    #: The value at which the bytes read must be reset
+    bytesReadReset = 0xee800000
+
     def __init__(self, protocol):
         self.protocol = protocol
         self.channels = {}
         self.activeChannels = []
         self.observer = None
-        self.bytes = 0
+        self.bytes = self.totalBytes = 0
 
         self.deferred = None
         self.frameSize = FRAME_SIZE
@@ -671,7 +674,12 @@ class Decoder(BaseCodec):
         self.readFrame()
 
     def checkBytesRead(self):
-        if self.bytes < self.nextBytesRead:
+        if self.bytes > BaseCodec.bytesReadReset:
+            self.bytes = 0
+            self.nextBytesRead = self.protocol.bytesReadInterval
+
+            return
+        elif self.bytes < self.nextBytesRead:
             return
 
         self.nextBytesRead += self.protocol.bytesReadInterval
@@ -716,7 +724,9 @@ class Decoder(BaseCodec):
 
         self.start()
 
-        self.bytes += len(data)
+        l = len(data)
+        self.bytes += l
+        self.totalBytes += l
 
         self.checkBytesRead()
 

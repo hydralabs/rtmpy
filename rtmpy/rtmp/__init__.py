@@ -88,7 +88,8 @@ class BaseProtocol(protocol.Protocol):
     HANDSHAKE = 'handshake'
     STREAM = 'stream'
 
-    bytesReadInterval = 512 * 1024
+    #: This value is based on tcp dumps from FME <-> FMS 3.5
+    bytesReadInterval = 1251810L
 
     def __init__(self):
         self.debug = DEBUG
@@ -274,14 +275,6 @@ class BaseProtocol(protocol.Protocol):
 
         # XXX: hack we force the timestamp to 0 - see #55
         s.timestamp = 0
-
-        # The maximum number of bytes read is 2 ** 32. After that the counter
-        # is reset back to 0. See #54 for further analysis
-
-        max = 2 ** 32
-
-        while bytes > max:
-            bytes -= max
 
         s.writeEvent(event.BytesRead(bytes), channelId=2)
 
