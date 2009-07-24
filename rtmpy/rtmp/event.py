@@ -217,8 +217,12 @@ class ControlEvent(BaseEvent):
         """
         self.type = buf.read_short()
         self.value1 = buf.read_long()
-        self.value2 = buf.read_long()
-        self.value3 = buf.read_long()
+
+        try:
+            self.value2 = buf.read_long()
+            self.value3 = buf.read_long()
+        except IOError:
+            pass
 
     def encode(self, buf, *args, **kwargs):
         """
