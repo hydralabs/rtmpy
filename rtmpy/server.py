@@ -216,6 +216,9 @@ class Client(object):
 
         return d
 
+    def checkBandwidth(self):
+        pass
+
 
 class Application(object):
     """
