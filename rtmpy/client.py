@@ -11,7 +11,8 @@ RTMP client implementation.
 
 from twisted.internet import reactor, protocol
 
-from rtmpy import rtmp, util, versions, handshake
+from rtmpy import rtmp, util, versions
+from rtmpy.rtmp import handshake
 
 
 class ClientProtocol(rtmp.BaseProtocol):
