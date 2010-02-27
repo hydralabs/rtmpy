@@ -11,7 +11,7 @@ RTMP client implementation.
 
 from twisted.internet import reactor, protocol
 
-from rtmpy import rtmp, util, versions
+from rtmpy import rtmp, util, versions, handshake
 
 
 class ClientProtocol(rtmp.BaseProtocol):
@@ -30,6 +30,12 @@ class ClientProtocol(rtmp.BaseProtocol):
         # generate and send initial handshake
         self.writeHeader()
         self.transport.write(self.handshake.generate())
+
+    def buildHandshakeNegotiator(self):
+        """
+        Generate a handshake negotiator cabable of handling client connections.
+        """
+        return handshake.ClientNegotiator(self)
 
     def _decodeHandshake(self):
         """
