@@ -11,7 +11,7 @@ from twisted.internet import defer
 from twisted.python.failure import Failure
 import pyamf
 
-from rtmpy.rtmp import interfaces, event
+from rtmpy.protocol import interfaces, event
 from rtmpy.util import BufferedByteStream
 
 

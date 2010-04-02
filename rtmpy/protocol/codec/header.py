@@ -8,21 +8,21 @@ Utility/helper functions for encoding and decoding RTMP headers.
 
 @see: U{RTMP Packet Structure on OSFlash
     (external)<http://osflash.org/documentation/rtmp#rtmp_packet_structure>}
-    
+
 @since: 0.1
 """
 
 from zope.interface import implements
 
-from rtmpy import rtmp, util
-from rtmpy.rtmp import interfaces
+from rtmpy import protocol, util
+from rtmpy.protocol import interfaces
 
 
 #: The header can come in one of four sizes: 12, 8, 4, or 1 byte(s).
 HEADER_SIZES = [12, 8, 4, 1]
 
 
-class HeaderError(rtmp.BaseError):
+class HeaderError(protocol.BaseError):
     """
     Raised if a header related operation failed.
     """

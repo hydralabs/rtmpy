@@ -7,7 +7,7 @@ Tests for L{rtmpy.rtmp.codec}.
 
 from twisted.trial import unittest
 
-from rtmpy.rtmp import codec, interfaces
+from rtmpy.protocol import codec, interfaces
 from rtmpy.tests.rtmp import mocks
 
 

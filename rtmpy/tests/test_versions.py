@@ -7,7 +7,7 @@ Tests for L{rtmpy.versions}
 
 from twisted.trial import unittest
 
-from rtmpy.versions import Version, H264_MIN_FLASH, H264_MIN_FMS
+from rtmpy.versions import Version, FLASH_MIN_H264, FMS_MIN_H264
 
 
 class VersionTestCase(unittest.TestCase):
@@ -50,7 +50,7 @@ class VersionTestCase(unittest.TestCase):
         self.assertEquals(str(e), 'Expected 4 parts for version (got:5)')
 
         e = self.assertRaises(ValueError, Version, 'aa,bb,cc,dd,ee')
-        self.assertEquals(str(e), 
+        self.assertEquals(str(e),
             "invalid literal for int() with base 10: 'aa'")
 
         e = self.assertRaises(ValueError, Version, '10,13,14,-1')
@@ -142,8 +142,8 @@ class VersionTestCase(unittest.TestCase):
         self.failIf(vb > '0,0,1,0')
 
     def test_h264_version(self):
-        self.assertTrue(isinstance(H264_MIN_FLASH, Version))
-        self.assertEquals(H264_MIN_FLASH, '9,0,115,0')
+        self.assertTrue(isinstance(FLASH_MIN_H264, Version))
+        self.assertEquals(FLASH_MIN_H264, '9,0,115,0')
 
-        self.assertTrue(isinstance(H264_MIN_FMS, Version))
-        self.assertEquals(H264_MIN_FMS, '3,0,1,1')
+        self.assertTrue(isinstance(FMS_MIN_H264, Version))
+        self.assertEquals(FMS_MIN_H264, '3,0,1,1')

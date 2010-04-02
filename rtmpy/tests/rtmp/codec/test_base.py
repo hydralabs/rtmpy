@@ -8,9 +8,9 @@ Tests for L{rtmpy.rtmp.codec}.
 from twisted.internet import defer, task
 from twisted.trial import unittest
 
-from rtmpy.rtmp import codec, interfaces
-from rtmpy.rtmp.codec import header
-from rtmpy import util, rtmp
+from rtmpy.protocol import codec, interfaces
+from rtmpy.protocol.codec import header
+from rtmpy import util, protocol
 
 from rtmpy.tests.rtmp import mocks
 
@@ -796,7 +796,7 @@ class ChannelDataTestCase(unittest.TestCase):
         self.assertEquals(self.channel.frameRemaining, 72)
         self.assertEquals(self.channel.bodyRemaining, 72)
 
-        # finish the body off, check for firing of complete reset the 
+        # finish the body off, check for firing of complete reset the
         self.channel.dataReceived('a' * 72)
 
         self.assertEquals(self.channel.bytes, 584)

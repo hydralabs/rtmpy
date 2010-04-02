@@ -12,8 +12,8 @@ import time
 
 from zope.interface import implements
 
-from rtmpy import util, rtmp
-from rtmpy.rtmp import interfaces
+from rtmpy import util, protocol
+from rtmpy.protocol import interfaces
 
 
 HANDSHAKE_LENGTH = 1536
@@ -22,7 +22,7 @@ RTMP_PROTOCOL_VERSION = 3
 MAX_PROTOCOL_VERSION = 31
 
 
-class HandshakeError(rtmp.BaseError):
+class HandshakeError(protocol.BaseError):
     """
     Generic class for handshaking related errors.
     """

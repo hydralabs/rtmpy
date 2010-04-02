@@ -96,7 +96,7 @@ class Version(object):
 
 
 #: Minimum version of the Adobe Flash Player that supports H.264 streaming
-H264_MIN_FLASH = Version('9,0,115,0')
+FLASH_MIN_H264 = Version('9,0,115,0')
 
 #: Minimum version of Adobe Flash Media Server that supports H.264 streaming
-H264_MIN_FMS = Version('3,0,1,1')
+FMS_MIN_H264 = Version('3,0,1,1')

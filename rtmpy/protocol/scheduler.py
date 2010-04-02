@@ -11,7 +11,7 @@ Contains various implementations for scheduling RTMP channels for encoding.
 
 from zope.interface import implements
 
-from rtmpy.rtmp import interfaces
+from rtmpy.protocol import interfaces
 
 
 class BaseChannelScheduler(object):

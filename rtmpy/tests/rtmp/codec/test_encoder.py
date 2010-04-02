@@ -8,7 +8,7 @@ Encoding tests for L{rtmpy.rtmp.codec}.
 from twisted.trial import unittest
 from twisted.internet import defer
 
-from rtmpy.rtmp import codec, interfaces
+from rtmpy.protocol import codec, interfaces
 from rtmpy import util
 from rtmpy.tests.rtmp import mocks
 

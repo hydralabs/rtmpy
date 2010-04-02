@@ -12,9 +12,9 @@ RTMP codecs. Encoders and decoders for rtmp streams.
 from twisted.internet import reactor, task, defer
 from zope.interface import implements
 
-from rtmpy import rtmp, util
-from rtmpy.rtmp import interfaces, event
-from rtmpy.rtmp.codec import header as _header
+from rtmpy import protocol, util
+from rtmpy.protocol import interfaces, event
+from rtmpy.protocol.codec import header as _header
 
 
 #: The default number of bytes per RTMP frame (excluding header)
@@ -776,7 +776,7 @@ class ChannelContext(object):
     @type encoder: L{Encoder}
     @ivar active: Whether this channel is actively producing data.
     @type active: C{bool}
-    @ivar bytes: Number of frame bytes fetched by 
+    @ivar bytes: Number of frame bytes fetched by
     """
 
     def __init__(self, channel, encoder):

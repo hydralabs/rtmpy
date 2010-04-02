@@ -7,8 +7,8 @@ Mock classes for testing sections of L{rtmpy.rtmp}
 
 from zope.interface import implements
 
-from rtmpy.rtmp import interfaces
-from rtmpy.rtmp import handshake
+from rtmpy.protocol import interfaces
+from rtmpy.protocol import handshake
 
 
 class ChannelManager(object):
@@ -96,7 +96,7 @@ class Channel(object):
             self.frames += 1
             l -= self.manager.frameSize
 
-        if (self.frameRemaining != self.manager.frameSize and 
+        if (self.frameRemaining != self.manager.frameSize and
                     l + self.frameRemaining >= self.manager.frameSize):
             self.frames += 1
             l -= self.manager.frameSize

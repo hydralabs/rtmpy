@@ -8,7 +8,7 @@ Tests for L{rtmpy.rtmp.handshake}.
 from twisted.trial import unittest
 from twisted.python import failure
 
-from rtmpy.rtmp import handshake
+from rtmpy.protocol import handshake
 from rtmpy.util import BufferedByteStream
 
 

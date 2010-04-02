@@ -8,7 +8,7 @@ Tests for L{rtmpy.rtmp.scheduler}.
 from twisted.internet import defer, task
 from twisted.trial import unittest
 
-from rtmpy.rtmp import interfaces, scheduler
+from rtmpy.protocol import interfaces, scheduler
 from rtmpy.tests.rtmp import mocks
 
 

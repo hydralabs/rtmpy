@@ -12,7 +12,7 @@ from zope.interface import implements
 import pyamf
 
 from rtmpy.util import BufferedByteStream
-from rtmpy.rtmp import interfaces
+from rtmpy.protocol import interfaces
 
 
 #: Changes the frame size for events

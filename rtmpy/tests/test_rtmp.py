@@ -9,8 +9,8 @@ from twisted.trial import unittest
 from twisted.internet import protocol
 from twisted.test.proto_helpers import StringTransportWithDisconnection
 
-from rtmpy import rtmp
-from rtmpy.rtmp import interfaces, codec, handshake
+from rtmpy import protocol
+from rtmpy.protocol import interfaces, codec, handshake
 
 from rtmpy.tests.rtmp import mocks
 
@@ -39,7 +39,7 @@ class DataReceiver(object):
 
 class BaseProtocolTestCase(unittest.TestCase):
     """
-    Tests for L{rtmp.BaseProtocol}
+    Tests for L{protocol.BaseProtocol}
     """
 
     def _buildHandshakeNegotiator(self):
@@ -49,24 +49,24 @@ class BaseProtocolTestCase(unittest.TestCase):
 
     def test_interface(self):
         self.assertTrue(
-            interfaces.IHandshakeObserver.implementedBy(rtmp.BaseProtocol))
+            interfaces.IHandshakeObserver.implementedBy(protocol.BaseProtocol))
 
-        p = rtmp.BaseProtocol()
+        p = protocol.BaseProtocol()
 
         self.assertTrue(interfaces.IHandshakeObserver.providedBy(p))
 
     def test_create(self):
-        p = rtmp.BaseProtocol()
+        p = protocol.BaseProtocol()
 
-        self.assertEquals(p.debug, rtmp.DEBUG)
+        self.assertEquals(p.debug, protocol.DEBUG)
 
     def test_buildHandshakeNegotiator(self):
-        p = rtmp.BaseProtocol()
+        p = protocol.BaseProtocol()
 
         self.assertRaises(NotImplementedError, p.buildHandshakeNegotiator)
 
     def test_connectionMade(self):
-        p = rtmp.BaseProtocol()
+        p = protocol.BaseProtocol()
 
         p.buildHandshakeNegotiator = self._buildHandshakeNegotiator
         self.executed = False
@@ -84,10 +84,10 @@ class BaseProtocolTestCase(unittest.TestCase):
 
         self.assertTrue(self.executed)
         self.assertEquals(self.handshakeNegotiator, p.handshaker)
-        self.assertEquals(p.state, rtmp.BaseProtocol.HANDSHAKE, 'handshake')
+        self.assertEquals(p.state, protocol.BaseProtocol.HANDSHAKE, 'handshake')
 
     def test_connectionLost(self):
-        p = rtmp.BaseProtocol()
+        p = protocol.BaseProtocol()
 
         self.executed = False
 
@@ -113,7 +113,7 @@ class BaseProtocolTestCase(unittest.TestCase):
         self.assertTrue(p.decoder.paused)
 
     def test_decodeHandshake(self):
-        p = rtmp.BaseProtocol()
+        p = protocol.BaseProtocol()
 
         p.buildHandshakeNegotiator = self._buildHandshakeNegotiator
         d = p.handshaker = DataReceiver()
@@ -123,7 +123,7 @@ class BaseProtocolTestCase(unittest.TestCase):
         self.assertEquals(d.buffer, ['hello'])
 
     def test_decodeStream(self):
-        p = rtmp.BaseProtocol()
+        p = protocol.BaseProtocol()
 
         d = p.decoder = DataReceiver()
 
@@ -132,7 +132,7 @@ class BaseProtocolTestCase(unittest.TestCase):
         self.assertEquals(d.buffer, ['foo'])
 
     def test_logAndDisconnect(self):
-        p = rtmp.BaseProtocol()
+        p = protocol.BaseProtocol()
         p.transport = StringTransportWithDisconnection()
         p.transport.protocol = p
 
@@ -146,7 +146,7 @@ class BaseProtocolTestCase(unittest.TestCase):
         self.assertFalse(p.transport.connected)
 
     def test_dataReceived(self):
-        p = rtmp.BaseProtocol()
+        p = protocol.BaseProtocol()
         p.transport = StringTransportWithDisconnection()
         p.transport.protocol = p
 
@@ -177,7 +177,7 @@ class BaseProtocolTestCase(unittest.TestCase):
         self.assertFalse(p.transport.connected)
 
     def test_handshakeSuccess(self):
-        p = rtmp.BaseProtocol()
+        p = protocol.BaseProtocol()
         p.transport = StringTransportWithDisconnection()
 
         p.buildHandshakeNegotiator = self._buildHandshakeNegotiator
@@ -195,7 +195,7 @@ class BaseProtocolTestCase(unittest.TestCase):
         self.assertTrue(isinstance(d, codec.Decoder))
 
         do = p.decoder.observer
-        self.assertTrue(isinstance(do, rtmp.ErrorLoggingCodecObserver))
+        self.assertTrue(isinstance(do, protocol.ErrorLoggingCodecObserver))
         self.assertIdentical(do.protocol, p)
         self.assertIdentical(do.codec, d)
 
@@ -204,7 +204,7 @@ class BaseProtocolTestCase(unittest.TestCase):
         self.assertIdentical(e.consumer, p.transport)
 
         do = e.observer
-        self.assertTrue(isinstance(do, rtmp.ErrorLoggingCodecObserver))
+        self.assertTrue(isinstance(do, protocol.ErrorLoggingCodecObserver))
         self.assertIdentical(do.protocol, p)
         self.assertIdentical(do.codec, e)
 
@@ -213,7 +213,7 @@ class BaseProtocolTestCase(unittest.TestCase):
         self.assertFalse(hasattr(p, 'handshaker'))
 
     def test_handshakeFailure(self):
-        p = rtmp.BaseProtocol()
+        p = protocol.BaseProtocol()
         p.transport = StringTransportWithDisconnection()
         p.transport.protocol = p
 
@@ -227,7 +227,7 @@ class BaseProtocolTestCase(unittest.TestCase):
         self.assertFalse(p.transport.connected)
 
     def test_write(self):
-        p = rtmp.BaseProtocol()
+        p = protocol.BaseProtocol()
         p.transport = StringTransportWithDisconnection()
         p.transport.protocol = p
 
@@ -238,11 +238,11 @@ class BaseProtocolTestCase(unittest.TestCase):
 
 class ClientProtocolTestCase(unittest.TestCase):
     """
-    Tests for L{rtmp.ClientProtocol}
+    Tests for L{protocol.ClientProtocol}
     """
 
     def test_handshake_negotiator(self):
-        p = rtmp.ClientProtocol()
+        p = protocol.ClientProtocol()
         n = p.buildHandshakeNegotiator()
 
         self.assertTrue(isinstance(n, handshake.ClientNegotiator))
@@ -250,7 +250,7 @@ class ClientProtocolTestCase(unittest.TestCase):
         self.assertIdentical(n.observer, p)
 
     def test_connection(self):
-        p = rtmp.ClientProtocol()
+        p = protocol.ClientProtocol()
         p.transport = StringTransportWithDisconnection()
         p.transport.protocol = p
 
@@ -262,11 +262,11 @@ class ClientProtocolTestCase(unittest.TestCase):
 
 class ServerProtocolTestCase(unittest.TestCase):
     """
-    Tests for L{rtmp.ServerProtocol}
+    Tests for L{protocol.ServerProtocol}
     """
 
     def test_handshake_negotiator(self):
-        p = rtmp.ServerProtocol()
+        p = protocol.ServerProtocol()
         n = p.buildHandshakeNegotiator()
 
         self.assertTrue(isinstance(n, handshake.ServerNegotiator))
@@ -274,7 +274,7 @@ class ServerProtocolTestCase(unittest.TestCase):
         self.assertIdentical(n.observer, p)
 
     def test_connection(self):
-        p = rtmp.ServerProtocol()
+        p = protocol.ServerProtocol()
         p.transport = StringTransportWithDisconnection()
         p.transport.protocol = p
 
@@ -288,7 +288,7 @@ class ServerProtocolTestCase(unittest.TestCase):
             def __init__(self):
                 self.buffer = None
 
-        p = rtmp.ServerProtocol()
+        p = protocol.ServerProtocol()
 
         p.handshaker = SimpleBuffer()
         p.handshaker.buffer = 'foo'
@@ -311,7 +311,7 @@ class StreamManagerTestCase(unittest.TestCase):
     """
 
     def setUp(self):
-        self.protocol = rtmp.BaseProtocol()
+        self.protocol = protocol.BaseProtocol()
 
         self.protocol.buildHandshakeNegotiator = self._buildHandshakeNegotiator
 
