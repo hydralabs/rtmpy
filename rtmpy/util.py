@@ -20,8 +20,12 @@ class BufferedByteStream(BBS):
     ENDIAN_BIG = DataTypeMixIn.ENDIAN_BIG
 
     def append(self, data):
+        pos = self.tell()
+
         self.seek(0, 2)
         self.write(data)
+
+        self.seek(pos, 0)
 
 
 #: The number of milliseconds since the epoch.
@@ -176,7 +180,7 @@ def uptime():
 
 def generateBytes(length, readable=False):
     """
-    Generates a string of C{length} bytes of pseudo-random data. Used for 
+    Generates a string of C{length} bytes of pseudo-random data. Used for
     filling in the gaps in unknown sections of the handshake.
 
     This function is going to to called a lot and is ripe for moving into C.
