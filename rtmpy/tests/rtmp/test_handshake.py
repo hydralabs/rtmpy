@@ -55,8 +55,15 @@ class BaseTestCase(unittest.TestCase):
         self.negotiator = self.negotiator_class(self.observer)
         self.buffer = self.observer.buffer
 
+    def tearDown(self):
+        self.observer.raiseException()
+
     def assertHandshakeFailure(self, cls):
-        return self.assertRaises(cls, self.observer.raiseException)
+        ret = self.assertRaises(cls, self.observer.raiseException)
+
+        self.observer.failure = None
+
+        return ret
 
 
 class ClientNegotiatorTestCase(BaseTestCase):
@@ -177,7 +184,7 @@ class ClientPeerSynTestCase(ClientNegotiatorTestCase):
 
         e = self.assertHandshakeFailure(handshake.HandshakeError)
 
-        self.assertEqual(str(e), 'Unexpected trailing data after peer syn/ack')
+        self.assertEqual(str(e), 'Unexpected trailing data after peer ack')
         self.assertFalse(self.succeeded)
 
     def test_peer_syn_only(self):

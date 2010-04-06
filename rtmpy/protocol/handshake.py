@@ -53,7 +53,7 @@ class VerificationError(HandshakeError):
     """
 
 
-class BaseToken(object):
+class Token(object):
     """
     Base functionality for handshake tokens. This is a state object for the
     negotiators.
@@ -72,7 +72,10 @@ class BaseToken(object):
     timestamp = None
 
     def __init__(self, **kwargs):
-        kwargs.setdefault('timestamp', int(time.time()))
+        timestamp = kwargs.get('timestamp', None)
+
+        if not timestamp:
+            kwargs['timestamp'] = int(time.time())
 
         self.__dict__.update(kwargs)
 
@@ -80,43 +83,13 @@ class BaseToken(object):
         buffer.write_ulong(self.first or 0)
         buffer.write_ulong(self.second or 0)
 
-        payload = self.encodePayload()
-
-        if payload:
-            buffer.write(payload)
+        buffer.write(self.payload)
 
     def decode(self, buffer):
         self.first = buffer.read_ulong()
         self.second = buffer.read_ulong()
 
-        self.decodePayload(buffer)
-
-    def encodePayload(self):
-        raise NotImplementedError
-
-    def decodePayload(self, buffer):
         self.payload = buffer.read(HANDSHAKE_LENGTH - 8)
-
-
-class RandomPayloadToken(BaseToken):
-    """
-    A token that provides a simple C{payload} attribute which will contain an
-    arbitrary block of data used to identify the token.
-
-    This is the token type used for RTMP handshakes. The idea in the future is
-    that RTMPE/T/S/FP(!) implementations will have their own tokens as required.
-    """
-
-    def encodePayload(self):
-        """
-        Generate some random data.
-        """
-        if self.payload:
-            return self.payload
-
-        self.payload = util.generateBytes(HANDSHAKE_LENGTH - 8)
-
-        return self.payload
 
 
 class BaseNegotiator(object):
@@ -131,7 +104,6 @@ class BaseNegotiator(object):
     implements(interfaces.IHandshakeNegotiator)
 
     protocolVersion = RTMP_PROTOCOL_VERSION
-    token_class = RandomPayloadToken
 
     def __init__(self, observer):
         self.observer = observer
@@ -150,28 +122,18 @@ class BaseNegotiator(object):
 
         self.peer_version = None
 
-        self.my_syn = self.token_class(first=uptime, second=version)
+        self.my_syn = Token(first=uptime, second=version)
         self.my_ack = None
 
         self.peer_syn = None
         self.peer_ack = None
-
-    def versionReceived(self):
-        if self.peer_version == self.protocolVersion:
-            return
-
-        if self.peer_version > MAX_PROTOCOL_VERSION:
-            raise ProtocolVersionError('Invalid protocol version')
-
-        if self.peer_version > self.protocolVersion:
-            raise ProtocolTooHigh('Unexpected protocol version')
 
     def getPeerToken(self):
         if self.buffer.remaining() < HANDSHAKE_LENGTH:
             # we're expecting more data
             return
 
-        token = self.token_class()
+        token = Token()
 
         token.decode(self.buffer)
 
@@ -181,9 +143,9 @@ class BaseNegotiator(object):
         self.buffer.truncate()
         self.buffer.write_uchar(self.protocolVersion)
 
-        self.writeToken(self.my_syn)
+        self._writeToken(self.my_syn)
 
-    def writeToken(self, token):
+    def _writeToken(self, token):
         token.encode(self.buffer)
 
         data = self.buffer.getvalue()
@@ -195,7 +157,7 @@ class BaseNegotiator(object):
         """
         Called when handshake data has been received. If an error occurs
         whilst negotiating the handshake then C{self.observer.handshakeFailure}
-        must be called, citing the reason.
+        will be called, citing the reason.
         """
         try:
             if not self.started:
@@ -204,21 +166,73 @@ class BaseNegotiator(object):
 
             self.buffer.append(data)
 
-            if not self.peer_version:
-                if self.buffer.remaining() < 1:
-                    # we're expecting more data
-                    return
-
-                self.peer_version = self.buffer.read_uchar()
-
-                self.versionReceived()
-
-            self.process()
+            self._process()
         except:
             self.observer.handshakeFailure(*sys.exc_info())
 
-    def process(self):
-        raise NotImplementedError
+    def _process(self):
+        if not self.peer_version:
+            if self.buffer.remaining() < 1:
+                # we're expecting more data
+                return
+
+            self.peer_version = self.buffer.read_uchar()
+
+            self.versionReceived()
+
+        if not self.peer_syn:
+            self.peer_syn = self.getPeerToken()
+
+            if not self.peer_syn:
+                return
+
+            self.synReceived()
+
+        if not self.peer_ack:
+            self.peer_ack = self.getPeerToken()
+
+            if not self.peer_ack:
+                return
+
+            self.ackReceived()
+
+        # if we get here then a successful handshake has been negotiated.
+        # inform the observer accordingly
+        self.observer.handshakeSuccess()
+
+    def writeAck(self):
+        self.buildAckPayload(self.my_ack)
+
+        self.buffer.truncate()
+        self._writeToken(self.my_ack)
+
+    def buildSynPayload(self, token):
+        """
+        """
+        generate_payload(token)
+
+    def buildAckPayload(self, token):
+        """
+        """
+        generate_payload(token)
+
+    def versionReceived(self):
+        if self.peer_version == self.protocolVersion:
+            return
+
+        if self.peer_version > MAX_PROTOCOL_VERSION:
+            raise ProtocolVersionError('Invalid protocol version')
+
+        if self.peer_version > self.protocolVersion:
+            raise ProtocolTooHigh('Unexpected protocol version')
+
+    def synReceived(self):
+        """
+        """
+
+    def ackReceived(self):
+        """
+        """
 
 
 class ClientNegotiator(BaseNegotiator):
@@ -233,31 +247,23 @@ class ClientNegotiator(BaseNegotiator):
         """
         BaseNegotiator.start(self, uptime, version)
 
+        self.buildSynPayload(self.my_syn)
+
         self.writeVersionAndSyn()
 
     def versionReceived(self):
         BaseNegotiator.versionReceived(self)
 
         if self.peer_version < self.protocolVersion:
-            raise ProtocolDegraded('Protocol version did not match '
-                '(got %d, expected %d)' % (
-                    self.peer_version, self.protocolVersion))
+            raise ProtocolDegraded('Protocol version did not match (got %d, '
+                'expected %d)' % (self.peer_version, self.protocolVersion))
 
-    def process(self):
-        if not self.peer_syn:
-            self.peer_syn = self.getPeerToken()
+    def synReceived(self):
+        pass
 
-            if not self.peer_syn:
-                return
-
-        if not self.peer_ack:
-            self.peer_ack = self.getPeerToken()
-
-            if not self.peer_ack:
-                return
-
+    def ackReceived(self):
         if self.buffer.remaining() != 0:
-            raise HandshakeError('Unexpected trailing data after peer syn/ack')
+            raise HandshakeError('Unexpected trailing data after peer ack')
 
         if self.peer_ack.first != self.my_syn.first:
             raise VerificationError('Received uptime is not the same')
@@ -265,15 +271,9 @@ class ClientNegotiator(BaseNegotiator):
         if self.peer_ack.payload != self.my_syn.payload:
             raise VerificationError('Received payload is not the same')
 
-        self.my_ack = self.token_class(first=self.peer_syn.first,
-            second=self.peer_syn.timestamp)
+        self.my_ack = Token(first=self.peer_syn.first, second=self.my_syn.timestamp)
 
-        self.buffer.truncate()
-        self.writeToken(self.my_ack)
-
-        # if we get here then a successful handshake has been negotiated.
-        # inform the observer accordingly
-        self.observer.handshakeSuccess()
+        self.writeAck()
 
 
 class ServerNegotiator(BaseNegotiator):
@@ -284,34 +284,22 @@ class ServerNegotiator(BaseNegotiator):
     def versionReceived(self):
         BaseNegotiator.versionReceived(self)
 
+        self.buildSynPayload(self.my_syn)
+
         self.writeVersionAndSyn()
 
-    def process(self):
-        if not self.peer_syn:
-            self.peer_syn = self.getPeerToken()
+    def synReceived(self):
+        self.my_ack = Token(first=self.peer_syn.timestamp, second=self.my_syn.timestamp)
 
-            if not self.peer_syn:
-                return
+        self.writeAck()
 
-            self.my_ack = self.token_class(first=self.peer_syn.timestamp,
-                second=self.my_syn.timestamp)
-
-            self.buffer.truncate()
-            self.writeToken(self.my_ack)
-
-        if not self.peer_ack:
-            self.peer_ack = self.getPeerToken()
-
-            if not self.peer_ack:
-                return
-
+    def ackReceived(self):
         if self.my_syn.first != self.peer_ack.first:
             raise VerificationError('Received uptime is not the same')
 
         if self.my_syn.payload != self.peer_ack.payload:
             raise VerificationError('Received payload does not match')
 
-        # at this point, as far as the server is concerned, handshaking has
-        # been successful
 
-        self.observer.handshakeSuccess()
+def generate_payload(token):
+    token.payload = util.generateBytes(HANDSHAKE_LENGTH - 8)
