@@ -9,17 +9,21 @@ RTMP client implementation.
 @since: 0.1.0
 """
 
-from twisted.internet import reactor, protocol
+from zope.interface import implements
+from twisted.internet import reactor, protocol as twisted_protocol
+import twisted
 
-from rtmpy import rtmp, util, versions
-from rtmpy.rtmp import handshake
+from rtmpy import protocol, util, versions
+from rtmpy.protocol import handshake
 
 
-class ClientProtocol(rtmp.BaseProtocol):
+class ClientProtocol(protocol.BaseProtocol):
     """
     Client RTMP Protocol.
     """
-    version = versions.Version('10,0,12,36')
+
+    version = versions.FLASH_MIN_H264
+    protocolVersion = protocol.RTMP_PROTOCOL_VERSION
 
     def connectionMade(self):
         """
@@ -28,81 +32,31 @@ class ClientProtocol(rtmp.BaseProtocol):
         """
         rtmp.BaseProtocol.connectionMade(self)
 
-        # generate and send initial handshake
-        self.writeHeader()
-        self.transport.write(self.handshake.generate())
+        self.negotiator = self.factory.getHandshakeNegotiator(self, self.protocolVersion)
 
-    def buildHandshakeNegotiator(self):
-        """
-        Generate a handshake negotiator cabable of handling client connections.
-        """
-        return handshake.ClientNegotiator(self)
+        self.negotiator.start(0, self.version)
 
-    def _decodeHandshake(self):
-        """
-        Negotiates the handshake phase of the protocol.
-
-        @see: U{RTMP handshake on OSFlash (external)
-        <http://osflash.org/documentation/rtmp#handshake>} for more info.
-        """
-        if self.debug:
-            rtmp._debug(self, "Begin decode handshake")
-        buffer = self.buffer
-
-        if len(buffer) < 1:
-            # no data has been received yet
-            if self.debug:
-                rtmp._debug(self, "Header not received")
-
-            return
-
-        if self.received_handshake is None and buffer.read(1) != rtmp.HEADER_BYTE:
-            self.dispatchEvent(rtmp.HANDSHAKE_FAILURE, 'Invalid header byte received')
-
-            return
-
-        self.received_handshake = ''
-
-        if buffer.remaining() < rtmp.HANDSHAKE_LENGTH * 2:
-            # buffer is too small, wait for more data
-            return
-
-        self.received_handshake = buffer.read(rtmp.HANDSHAKE_LENGTH)
-
-        if self.debug:
-            from pyamf.util import hexdump
-
-            rtmp._debug(self, 'received handshake :')
-            rtmp._debug(self, hexdump(self.received_handshake))
-
-        hs = buffer.read(rtmp.HANDSHAKE_LENGTH)
-
-        print hexdump(hs[:7])
-        if hs[8:] != self.my_handshake[8:]:
-            self.dispatchEvent(rtmp.HANDSHAKE_FAILURE, 'Handshake mismatch')
-        else:
-            self.transport.write(self.received_handshake)
-            self.dispatchEvent(rtmp.HANDSHAKE_SUCCESS)
-
-    def decodeHandshake(self, data):
-        self.buffer.seek(0, 2)
-        self.buffer.write(data)
-        self.buffer.seek(0)
-        self._decodeHandshake()
-        self.buffer.consume()
-
-    def onHandshakeSuccess(self):
-        """
-        Successful handshake between client and server.
-        """
-        rtmp.BaseProtocol.onHandshakeSuccess(self)
-
-        # send invoke->connect here
+    def connectionLost(self, *args):
+        print args
 
 
-class ClientFactory(protocol.ClientFactory):
+class ClientFactory(twisted_protocol.ClientFactory):
     """
     RTMP client protocol factory.
     """
 
     protocol = ClientProtocol
+
+    def getHandshakeNegotiator(self, protocol, version):
+        """
+        Returns an implementation of L{handshake.IHandshakeNegotiator} based on 
+        the version supplied.
+
+        @param protocol: The client protocol instance.
+        @type protocol: L{ClientProtocol}
+        @param version: The RTMP version request.
+        @type version: C{int}
+        """
+        imp = handshake.get_implementation(version)
+
+        return imp.ClientNegotiator(imp.HandshakeObserver(protocol))
