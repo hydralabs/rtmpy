@@ -1210,7 +1210,7 @@ class FrameReader(object):
         return self
 
 
-class Demuxer(FrameReader):
+class ChannelDemuxer(FrameReader):
     """
     The next layer up from reading raw RTMP frames. Reassembles the interleaved
     channel data and dispatches the raw channel data when it is complete.

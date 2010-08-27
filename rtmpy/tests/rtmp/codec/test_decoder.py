@@ -216,7 +216,7 @@ class DeMuxerTestCase(unittest.TestCase):
     def setUp(self):
         self.patch('codec.FrameReader', MockFrameReader)
 
-        self.demuxer = codec.Demuxer()
+        self.demuxer = codec.ChannelDemuxer()
 
     def add_events(self, *events):
         if not hasattr(self.demuxer, 'events'):
