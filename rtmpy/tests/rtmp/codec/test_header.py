@@ -5,12 +5,27 @@
 Tests for L{rtmpy.rtmp.codec.header}.
 """
 
-from twisted.trial import unittest
+import unittest
 
 from rtmpy.protocol import interfaces
 from rtmpy.protocol.codec import header
 from rtmpy import util, protocol
-from rtmpy.tests.rtmp import mocks
+
+
+class MockHeader(object):
+    """
+    Pretend to be a header
+    """
+
+    datatype = None
+    bodyLength = None
+    streamId = None
+    channelId = None
+    relative = None
+    timestamp = None
+
+    def __init__(self, **kwargs):
+        self.__dict__.update(kwargs)
 
 
 class HeaderTestCase(unittest.TestCase):
@@ -18,21 +33,19 @@ class HeaderTestCase(unittest.TestCase):
     Tests for L{rtmp.Header}
     """
 
-    def test_interface(self):
-        h = header.Header()
-
-        self.assertTrue(interfaces.IHeader.providedBy(h))
-
     def test_init(self):
-        h = header.Header()
+        h = header.Header(None)
 
-        self.assertEquals(h.__dict__, {
+        expected_attrs = {
             'channelId': None,
             'timestamp': None,
             'datatype': None,
             'bodyLength': None,
             'streamId': None
-        })
+        }
+
+        for k, v in expected_attrs.items():
+            self.assertEqual(getattr(h, k), v)
 
     def test_kwargs(self):
         d = {
@@ -45,14 +58,14 @@ class HeaderTestCase(unittest.TestCase):
 
         h = header.Header(**d)
 
-        self.assertEquals(h.__dict__, d)
+        for k, v in d.items():
+            self.assertEqual(getattr(h, k), v)
 
     def test_repr(self):
-        h = header.Header()
+        h = header.Header(None)
 
-        self.assertEquals(repr(h), '<rtmpy.rtmp.codec.header.Header '
-            'datatype=None timestamp=None bodyLength=None channelId=None '
-            'streamId=None at 0x%x>' % (id(h),))
+        self.assertEquals(repr(h), '<rtmpy.protocol.codec.header.Header '
+            'relative=True at 0x%x>' % (id(h),))
 
         d = {
             'channelId': 1,
@@ -60,17 +73,16 @@ class HeaderTestCase(unittest.TestCase):
             'datatype': 20,
             'bodyLength': 2000,
             'streamId': 98,
-            'relative': False
         }
 
         h = header.Header(**d)
 
-        self.assertEquals(repr(h), '<rtmpy.rtmp.codec.header.Header '
-            'datatype=20 timestamp=50 bodyLength=2000 channelId=1 '
-            'streamId=98 at 0x%x>' % (id(h),))
+        self.assertEquals(repr(h), '<rtmpy.protocol.codec.header.Header '
+            'bodyLength=2000 channelId=1 datatype=20 streamId=98 timestamp=50 '
+            'relative=False at 0x%x>' % (id(h),))
 
     def test_relative(self):
-        h = header.Header()
+        h = header.Header(None)
         self.assertTrue(h.relative)
 
         h.channelId = 3
@@ -98,10 +110,6 @@ class DecodeHeaderByteTestCase(unittest.TestCase):
         except TypeError, e:
             self.fail('Unexpected TypeError raised')
 
-    def test_overflow(self):
-        self.assertRaises(OverflowError, header.decodeHeaderByte, -1)
-        self.assertRaises(OverflowError, header.decodeHeaderByte, 256)
-
     def test_return(self):
         self.assertEquals(header.decodeHeaderByte(0), (12, 0))
         self.assertEquals(header.decodeHeaderByte(192), (1, 0))
@@ -113,17 +121,6 @@ class EncodeHeaderByteTestCase(unittest.TestCase):
     Tests for L{header.encodeHeaderByte}
     """
 
-    def test_types(self):
-        self.assertRaises(TypeError, header.encodeHeaderByte, 'foo', 0)
-        self.assertRaises(TypeError, header.encodeHeaderByte, 0, 'foo')
-
-        try:
-            header.encodeHeaderByte(0, 0)
-        except TypeError, e:
-            self.fail('Unexpected TypeError raised')
-        except:
-            pass
-
     def test_values(self):
         for x in header.HEADER_SIZES:
             try:
@@ -132,18 +129,9 @@ class EncodeHeaderByteTestCase(unittest.TestCase):
                 self.fail('Raised header.HeaderError on %d' % (x,))
 
         self.assertFalse(16 in header.HEADER_SIZES)
-        e = self.assertRaises(header.HeaderError,
-            header.encodeHeaderByte, 16, 0)
-        self.assertEquals(str(e), 'Unexpected headerLength value (got 16)')
-
-        e = self.assertRaises(header.HeaderError,
-            header.encodeHeaderByte, 1, -1)
-        self.assertEquals(str(e),
-            'Expected channelId between 0x00 and 0x3f (got -1)')
-        e = self.assertRaises(header.HeaderError,
-            header.encodeHeaderByte, 1, 0x40)
-        self.assertEquals(str(e),
-            'Expected channelId between 0x00 and 0x3f (got 64)')
+        self.assertRaises(header.HeaderError, header.encodeHeaderByte, 16, 0)
+        self.assertRaises(header.HeaderError, header.encodeHeaderByte, 1, -1)
+        self.assertRaises(header.HeaderError, header.encodeHeaderByte, 1, 0x40)
 
     def test_return(self):
         self.assertEquals(header.encodeHeaderByte(12, 0), 0)
@@ -156,27 +144,14 @@ class GetHeaderSizeIndexTestCase(unittest.TestCase):
     Tests for L{header.getHeaderSizeIndex}
     """
 
-    def test_types(self):
-        self.assertRaises(TypeError, header.getHeaderSizeIndex, object())
-
-        h = mocks.Header()
-        self.assertTrue(interfaces.IHeader.providedBy(h))
-
-        try:
-            header.getHeaderSizeIndex(h)
-        except TypeError:
-            self.fail('Unexpected TypeError raised')
-        except:
-            pass
-
     def test_values(self):
-        h = mocks.Header()
+        h = MockHeader()
         self.assertEquals(h.channelId, None)
 
         self.assertRaises(header.HeaderError, header.getHeaderSizeIndex, h)
 
     def test_return(self):
-        h = mocks.Header(channelId=3)
+        h = MockHeader(channelId=3)
 
         self.assertEquals(
             [h.timestamp, h.datatype, h.bodyLength, h.streamId],
@@ -196,7 +171,7 @@ class GetHeaderSizeIndexTestCase(unittest.TestCase):
         h.timestamp = None
         e = self.assertRaises(header.HeaderError, header.getHeaderSizeIndex, h)
 
-        h = mocks.Header(channelId=23, streamId=234, bodyLength=1232,
+        h = MockHeader(channelId=23, streamId=234, bodyLength=1232,
             datatype=2, timestamp=234234)
 
         self.assertEquals(header.getHeaderSizeIndex(h), 0)
@@ -219,21 +194,8 @@ class GetHeaderSizeTestCase(unittest.TestCase):
     Tests for L{header.getHeaderSize}
     """
 
-    def test_types(self):
-        self.assertRaises(TypeError, header.getHeaderSize, object())
-
-        h = mocks.Header()
-        self.assertTrue(interfaces.IHeader.providedBy(h))
-
-        try:
-            header.getHeaderSize(h)
-        except TypeError:
-            self.fail('Unexpected TypeError raised')
-        except:
-            pass
-
     def test_return(self):
-        h = mocks.Header(channelId=3)
+        h = MockHeader(channelId=3)
 
         self.assertEquals(
             [h.timestamp, h.datatype, h.bodyLength, h.streamId],
@@ -257,20 +219,6 @@ class EncodeHeaderTestCase(unittest.TestCase):
     def setUp(self):
         self.stream = util.BufferedByteStream()
 
-    def test_types(self):
-        h = mocks.Header()
-        self.assertTrue(interfaces.IHeader.providedBy(h))
-        self.assertRaises(TypeError, header.encodeHeader, object(), h)
-        self.assertRaises(TypeError,
-            header.encodeHeader, self.stream, object())
-
-        try:
-            self.assertRaises(TypeError, header.encodeHeader, self.stream, h)
-        except TypeError:
-            self.fail('Unexpected TypeError raised')
-        except:
-            pass
-
     def _encode(self, h):
         self.stream.seek(0, 2)
         self.stream.truncate()
@@ -279,7 +227,7 @@ class EncodeHeaderTestCase(unittest.TestCase):
         return self.stream.getvalue()
 
     def test_encode(self):
-        h = mocks.Header(channelId=3)
+        h = MockHeader(channelId=3)
 
         self.assertEquals(
             [h.timestamp, h.datatype, h.bodyLength, h.streamId],
@@ -301,19 +249,8 @@ class EncodeHeaderTestCase(unittest.TestCase):
         self.assertEquals(self._encode(h),
             '\x15\x03\x92\xfa\x00z\n\x03-\x00\x00\x00')
 
-    def test_encode_little_endian(self):
-        """
-        In this test we set the stream's endian to LITTLE_ENDIAN to ensure
-        that endianness is correctly handled.
-        """
-        self.stream.endian = util.BufferedByteStream.ENDIAN_LITTLE
-
-        self.test_encode()
-        self.assertEquals(self.stream.endian,
-            util.BufferedByteStream.ENDIAN_LITTLE)
-
     def test_extended_timestamp(self):
-        h = mocks.Header(channelId=34, timestamp=0x1000000)
+        h = MockHeader(channelId=34, timestamp=0x1000000)
 
         self.assertEquals(self._encode(h), '\xa2\xff\xff\xff\x01\x00\x00\x00')
 
@@ -340,7 +277,6 @@ class DecodeHeaderTestCase(unittest.TestCase):
     def test_decodeSize1(self):
         h = self._decode('\xc3')
 
-        self.assertTrue(interfaces.IHeader.providedBy(h))
         self.assertEquals(h.channelId, 3)
         self.assertEquals(h.relative, True)
         self.assertEquals(h.timestamp, None)
@@ -350,7 +286,6 @@ class DecodeHeaderTestCase(unittest.TestCase):
 
         h = self._decode('\xd5')
 
-        self.assertTrue(interfaces.IHeader.providedBy(h))
         self.assertEquals(h.channelId, 21)
         self.assertEquals(h.relative, True)
         self.assertEquals(h.timestamp, None)
@@ -361,7 +296,6 @@ class DecodeHeaderTestCase(unittest.TestCase):
     def test_decodeSize4(self):
         h = self._decode('\x95\x03\x92\xfa')
 
-        self.assertTrue(interfaces.IHeader.providedBy(h))
         self.assertEquals(h.channelId, 21)
         self.assertEquals(h.relative, True)
         self.assertEquals(h.timestamp, 234234)
@@ -372,7 +306,6 @@ class DecodeHeaderTestCase(unittest.TestCase):
     def test_decodeSize8(self):
         h = self._decode('U\x03\x92\xfa\x00z\n\x03')
 
-        self.assertTrue(interfaces.IHeader.providedBy(h))
         self.assertEquals(h.channelId, 21)
         self.assertEquals(h.relative, True)
         self.assertEquals(h.timestamp, 234234)
@@ -383,7 +316,6 @@ class DecodeHeaderTestCase(unittest.TestCase):
     def test_decodeSize12(self):
         h = self._decode('\x15\x03\x92\xfa\x00z\n\x03-\x00\x00\x00')
 
-        self.assertTrue(interfaces.IHeader.providedBy(h))
         self.assertEquals(h.channelId, 21)
         self.assertEquals(h.relative, False)
         self.assertEquals(h.timestamp, 234234)
@@ -394,7 +326,6 @@ class DecodeHeaderTestCase(unittest.TestCase):
     def test_extended_timestamp(self):
         h = self._decode('\xa2\xff\xff\xff\x01\x00\x00\x00')
 
-        self.assertTrue(interfaces.IHeader.providedBy(h))
         self.assertEquals(h.channelId, 34)
         self.assertEquals(h.relative, True)
         self.assertEquals(h.timestamp, 0x1000000)
@@ -404,7 +335,6 @@ class DecodeHeaderTestCase(unittest.TestCase):
 
         h = self._decode('b\xff\xff\xff\x00z\n\x03\x01\x00\x00\x00')
 
-        self.assertTrue(interfaces.IHeader.providedBy(h))
         self.assertEquals(h.channelId, 34)
         self.assertEquals(h.relative, True)
         self.assertEquals(h.timestamp, 0x1000000)
@@ -415,7 +345,6 @@ class DecodeHeaderTestCase(unittest.TestCase):
         h = self._decode(
             '"\xff\xff\xff\x00z\n\x03-\x00\x00\x00\x01\x00\x00\x00')
 
-        self.assertTrue(interfaces.IHeader.providedBy(h))
         self.assertEquals(h.channelId, 34)
         self.assertEquals(h.relative, False)
         self.assertEquals(h.timestamp, 0x1000000)
@@ -434,58 +363,30 @@ class DiffHeadersTestCase(unittest.TestCase):
         Generates an absolute header and guarantees that the attributes will
         be the same on each call.
         """
-        return mocks.Header(relative=False, channelId=3, timestamp=1000,
+        return MockHeader(relative=False, channelId=3, timestamp=1000,
             bodyLength=2000, datatype=3, streamId=243)
 
-    def test_types(self):
-        h = mocks.Header()
-
-        self.assertTrue(interfaces.IHeader.providedBy(h))
-        self.assertRaises(TypeError, header.diffHeaders, h, object())
-        self.assertRaises(TypeError, header.diffHeaders, object(), h)
-
-        try:
-            header.diffHeaders(h, h)
-        except TypeError:
-            self.fail('Unexpected TypeError raised')
-        except:
-            pass
-
     def test_absolute(self):
-        h1 = mocks.Header(relative=None)
-        h2 = mocks.Header(relative=True)
-        h3 = mocks.Header(relative=False)
+        h1 = MockHeader(relative=None)
+        h2 = MockHeader(relative=True)
+        h3 = MockHeader(relative=False)
 
-        e = self.assertRaises(header.HeaderError, header.diffHeaders, h1, h1)
-        self.assertEquals(str(e),
-            'Received a non-absolute header for old (relative = None)')
-
-        e = self.assertRaises(header.HeaderError, header.diffHeaders, h2, h2)
-        self.assertEquals(str(e),
-            'Received a non-absolute header for old (relative = True)')
-
-        e = self.assertRaises(header.HeaderError, header.diffHeaders, h3, h1)
-        self.assertEquals(str(e),
-            'Received a non-absolute header for new (relative = None)')
-
-        e = self.assertRaises(header.HeaderError, header.diffHeaders, h3, h2)
-        self.assertEquals(str(e),
-            'Received a non-absolute header for new (relative = True)')
+        self.assertRaises(header.HeaderError, header.diffHeaders, h1, h1)
+        self.assertRaises(header.HeaderError, header.diffHeaders, h2, h2)
+        self.assertRaises(header.HeaderError, header.diffHeaders, h3, h1)
+        self.assertRaises(header.HeaderError, header.diffHeaders, h3, h2)
 
     def test_sameChannel(self):
-        h1 = mocks.Header(relative=False, channelId=3)
-        h2 = mocks.Header(relative=False, channelId=42)
+        h1 = MockHeader(relative=False, channelId=3)
+        h2 = MockHeader(relative=False, channelId=42)
 
-        e = self.assertRaises(header.HeaderError, header.diffHeaders, h1, h2)
-        self.assertEquals(str(e), 'The two headers are not for the ' \
-            'same channel')
+        self.assertRaises(header.HeaderError, header.diffHeaders, h1, h2)
 
     def test_nodiff(self):
         old = self._generate()
         new = self._generate()
 
         h = header.diffHeaders(old, new)
-        self.assertTrue(interfaces.IHeader.providedBy(h))
         self.assertTrue(h.relative)
         self.assertEquals(h.timestamp, None)
         self.assertEquals(h.bodyLength, None)
@@ -500,7 +401,6 @@ class DiffHeadersTestCase(unittest.TestCase):
         new.timestamp = old.timestamp + 234234
         h = header.diffHeaders(old, new)
 
-        self.assertTrue(interfaces.IHeader.providedBy(h))
         self.assertTrue(h.relative)
         self.assertEquals(h.timestamp, 235234)
         self.assertEquals(h.bodyLength, None)
@@ -516,7 +416,6 @@ class DiffHeadersTestCase(unittest.TestCase):
         self.assertNotEquals(new.datatype, old.datatype)
         h = header.diffHeaders(old, new)
 
-        self.assertTrue(interfaces.IHeader.providedBy(h))
         self.assertTrue(h.relative)
         self.assertEquals(h.timestamp, None)
         self.assertEquals(h.bodyLength, None)
@@ -532,7 +431,6 @@ class DiffHeadersTestCase(unittest.TestCase):
         self.assertNotEquals(new.bodyLength, old.bodyLength)
         h = header.diffHeaders(old, new)
 
-        self.assertTrue(interfaces.IHeader.providedBy(h))
         self.assertTrue(h.relative)
         self.assertEquals(h.timestamp, None)
         self.assertEquals(h.bodyLength, 2001)
@@ -548,7 +446,6 @@ class DiffHeadersTestCase(unittest.TestCase):
         self.assertNotEquals(new.streamId, old.streamId)
         h = header.diffHeaders(old, new)
 
-        self.assertTrue(interfaces.IHeader.providedBy(h))
         self.assertTrue(h.relative)
         self.assertEquals(h.timestamp, None)
         self.assertEquals(h.bodyLength, None)
@@ -567,7 +464,6 @@ class DiffHeadersTestCase(unittest.TestCase):
 
         h = header.diffHeaders(old, new)
 
-        self.assertTrue(interfaces.IHeader.providedBy(h))
         self.assertFalse(h.relative)
         self.assertEquals(h.timestamp, 234234)
         self.assertEquals(h.bodyLength, 2001)
@@ -582,64 +478,36 @@ class MergeHeadersTestCase(unittest.TestCase):
     """
 
     def setUp(self):
-        self.absolute = mocks.Header(relative=False, channelId=3,
+        self.absolute = MockHeader(relative=False, channelId=3,
             timestamp=1000, bodyLength=2000, datatype=3, streamId=243)
 
     def _generate(self):
         """
         Generates a relative header and with the same channelId on each call.
         """
-        return mocks.Header(relative=True, channelId=3)
-
-    def test_types(self):
-        h = mocks.Header()
-
-        self.assertTrue(interfaces.IHeader.providedBy(h))
-        self.assertRaises(TypeError, header.mergeHeaders, h, object())
-        self.assertRaises(TypeError, header.mergeHeaders, object(), h)
-
-        try:
-            header.mergeHeaders(h, h)
-        except TypeError:
-            self.fail('Unexpected TypeError raised')
-        except:
-            pass
+        return MockHeader(relative=True, channelId=3)
 
     def test_absolute(self):
-        h1 = mocks.Header(relative=None)
-        h2 = mocks.Header(relative=True)
-        h3 = mocks.Header(relative=False)
+        h1 = MockHeader(relative=None)
+        h2 = MockHeader(relative=True)
+        h3 = MockHeader(relative=False)
 
-        e = self.assertRaises(header.HeaderError, header.mergeHeaders, h1, h1)
-        self.assertEquals(str(e),
-            'Received a non-absolute header for old (relative = None)')
-
-        e = self.assertRaises(header.HeaderError, header.mergeHeaders, h2, h2)
-        self.assertEquals(str(e),
-            'Received a non-absolute header for old (relative = True)')
-
-        e = self.assertRaises(header.HeaderError, header.mergeHeaders, h3, h1)
-        self.assertEquals(str(e),
-            'Received a non-relative header for new (relative = None)')
-
-        e = self.assertRaises(header.HeaderError, header.mergeHeaders, h2, h3)
-        self.assertEquals(str(e),
-            'Received a non-absolute header for old (relative = True)')
+        self.assertRaises(header.HeaderError, header.mergeHeaders, h1, h1)
+        self.assertRaises(header.HeaderError, header.mergeHeaders, h2, h2)
+        self.assertRaises(header.HeaderError, header.mergeHeaders, h3, h1)
+        self.assertRaises(header.HeaderError, header.mergeHeaders, h2, h3)
 
     def test_sameChannel(self):
-        h1 = mocks.Header(relative=False, channelId=3)
-        h2 = mocks.Header(relative=True, channelId=42)
+        h1 = MockHeader(relative=False, channelId=3)
+        h2 = MockHeader(relative=True, channelId=42)
 
-        e = self.assertRaises(header.HeaderError, header.mergeHeaders, h1, h2)
-        self.assertEquals(str(e), 'The two headers are not for the ' \
-            'same channel')
+        self.assertRaises(header.HeaderError, header.mergeHeaders, h1, h2)
 
     def test_nodiff(self):
         new = self._generate()
 
         h = header.mergeHeaders(self.absolute, new)
 
-        self.assertTrue(interfaces.IHeader.providedBy(h))
         self.assertFalse(h.relative)
         self.assertEquals(h.timestamp, self.absolute.timestamp)
         self.assertEquals(h.bodyLength, self.absolute.bodyLength)
@@ -653,7 +521,6 @@ class MergeHeadersTestCase(unittest.TestCase):
 
         h = header.mergeHeaders(self.absolute, new)
 
-        self.assertTrue(interfaces.IHeader.providedBy(h))
         self.assertFalse(h.relative)
         self.assertEquals(h.timestamp, 3)
         self.assertEquals(h.bodyLength, self.absolute.bodyLength)
@@ -667,7 +534,6 @@ class MergeHeadersTestCase(unittest.TestCase):
 
         h = header.mergeHeaders(self.absolute, new)
 
-        self.assertTrue(interfaces.IHeader.providedBy(h))
         self.assertFalse(h.relative)
         self.assertEquals(h.timestamp, self.absolute.timestamp)
         self.assertEquals(h.bodyLength, self.absolute.bodyLength)
@@ -681,7 +547,6 @@ class MergeHeadersTestCase(unittest.TestCase):
 
         h = header.mergeHeaders(self.absolute, new)
 
-        self.assertTrue(interfaces.IHeader.providedBy(h))
         self.assertFalse(h.relative)
         self.assertEquals(h.timestamp, self.absolute.timestamp)
         self.assertEquals(h.bodyLength, 42)
@@ -695,7 +560,6 @@ class MergeHeadersTestCase(unittest.TestCase):
 
         h = header.mergeHeaders(self.absolute, new)
 
-        self.assertTrue(interfaces.IHeader.providedBy(h))
         self.assertFalse(h.relative)
         self.assertEquals(h.timestamp, self.absolute.timestamp)
         self.assertEquals(h.bodyLength, self.absolute.bodyLength)
@@ -713,7 +577,6 @@ class MergeHeadersTestCase(unittest.TestCase):
 
         h = header.mergeHeaders(self.absolute, new)
 
-        self.assertTrue(interfaces.IHeader.providedBy(h))
         self.assertFalse(h.relative)
         self.assertEquals(h.timestamp, 234234)
         self.assertEquals(h.bodyLength, 2001)

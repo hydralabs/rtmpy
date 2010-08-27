@@ -12,8 +12,6 @@ Utility/helper functions for encoding and decoding RTMP headers.
 @since: 0.1
 """
 
-from zope.interface import implements
-
 from rtmpy import protocol, util
 from rtmpy.protocol import interfaces
 
@@ -35,14 +33,15 @@ class Header(object):
     @see: L{interfaces.IHeader}
     """
 
-    implements(interfaces.IHeader)
+    __slots__ = ('bodyLength', 'channelId', 'datatype', 'streamId', 'timestamp')
 
-    def __init__(self, **kwargs):
-        self.channelId = kwargs.get('channelId', None)
-        self.timestamp = kwargs.get('timestamp', None)
-        self.datatype = kwargs.get('datatype', None)
-        self.bodyLength = kwargs.get('bodyLength', None)
-        self.streamId = kwargs.get('streamId', None)
+    def __init__(self, channelId, timestamp=None, datatype=None,
+                 bodyLength=None, streamId=None):
+        self.channelId = channelId
+        self.timestamp = timestamp
+        self.datatype = datatype
+        self.bodyLength = bodyLength
+        self.streamId = streamId
 
     def _get_relative(self):
         return None in [
@@ -55,15 +54,23 @@ class Header(object):
     relative = property(_get_relative)
 
     def __repr__(self):
-        s = ['%s=%r' % (k, v) for k, v in self.__dict__.iteritems()]
+        attrs = []
 
-        s = '<%s.%s %s at 0x%x>' % (
+        for k in self.__slots__:
+            v = getattr(self, k, None)
+
+            if v is None:
+                continue
+
+            attrs.append('%s=%r' % (k, v))
+
+        attrs.append('relative=%r' % (self.relative,))
+
+        return '<%s.%s %s at 0x%x>' % (
             self.__class__.__module__,
             self.__class__.__name__,
-            ' '.join(s),
+            ' '.join(attrs),
             id(self))
-
-        return s
 
 
 def decodeHeaderByte(byte):
@@ -76,12 +83,6 @@ def decodeHeaderByte(byte):
     @return: The header length and the channel id.
     @rtype: C{tuple}
     """
-    byte = int(byte)
-
-    if byte > 255 or byte < 0:
-        raise OverflowError('Byte must be between 0 and 255 (got %d)' % (
-            byte,))
-
     index = byte >> 6
 
     return HEADER_SIZES[index], byte & 0x3f
@@ -163,41 +164,37 @@ def encodeHeader(stream, header):
     """
     Encodes a RTMP header to C{stream}.
 
+    We expect the stream to already be in network endian
+
     @param stream: The stream to write the encoded header.
     @type stream: L{util.BufferedByteStream}
     @param header: An I{interfaces.IHeader} object.
     @raise TypeError: If L{interfaces.IHeader} is not provided by C{header}.
     """
-    def _encode():
-        size = getHeaderSize(header)
-        stream.write_uchar(encodeHeaderByte(size, header.channelId))
+    size = getHeaderSize(header)
+    stream.write_uchar(encodeHeaderByte(size, header.channelId))
 
-        if size == 1:
-            return
+    if size == 1:
+        return
 
-        if size >= 4:
-            if header.timestamp >= 0xffffff:
-                stream.write_24bit_uint(0xffffff)
-            else:
-                stream.write_24bit_uint(header.timestamp)
+    if size >= 4:
+        if header.timestamp >= 0xffffff:
+            stream.write_24bit_uint(0xffffff)
+        else:
+            stream.write_24bit_uint(header.timestamp)
 
-        if size >= 8:
-            stream.write_24bit_uint(header.bodyLength)
-            stream.write_uchar(header.datatype)
+    if size >= 8:
+        stream.write_24bit_uint(header.bodyLength)
+        stream.write_uchar(header.datatype)
 
-        if size >= 12:
-            stream.endian = util.BufferedByteStream.ENDIAN_LITTLE
-            stream.write_ulong(header.streamId)
+    if size >= 12:
+        stream.endian = 'little'
+        stream.write_ulong(header.streamId)
+        stream.endian = 'network'
 
-        if size >= 4:
-            if header.timestamp >= 0xffffff:
-                stream.endian = util.BufferedByteStream.ENDIAN_BIG
-                stream.write_ulong(header.timestamp)
-
-    oldEndian = stream.endian
-    stream.endian = util.BufferedByteStream.ENDIAN_NETWORK
-    _encode()
-    stream.endian = oldEndian
+    if size >= 4:
+        if header.timestamp >= 0xffffff:
+            stream.write_ulong(header.timestamp)
 
 
 def decodeHeader(stream):
@@ -216,16 +213,10 @@ def decodeHeader(stream):
     size, channelId = decodeHeaderByte(stream.read_uchar())
     relative = size != 12
 
-    header = Header(channelId=channelId, relative=relative)
+    header = Header(channelId)
 
     if size == 1:
         return header
-
-    if rtmp.DEBUG:
-        rtmp.log(None, 'header size = %d' % (size,))
-
-    endian = stream.endian
-    stream.endian = util.BufferedByteStream.ENDIAN_BIG
 
     if size >= 4:
         header.timestamp = stream.read_24bit_uint()
@@ -236,17 +227,12 @@ def decodeHeader(stream):
 
     if size >= 12:
         # streamId is little endian
-        stream.endian = util.BufferedByteStream.ENDIAN_LITTLE
+        stream.endian = '<'
         header.streamId = stream.read_ulong()
+        stream.endian = '!'
 
     if header.timestamp == 0xffffff:
-        stream.endian = util.BufferedByteStream.ENDIAN_BIG
         header.timestamp = stream.read_ulong()
-
-    stream.endian = endian
-
-    if rtmp.DEBUG:
-        rtmp.log(None, 'header read = %r' % (header,))
 
     return header
 
@@ -307,17 +293,17 @@ def mergeHeaders(old, new):
     @rtype: L{Header}
     """
     if old.relative is not False:
-        raise HeaderError("Received a non-absolute header for old " \
+        raise HeaderError("Received a non-absolute header for old "
             "(relative = %r)" % (old.relative))
 
     if new.relative is not True:
-        raise HeaderError("Received a non-relative header for new " \
+        raise HeaderError("Received a non-relative header for new "
             "(relative = %r)" % (new.relative))
 
     if old.channelId != new.channelId:
         raise HeaderError("The two headers are not for the same channel")
 
-    header = Header(channelId=old.channelId, relative=False)
+    header = Header(old.channelId)
 
     if new.timestamp is not None:
         header.timestamp = new.timestamp
