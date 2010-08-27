@@ -778,3 +778,6 @@ class FrameReadingTestCase(BaseDecoderTestCase):
         self.assertEquals(channel.buffer, ' ' * (self.decoder.frameSize + 50))
         self.assertEquals(channel.frames, 1)
         self.assertEquals(self.decoder.currentChannel, channel)
+
+
+BaseDecoderTestCase = DecoderClassTestCase = GetBytesAvailableForChannelTestCase = DecodingTestCase = FrameReadingTestCase = None
