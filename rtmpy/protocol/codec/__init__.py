@@ -4,7 +4,7 @@
 """
 RTMP codecs. Encoders and decoders for rtmp streams.
 
-@see: U{RTMP (external)<http://rtmpy.org/wiki/RTMP>}
+@see: U{RTMP<http://rtmpy.org/wiki/RTMP>}
 @since: 0.1
 """
 
