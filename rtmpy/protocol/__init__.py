@@ -1,6 +1,6 @@
 # -*- test-case-name: rtmpy.tests.test_rtmp -*-
-# Copyright (c) 2007-2009 The RTMPy Project.
-# See LICENSE for details.
+# Copyright The RTMPy Project
+# See LICENSE for details
 
 """
 RTMP implementation.
