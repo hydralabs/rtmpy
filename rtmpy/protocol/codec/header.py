@@ -164,7 +164,7 @@ def encodeHeader(stream, header):
     """
     Encodes a RTMP header to C{stream}.
 
-    We expect the stream to already be in network endian
+    We expect the stream to already be in network endian mode.
 
     @param stream: The stream to write the encoded header.
     @type stream: L{util.BufferedByteStream}
