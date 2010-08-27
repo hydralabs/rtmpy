@@ -27,6 +27,7 @@ DOWNSTREAM_BANDWIDTH = 0x05
 #: The clients upstream bandwidth
 UPSTREAM_BANDWIDTH = 0x06
 #: Packet containing audio
+# 0x07 anyone?
 AUDIO_DATA = 0x08
 #: Packet containing video data
 VIDEO_DATA = 0x09
@@ -44,6 +45,9 @@ INVOKE = 0x14
 # 0x15 anyone?
 #: FLV data
 FLV_DATA = 0x16
+
+
+STREAMABLE_TYPES = [AUDIO_DATA, VIDEO_DATA]
 
 
 class BaseError(Exception):
