@@ -11,21 +11,7 @@ RTMPy Utilities.
 
 import os.path, sys, time, random
 
-from pyamf.util import BufferedByteStream as BBS, DataTypeMixIn
-
-class BufferedByteStream(BBS):
-    ENDIAN_NETWORK = DataTypeMixIn.ENDIAN_NETWORK
-    ENDIAN_NATIVE = DataTypeMixIn.ENDIAN_NATIVE
-    ENDIAN_LITTLE = DataTypeMixIn.ENDIAN_LITTLE
-    ENDIAN_BIG = DataTypeMixIn.ENDIAN_BIG
-
-    def append(self, data):
-        pos = self.tell()
-
-        self.seek(0, 2)
-        self.write(data)
-
-        self.seek(pos, 0)
+from pyamf.util import BufferedByteStream
 
 
 #: The number of milliseconds since the epoch.
