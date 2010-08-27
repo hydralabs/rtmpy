@@ -7,6 +7,36 @@ use_setuptools()
 
 import sys
 from setuptools import setup, find_packages
+from setuptools.command import test
+
+
+class TestCommand(test.test):
+    """
+    Ensures that unittest2 is imported if required and replaces the old
+    unittest module.
+    """
+
+    def run_tests(self):
+        try:
+            import unittest2
+            import sys
+
+            sys.modules['unittest'] = unittest2
+        except ImportError:
+            pass
+
+        return test.test.run_tests(self)
+
+
+
+def get_test_requirements():
+    tests_require = []
+
+    if sys.version_info < (2, 7):
+        tests_require.append('unittest2')
+
+    return tests_require
+
 
 def get_version():
     """
@@ -40,7 +70,7 @@ def get_install_requirements():
     Returns a list of dependencies for RTMPy to function correctly on the
     target platform.
     """
-    install_requires = ['Twisted>=2.5.0', 'PyAMF>=0.5']
+    install_requires = ['Twisted>=2.5.0', 'PyAMF>=0.6b2']
 
     if sys.platform.startswith('win'):
         install_requires.append('PyWin32')
@@ -56,12 +86,17 @@ setup(name = "RTMPy",
     version = get_version(),
     description = "Twisted protocol for RTMP",
     long_description = open('README.txt', 'rt').read(),
+    cmdclass = {
+       'test': TestCommand
+    },
     url = "http://rtmpy.org",
     author = "The RTMPy Project",
     author_email = "rtmpy-dev@rtmpy.org",
     keywords = keyw,
     packages = find_packages(exclude=["*.tests"]),
     install_requires = get_install_requirements(),
+    tests_require = get_test_requirements(),
+    test_suite = "rtmpy.tests.get_suite",
     zip_safe = True,
     license = "MIT License",
     platforms = ["any"],
