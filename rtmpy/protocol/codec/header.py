@@ -33,7 +33,7 @@ class Header(object):
     @see: L{interfaces.IHeader}
     """
 
-    __slots__ = ('bodyLength', 'channelId', 'datatype', 'streamId', 'timestamp')
+    __slots__ = ('streamId', 'datatype', 'timestamp', 'bodyLength', 'channelId')
 
     def __init__(self, channelId, timestamp=None, datatype=None,
                  bodyLength=None, streamId=None):
