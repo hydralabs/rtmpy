@@ -9,9 +9,10 @@ RTMP codecs. Encoders and decoders for rtmp streams.
 """
 
 from twisted.internet import reactor, task, defer
-from zope.interface import implements
+from zope.interface import implements, Interface, Attribute
+from pyamf.util import BufferedByteStream
 
-from rtmpy import protocol, util
+from rtmpy import protocol
 from rtmpy.protocol import interfaces, event
 from rtmpy.protocol.codec import header as _header
 
@@ -53,15 +54,27 @@ class ChannelError(BaseError):
     """
 
 
+class IChannelMeta(Interface):
+    """
+    Contains meta data related to a channel.
+    """
+
+    channelId = Attribute("An C{int} representing the linked channel.")
+    timestamp = Attribute(
+        "An C{int} time value - not sure what this represents atm.")
+    datatype = Attribute("The datatype for the corresponding channel.")
+    bodyLength = Attribute(
+        "An C{int} which represents the length of the channel body.")
+    streamId = Attribute(
+        "An C{int} representing the linked stream.")
+
+
 class Channel(object):
     """
     Acts as a container for an RTMP channel. Does not know anything of
     encoding or decoding channels, it is literally meant as a proxy between
     the byte stream and an observer.
 
-    @ivar manager: The manager for this channel. The channel will report back
-        to the manager about various activities it is performing.
-    @type manager: L{interfaces.IChannelManager}
     @ivar header: The calculated header for this channel. RTMP can send
         relative headers, which will be merged with the previous headers to
         calculate the absolute values for the header.
@@ -69,47 +82,23 @@ class Channel(object):
     @ivar frameRemaining: The amount of data that needs to be received before
         a frame can be considered complete.
     @type frameRemaining: C{int}
-    @ivar buffer: Any buffered data before an observer was registered.
-    @type buffer: C{str} or C{None}
     """
 
     implements(interfaces.IChannel)
 
-    def __init__(self, manager):
-        self.manager = manager
-        self.header = None
-        self.buffer = None
-        self.observer = None
+    header = None
 
-        self.debug = rtmp.DEBUG
+    def __init__(self, codec, stream):
+        self.codec = codec
+        self.stream = stream
+        self.frameSize = self.codec.frameSize
 
-    def registerObserver(self, observer):
-        """
-        Registers an observer to this channel. If there is any buffered data,
-        the observer will be notified immediately.
-
-        @param observer: The observer for this channel.
-        @type observer: L{interfaces.IChannelObserver}
-        """
-        self.observer = observer
-
-        if self.buffer is not None:
-            self.observer.dataReceived(self.buffer)
-            self.buffer = None
+        self.reset()
 
     def reset(self):
-        """
-        Called to reset the channel's context.
-
-        @note: Does not reset any header information or observer that may
-            already be applied to this channel.
-        @raise ChannelError: If no manager has been registered.
-        """
-        self.frameRemaining = self.manager.frameSize
-        self.frames = 0
         self.bytes = 0
-        self.buffer = None
         self.bodyRemaining = None
+        self.frameRemaining = self.frameSize
 
     def getHeader(self):
         """
@@ -130,10 +119,9 @@ class Channel(object):
         @param header: The header to apply to this channel.
         @type header: L{interfaces.IHeader}
         """
-        if self.debug or rtmp.DEBUG:
-            rtmp.log(self, 'setHeader(%s)' % (header,))
+        old_header = self.header
 
-        if self.header is None:
+        if old_header is None:
             if header.relative is True:
                 raise _header.HeaderError(
                     'Tried to set a relative header as absolute')
@@ -143,94 +131,53 @@ class Channel(object):
                     'different channel (original:%r, new:%r)' % (
                         self.header.channelId, header.channelId))
 
-        if header.relative is False:
-            old_header, self.header = self.header, header
-
-            self.manager.initialiseChannel(self, old_header)
-        else:
+        if header.relative:
             self.header = _header.mergeHeaders(self.header, header)
+        else:
+            self.reset()
 
-            if self.observer is not None:
-                self.observer.headerChanged(header)
+            self.header = header
 
         self.bodyRemaining = self.header.bodyLength - self.bytes
 
-    def _write(self, data):
-        """
-        If an observer is registered then L{IChannelObserver.dataReceived} is
-        called, otherwise the data is buffered until an observer is
-        registered.
-        """
-        if self.observer is not None:
-            self.observer.dataReceived(data)
+    @property
+    def channelId(self):
+        return self.header.channelId
 
-            return
+    @property
+    def datatype(self):
+        return self.header.datatype
 
-        if self.buffer is None:
-            self.buffer = ''
-
-        self.buffer += data
+    @property
+    def streamId(self):
+        return self.header.streamId
 
     def _adjustFrameRemaining(self, l):
         """
         Adjusts the C{frames} and C{frameRemaining} attributes based on the
         supplied length C{l}.
         """
-        size = self.manager.frameSize
+        size = self.frameSize
 
         while l >= size:
-            self.frames += 1
             l -= size
 
         if l >= self.frameRemaining:
-            self.frames += 1
             l -= self.frameRemaining
             self.frameRemaining = size
 
         self.frameRemaining -= l
 
-    def dataReceived(self, data):
-        """
-        Called when a frame or partial frame is read from or written to the
-        RTMP byte stream.
+    def readFrame(self):
+        l = min(self.frameRemaining, self.frameSize, self.bodyRemaining)
 
-        @param data: A string of bytes.
-        @type data: C{str}
-        """
-        if self.header is None:
-            raise _header.HeaderError(
-                'Cannot write to a channel with no header')
-
-        l = len(data)
-
-        if self.bodyRemaining - l < 0:
-            raise OverflowError('Attempted to write more data than was '
-                'expected (attempted:%d remaining:%d total:%d)' % (
-                    l, self.bodyRemaining, self.bytes + self.bodyRemaining))
-
-        if self.debug or rtmp.DEBUG:
-            rtmp.log(self, 'Received %d bytes' % (l,))
+        bytes = self.stream.read(l)
 
         self.bytes += l
         self.bodyRemaining -= l
         self._adjustFrameRemaining(l)
 
-        self._write(data)
-
-        if self.bodyRemaining == 0:
-            self.onComplete()
-
-    def onComplete(self):
-        """
-        Called when the channel has receieved the correct amount of data.
-        """
-        if self.debug or rtmp.DEBUG:
-            rtmp.log(self, 'body completed')
-
-        self.manager.channelComplete(self)
-
-        if self.observer:
-            self.observer.bodyComplete()
+        return bytes
 
     def __repr__(self):
         s = []
@@ -294,7 +241,7 @@ class BaseCodec(object):
         self.deferred = None
         self.frameSize = FRAME_SIZE
 
-        self.buffer = util.BufferedByteStream()
+        self.buffer = BufferedByteStream()
         self.job = task.LoopingCall(self.getJob())
 
         self.debug = rtmp.DEBUG
@@ -1155,3 +1102,160 @@ class Encoder(BaseCodec):
         self.activateChannel(channel)
 
         return d
+
+
+class FrameReader(object):
+    """
+    A generator object that decodes RTMP frames from a data stream. Feed it data
+    via L{send} and then iteratively call L{next}.
+
+    A frame consists of a header and then a chunk of data. Each header will
+    contain the channel that the frame is destined for. RTMP allows multiple
+    channels to be interleaved together.
+
+    @ivar frameSize: The maximum size for an individual frame. Read-only, use
+        L{setFrameSize} instead.
+    @ivar stream: The underlying buffer containing the raw bytes.
+    @type stream: L{BufferedByteStream}
+    @ivar channels: A L{dict} of L{Channel} objects that are awaiting data.
+    """
+
+    frameSize = 128
+
+    def __init__(self, stream=None):
+        self.stream = stream or BufferedByteStream()
+        self.channels = {}
+
+    def setFrameSize(self, size):
+        """
+        Set the size of the next frame to be read.
+        """
+        self.frameSize = size
+
+        for channel in self.channels.values():
+            channel.frameSize = size
+
+    def readHeader(self):
+        """
+        Reads an RTMP header from the stream.
+
+        @rtype: L{_header.Header}
+        """
+        return _header.decodeHeader(self.stream)
+
+    def getChannel(self, channelId):
+        """
+        Returns a channel based on channelId. If the channel doesn't exist,
+        then one is created.
+
+        @param channelId: Index for the channel to retrieve.
+        @type channelId: C{int}
+        @rtype: L{Channel}
+        """
+        channel = self.channels.get(channelId, None)
+
+        if channel is not None:
+            return channel
+
+        channel = self.channels[channelId] = Channel(self, self.stream)
+
+        return channel
+
+    def send(self, data):
+        """
+        Adds more data to the stream for the reader to consume.
+        """
+        self.stream.append(data)
+
+    def next(self):
+        """
+        Called to pull the next RTMP frame out of the stream. A tuple containing
+        three items is returned:
+
+        * the raw bytes for the frame
+        * whether the channel is considered complete (i.e. all the data has been
+            received)
+        * An L{IChannelMeta} instance.
+
+        If an attempt to read from the stream comes to a natural end then
+        C{StopIteration} is raised, otherwise C{IOError}.
+        """
+        pos = self.stream.tell()
+
+        try:
+            h = self.readHeader()
+
+            channel = self.getChannel(h.channelId)
+            channel.setHeader(h)
+
+            bytes = channel.readFrame()
+
+            complete = channel.bodyRemaining == 0
+
+            if complete:
+                channel.reset()
+
+            return bytes, complete, channel.header
+        except IOError:
+            self.stream.seek(pos, 0)
+
+            if self.stream.at_eof():
+                self.stream.consume()
+
+                raise StopIteration
+
+            raise
+
+    def __iter__(self):
+        return self
+
+
+class Demuxer(FrameReader):
+    """
+    The next layer up from reading raw RTMP frames. Reassembles the interleaved
+    channel data and dispatches the raw channel data when it is complete.
+
+    There are two generic categories of channels in RTMP; streaming and
+    non-streaming. Audio/Video data is considered streamable data, everything
+    else is not. This means that the raw data is buffered until the channel is
+    complete.
+
+    @ivar bucket: Buffers any incomplete channel data.
+    @type bucket: channel -> buffered data.
+    """
+
+    def __init__(self, stream=None):
+        FrameReader.__init__(self, stream=stream)
+
+        self.bucket = {}
+
+    def next(self):
+        """
+        Read an RTMP frame and buffer the data (if necessary) until the channel
+        is considered complete.
+
+        Return a tuple containing:
+
+        * the raw bytes for the channel
+        * The associated L{IChannelMeta} instance
+
+        C{None, None} will be returned if a frame was read, but no channel was
+        complete.
+        """
+        data, complete, meta = FrameReader.next(self)
+
+        if meta.datatype in event.STREAMABLE_TYPES:
+            # don't buffer the data, pass it right on through
+            return data, meta
+
+        if complete:
+            data = self.bucket.pop(meta.channelId, '') + data
+
+            return data, meta
+
+        channelId = meta.channelId
+
+        self.bucket[channelId] = self.bucket.get(channelId, '') + data
+
+        # nothing was available
+        return None, None
