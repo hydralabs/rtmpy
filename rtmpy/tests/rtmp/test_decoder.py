@@ -7,8 +7,7 @@ Tests for L{rtmpy.rtmp.codec}.
 
 import unittest
 
-from rtmpy.protocol import codec, event
-from rtmpy.protocol.codec import header
+from rtmpy.protocol.rtmp import codec, event, header
 
 
 class MockChannel(object):
@@ -22,7 +21,9 @@ class MockFrameReader(object):
     Pretend to act like a L{codec.FrameReader}
     """
 
-    stream = None
+    @classmethod
+    def __init__(cls, self, stream=None):
+        self.stream = stream
 
     @classmethod
     def next(cls, self):

@@ -8,7 +8,7 @@ Tests for L{rtmpy.rtmp.codec.header}.
 import unittest
 
 from rtmpy.protocol import interfaces
-from rtmpy.protocol.codec import header
+from rtmpy.protocol.rtmp import header
 from rtmpy import util, protocol
 
 
@@ -64,7 +64,7 @@ class HeaderTestCase(unittest.TestCase):
     def test_repr(self):
         h = header.Header(None)
 
-        self.assertEquals(repr(h), '<rtmpy.protocol.codec.header.Header '
+        self.assertEquals(repr(h), '<rtmpy.protocol.rtmp.header.Header '
             'relative=True at 0x%x>' % (id(h),))
 
         d = {
@@ -77,8 +77,8 @@ class HeaderTestCase(unittest.TestCase):
 
         h = header.Header(**d)
 
-        self.assertEquals(repr(h), '<rtmpy.protocol.codec.header.Header '
-            'bodyLength=2000 channelId=1 datatype=20 streamId=98 timestamp=50 '
+        self.assertEquals(repr(h), '<rtmpy.protocol.rtmp.header.Header '
+            'streamId=98 datatype=20 timestamp=50 bodyLength=2000 channelId=1 '
             'relative=False at 0x%x>' % (id(h),))
 
     def test_relative(self):
