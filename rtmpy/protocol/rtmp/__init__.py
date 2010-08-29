@@ -1,4 +1,3 @@
-# -*- test-case-name: rtmpy.tests.test_rtmp -*-
 # Copyright The RTMPy Project
 # See LICENSE for details
 
@@ -25,25 +24,8 @@ from zope.interface import implements
 from rtmpy.protocol import interfaces, stream, scheduler, status, event
 from rtmpy import util
 
-#: Set this to C{True} to force all rtmp.* instances to log debugging messages
-DEBUG = False
-
-#: The default RTMP port is a registered port at U{IANA<http://iana.org>}
-RTMP_PORT = 1935
-
-RTMP_PROTOCOL_VERSION = 3
-RTMPE_PROTOCOL_VERSION = 6
-MAX_PROTOCOL_VERSION = 31
-
 #: Maximum number of streams that can be active per RTMP stream
 MAX_STREAMS = 0xffff
-
-
-def log(obj, msg):
-    """
-    Used to log interesting messages from within this module (and submodules).
-    """
-    print repr(obj), msg
 
 
 class BaseError(Exception):
@@ -60,26 +42,6 @@ class VersionMismatch(BaseError):
         BaseError.__init__(self, *args, **kwargs)
 
         self.version = versionReceived
-
-
-class ErrorLoggingCodecObserver(object):
-    """
-    """
-
-    def __init__(self, protocol, codec):
-        self.protocol = protocol
-        self.codec = codec
-
-        self.codec.registerObserver(self)
-
-    def started(self):
-        """
-        """
-        self.codec.deferred.addErrback(self.protocol.logAndDisconnect)
-
-    def stopped(self):
-        """
-        """
 
 
 class BaseProtocol(protocol.Protocol):
@@ -193,8 +155,6 @@ class BaseProtocol(protocol.Protocol):
         self.decoder = codec.Decoder(self)
         self.encoder = codec.Encoder(self)
 
-        ErrorLoggingCodecObserver(self, self.decoder)
-        ErrorLoggingCodecObserver(self, self.encoder)
 
         self.encoder.registerConsumer(self.transport)
 
