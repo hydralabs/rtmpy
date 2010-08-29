@@ -12,7 +12,7 @@ from urlparse import urlparse
 from zope.interface import implements
 from twisted.internet import defer, reactor, error
 
-from rtmpy.protocol import interfaces, event, status
+from rtmpy.protocol import interfaces, status
 from rtmpy import util
 
 

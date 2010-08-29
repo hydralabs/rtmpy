@@ -19,10 +19,9 @@ packets are split up into fixed size body chunks.
 @since: 0.1
 """
 
-from twisted.internet import protocol, defer, error
 from zope.interface import implements
 
-from rtmpy.protocol import interfaces, stream, scheduler, status, event
+from rtmpy.protocol import interfaces, stream, status
 from rtmpy import util
 
 #: Set this to C{True} to force all rtmp.* instances to log debugging messages
@@ -82,7 +81,7 @@ class ErrorLoggingCodecObserver(object):
         """
 
 
-class BaseProtocol(protocol.Protocol):
+class BaseProtocol(object):
     """
     Provides basic handshaking and RTMP protocol support.
 
