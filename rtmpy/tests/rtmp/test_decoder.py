@@ -51,7 +51,35 @@ class MockChannelDemuxer(MockFrameReader):
 
 
 class MockStreamFactory(object):
-    pass
+    def __init__(self, test):
+        self.test = test
+
+    def getStream(self, *args):
+        return self.test.getStream(*args)
+
+
+class DispatchTester(object):
+    """
+    """
+
+    def __init__(self, test):
+        self.test = test
+        self.messages = []
+
+    def dispatchMessage(self, *args):
+        fod = getattr(self.test, 'failOnDispatch', False)
+
+        if fod:
+            raise AssertionError('Message dispatched %r' % (args,))
+
+        self.messages.append(args)
+
+
+class MockStream(object):
+    """
+    """
+
+    timestamp = 0
 
 
 class FrameReaderTestCase(unittest.TestCase):
@@ -283,12 +311,75 @@ class DecoderTestCase(unittest.TestCase):
     """
 
     def setUp(self):
-        self.patch('codec.ChannelDemuxer', MockFrameReader)
+        self.patch('codec.ChannelDemuxer', MockChannelDemuxer)
 
-        self.dispatcher = None
-        self.stream_factory = MockStreamFactory()
+        self.dispatcher = DispatchTester(self)
+        self.stream_factory = MockStreamFactory(self)
         self.decoder = codec.Decoder(self.dispatcher, self.stream_factory)
+
+        self.expected_streams = None
+        self.streams = {}
+
+    def add_events(self, *events):
+        if not hasattr(self.decoder, 'events'):
+            self.decoder.events = []
+
+        self.decoder.events.extend(events)
+
+    def getStream(self, streamId):
+        if self.expected_streams:
+            expected = self.expected_streams.pop(0)
+
+            self.assertEqual(expected, streamId)
+
+        try:
+            return self.streams[streamId]
+        except KeyError:
+            s = self.streams[streamId] = MockStream()
+
+            return s
 
     def test_create(self):
         self.assertIdentical(self.decoder.stream_factory, self.stream_factory)
         self.assertIdentical(self.decoder.dispatcher, self.dispatcher)
+
+    def test_fail_on_dispatch(self):
+        m = ChannelMeta(streamId=2, timestamp=0)
+        self.add_events(('foo', m))
+        self.expected_streams = [2]
+
+        self.failOnDispatch = True
+
+        self.assertRaises(AssertionError, self.decoder.next)
+
+    def test_do_nothing(self):
+        self.add_events((None, None))
+        self.failOnDispatch = True
+
+        self.assertEqual(self.decoder.next(), None)
+
+    def test_simple(self):
+        meta = ChannelMeta(streamId=2, timestamp=3, datatype='bar')
+
+        self.add_events(('foo', meta))
+
+        self.assertEqual(self.decoder.next(), None)
+        self.assertEquals(len(self.dispatcher.messages), 1)
+
+        stream, datatype, timestamp, data = self.dispatcher.messages[0]
+
+        self.assertIdentical(stream, self.streams[2])
+        self.assertEqual(datatype, 'bar')
+        self.assertEqual(timestamp, 3)
+        self.assertEqual(data, 'foo')
+
+    def test_incrementing_timestamp(self):
+        t1 = ChannelMeta(streamId=2, timestamp=2)
+        t2 = ChannelMeta(streamId=2, timestamp=3)
+
+        self.add_events(('foo', t1), ('foo', t2))
+
+        self.assertEqual(self.decoder.next(), None)
+        self.assertEqual(self.decoder.next(), None)
+
+        self.assertEqual(self.streams[2].timestamp, 5)
