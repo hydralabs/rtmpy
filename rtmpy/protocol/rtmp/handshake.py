@@ -5,13 +5,12 @@
 Handshaking specific to C{RTMP}.
 """
 
-from rtmpy.protocol import handshake, rtmp
+from rtmpy.protocol import handshake, version
 from rtmpy import util
 
 __all__ = [
     'ClientNegotiator',
     'ServerNegotiator',
-    'HandshakeObserver'
 ]
 
 
@@ -20,7 +19,7 @@ class RandomPayloadNegotiator(object):
     Generate a random payload for the syn/ack packets.
     """
 
-    protocolVersion = rtmp.PROTOCOL_VERSION
+    protocolVersion = version.RTMP
 
     def _generate_payload(self):
         return util.generateBytes(handshake.HANDSHAKE_LENGTH - 8)
@@ -52,6 +51,3 @@ class ServerNegotiator(RandomPayloadNegotiator, handshake.ServerNegotiator):
     """
     A server negotiator for RTMP specific handshaking.
     """
-
-
-HandshakeObserver = handshake.HandshakeObserver

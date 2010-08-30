@@ -210,11 +210,6 @@ class BaseProtocol(object):
 
         self.transport.loseConnection()
 
-    def write(self, data):
-        """
-        """
-        self.transport.write(data)
-
     def writePacket(self, *args, **kwargs):
         """
         """

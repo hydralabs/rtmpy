@@ -422,26 +422,15 @@ class ServerNegotiator(BaseNegotiator):
             raise VerificationError('Received payload does not match')
 
 
-class HandshakeObserver(object):
-    """
-    A handshake observer that provides the base functionality for interacting
-    with the underlying protocol.
-    """
-
-    def __init__(self, protocol):
-        self.protocol = protocol
-
-    def handshakeSuccess(self):
-        self.protocol.handshakeSuccess()
-
-
 def get_implementation(protocol):
     """
     Returns the implementation suitable for handling RTMP handshakes for the
     version specified. Will raise L{HandshakeError} if an invalid version is
     found.
+
+    @param protocol: The C{int} version of the protocol.
     """
-    protocol_mod = 'rtmpy.protocol.%s' % (protocol,)
+    protocol_mod = 'rtmpy.protocol.%s' % (version.get(protocol),)
     full_mod_path = protocol_mod + '.handshake'
 
     try:
