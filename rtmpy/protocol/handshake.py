@@ -222,13 +222,12 @@ class BaseNegotiator(object):
 
         return packet
 
-    def _writePacket(self, packet):
-        packet.encode(self.buffer)
+    def _writePacket(self, packet, stream=None):
+        stream = stream or BufferedByteStream()
 
-        data = self.buffer.getvalue()
-        self.buffer.truncate()
+        packet.encode(stream)
 
-        self.transport.write(data)
+        self.transport.write(stream.getvalue())
 
     def dataReceived(self, data):
         """
@@ -334,8 +333,10 @@ class ClientNegotiator(BaseNegotiator):
 
         self.buildSynPayload(self.my_syn)
 
-        self.buffer.write_uchar(self.protocolVersion)
-        self._writePacket(self.my_syn)
+        stream = BufferedByteStream()
+
+        stream.write_uchar(self.protocolVersion)
+        self._writePacket(self.my_syn, stream)
 
     def versionReceived(self):
         """
@@ -396,8 +397,9 @@ class ServerNegotiator(BaseNegotiator):
 
         self.buildSynPayload(self.my_syn)
 
-        #self.buffer.write_uchar(self.protocolVersion)
-        self._writePacket(self.my_syn)
+        stream = BufferedByteStream()
+        stream.write_uchar(self.protocolVersion)
+        self._writePacket(self.my_syn, stream)
 
     def synReceived(self):
         """

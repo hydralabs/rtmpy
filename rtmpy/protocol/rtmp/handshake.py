@@ -21,24 +21,21 @@ class RandomPayloadNegotiator(object):
 
     protocolVersion = version.RTMP
 
-    def _generate_payload(self):
-        return util.generateBytes(handshake.HANDSHAKE_LENGTH - 8)
-
-    def buildSynPayload(self):
+    def buildSynPayload(self, packet):
         """
         Called to build the syn packet, based on the state of the negotiations.
 
         C{RTMP} payloads are just random.
         """
-        return self._generate_payload()
+        packet.payload = _generate_payload()
 
-    def buildAckPayload(self):
+    def buildAckPayload(self, packet):
         """
         Called to build the ack packet, based on the state of the negotiations.
 
         C{RTMP} payloads are just random.
         """
-        return self._generate_payload()
+        packet.payload = _generate_payload()
 
 
 class ClientNegotiator(RandomPayloadNegotiator, handshake.ClientNegotiator):
@@ -51,3 +48,7 @@ class ServerNegotiator(RandomPayloadNegotiator, handshake.ServerNegotiator):
     """
     A server negotiator for RTMP specific handshaking.
     """
+
+
+def _generate_payload():
+    return util.generateBytes(handshake.HANDSHAKE_LENGTH - 8)
