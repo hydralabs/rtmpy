@@ -100,15 +100,6 @@ class Channel(object):
         self.bodyRemaining = None
         self.frameRemaining = self.frameSize
 
-    def getHeader(self):
-        """
-        Gets the header for this channel. The header contains the absolute
-        values for all received headers in the stream.
-
-        @rtype: L{interfaces.IHeader} or C{None}
-        """
-        return self.header
-
     def setHeader(self, new):
         """
         Applies a new header to this channel. If this channel has no previous
@@ -140,8 +131,7 @@ class Channel(object):
 
     def _adjustFrameRemaining(self, l):
         """
-        Adjusts the C{frames} and C{frameRemaining} attributes based on the
-        supplied length C{l}.
+        Adjusts the C{frameRemaining} attributes based on the supplied length.
         """
         size = self.frameSize
 
@@ -155,6 +145,12 @@ class Channel(object):
         self.frameRemaining -= l
 
     def readFrame(self):
+        """
+        Reads an RTMP frame from the stream and returns the content of the body.
+
+        If ther is not enough data to fulfill the frame requirements then
+        C{IOError} will be raised.
+        """
         l = min(self.frameRemaining, self.frameSize, self.bodyRemaining)
 
         bytes = self.stream.read(l)
