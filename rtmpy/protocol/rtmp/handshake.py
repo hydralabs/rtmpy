@@ -1,20 +1,26 @@
+# Copyright The RTMPy Project
+# See LICENSE.txt for details
+
 """
-Handshaking specific to C{RTMP}, that is where the protocol version = C{0x03}.
+Handshaking specific to C{RTMP}.
 """
 
-from rtmpy.protocol import handshake
+from rtmpy.protocol import handshake, rtmp
 from rtmpy import util
 
-# from zope.interface import implements
+__all__ = [
+    'ClientNegotiator',
+    'ServerNegotiator',
+    'HandshakeObserver'
+]
 
-# implements(handshake.IProtocolNegotiator)
 
 class RandomPayloadNegotiator(object):
     """
-    Functionality specific to RTMP handshaking
+    Generate a random payload for the syn/ack packets.
     """
 
-    protocolVersion = handshake.RTMP_PROTOCOL_VERSION
+    protocolVersion = rtmp.PROTOCOL_VERSION
 
     def _generate_payload(self):
         return util.generateBytes(handshake.HANDSHAKE_LENGTH - 8)

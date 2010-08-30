@@ -16,16 +16,13 @@ import sys
 import time
 
 from zope.interface import implements, Interface, Attribute
+from pyamf.util import BufferedByteStream
 
-from rtmpy import util, protocol
-from rtmpy.protocol import interfaces
+from rtmpy import util
+from rtmpy.protocol import interfaces, version
 
 
 HANDSHAKE_LENGTH = 1536
-
-_versions = {
-    protocol.RTMP_PROTOCOL_VERSION: 'rtmp'
-}
 
 
 class IProtocolImplementation(Interface):
@@ -50,19 +47,6 @@ class IHandshakeObserver(Interface):
         Handshaking was successful.
         """
 
-    def handshakeFailure(reason):
-        """
-        Handshaking failed.
-
-        @param reason: Why the handshake failed.
-        @type reason: Exception wrapped L{Failure}
-        """
-
-    def write(data):
-        """
-        Called when the handshake negotiator writes some data.
-        """
-
 
 class IHandshakeNegotiator(Interface):
     """
@@ -71,6 +55,7 @@ class IHandshakeNegotiator(Interface):
 
     observer = Attribute("An L{IHandshakeObserver} that listens for events "
         "from this negotiator")
+    transport = Attribute("Provides ITransport")
 
     def start(uptime=None, version=None):
         """
@@ -97,9 +82,28 @@ class IHandshakeNegotiator(Interface):
         """
 
 
-class HandshakeError(protocol.BaseError):
+class HandshakeError(Exception):
     """
     Generic class for handshaking related errors.
+    """
+
+
+class ProtocolVersionError(HandshakeError):
+    """
+    Base error class for RTMP protocol version errors.
+    """
+
+
+class ProtocolTooHigh(ProtocolVersionError):
+    """
+    Raised if a protocol version is greater than can the requested version.
+    """
+
+
+class ProtocolDegraded(ProtocolVersionError):
+    """
+    Raised when a protocol version is lower than expected. This is a request
+    from the remote endpoint to use a lower protocol version.
     """
 
 
@@ -134,7 +138,7 @@ class Packet(object):
     def __init__(self, **kwargs):
         timestamp = kwargs.get('timestamp', None)
 
-        if not timestamp:
+        if timestamp is None:
             kwargs['timestamp'] = int(time.time())
 
         self.__dict__.update(kwargs)
@@ -165,7 +169,7 @@ class BaseNegotiator(object):
     @ivar observer: An observer for handshake negotiations.
     @type observer: L{IHandshakeObserver}
     @ivar buffer: Any data that has not yet been consumed.
-    @type buffer: L{util.BufferedByteStream}
+    @type buffer: L{BufferedByteStream}
     @ivar started: Determines whether negotiations have already begun.
     @type started: C{bool}
     @ivar my_syn: The initial handshake packet that will be sent by this
@@ -180,8 +184,9 @@ class BaseNegotiator(object):
 
     implements(IHandshakeNegotiator)
 
-    def __init__(self, observer):
+    def __init__(self, observer, transport):
         self.observer = observer
+        self.transport = transport
         self.started = False
 
     def start(self, uptime, version):
@@ -192,7 +197,7 @@ class BaseNegotiator(object):
             raise HandshakeError('Handshake negotiator cannot be restarted')
 
         self.started = True
-        self.buffer = util.BufferedByteStream()
+        self.buffer = BufferedByteStream()
 
         self.peer_version = None
 
@@ -223,7 +228,7 @@ class BaseNegotiator(object):
         data = self.buffer.getvalue()
         self.buffer.truncate()
 
-        self.observer.write(data)
+        self.transport.write(data)
 
     def dataReceived(self, data):
         """
@@ -234,23 +239,27 @@ class BaseNegotiator(object):
         3 stages of data are received. The handshake version, the syn packet and
         then the ack packet.
         """
-        try:
-            if not self.started:
-                raise HandshakeError('Data was received, but negotiator was '
-                    'not started')
+        if not self.started:
+            raise HandshakeError('Data was received, but negotiator was '
+                'not started')
 
-            self.buffer.append(data)
+        self.buffer.append(data)
 
-            self._process()
-        except:
-            self.observer.handshakeFailure(*sys.exc_info())
+        self._process()
 
     def _process(self):
+        if not self.peer_version:
+            self.peer_version = self.buffer.read_uchar()
+
+            self.versionReceived()
+
         if not self.peer_syn:
             self.peer_syn = self.getPeerPacket()
 
             if not self.peer_syn:
                 return
+
+            self.buffer.consume()
 
             self.synReceived()
 
@@ -259,6 +268,8 @@ class BaseNegotiator(object):
 
             if not self.peer_ack:
                 return
+
+            self.buffer.consume()
 
             self.ackReceived()
 
@@ -270,6 +281,7 @@ class BaseNegotiator(object):
         """
         Writes L{self.my_ack} to the observer.
         """
+        self._writePacket(self.my_ack)
 
     def buildSynPayload(self, packet):
         """
@@ -287,6 +299,14 @@ class BaseNegotiator(object):
         """
         Called when the peers handshake version has been received.
         """
+        if self.peer_version == self.protocolVersion:
+            return
+
+        if self.peer_version > version.MAX_VERSION:
+            raise ProtocolVersionError('Invalid protocol version')
+
+        if self.peer_version > self.protocolVersion:
+            raise ProtocolTooHigh('Unexpected protocol version')
 
     def synReceived(self):
         """
@@ -312,8 +332,9 @@ class ClientNegotiator(BaseNegotiator):
         """
         BaseNegotiator.start(self, uptime, version)
 
-        self.my_syn.payload = self.buildSynPayload()
+        self.buildSynPayload(self.my_syn)
 
+        self.buffer.write_uchar(self.protocolVersion)
         self._writePacket(self.my_syn)
 
     def versionReceived(self):
@@ -355,6 +376,8 @@ class ClientNegotiator(BaseNegotiator):
         self.my_ack = Packet(first=self.peer_syn.first,
             second=self.my_syn.timestamp)
 
+        self.buildAckPayload(self.my_ack)
+
         self.writeAck()
 
 
@@ -371,9 +394,10 @@ class ServerNegotiator(BaseNegotiator):
         """
         BaseNegotiator.versionReceived(self)
 
-        self.my_syn.payload = self.buildSynPayload()
+        self.buildSynPayload(self.my_syn)
 
-        self.writeVersionAndSyn()
+        #self.buffer.write_uchar(self.protocolVersion)
+        self._writePacket(self.my_syn)
 
     def synReceived(self):
         """
@@ -384,6 +408,7 @@ class ServerNegotiator(BaseNegotiator):
         self.my_ack = Packet(first=self.peer_syn.timestamp,
             second=self.my_syn.timestamp)
 
+        self.buildAckPayload(self.my_ack)
         self.writeAck()
 
     def ackReceived(self):
@@ -409,27 +434,19 @@ class HandshakeObserver(object):
     def handshakeSuccess(self):
         self.protocol.handshakeSuccess()
 
-    def handshakeFailure(self, *args):
-        self.protocol.handshakeFailure(*args)
 
-    def write(self, data):
-        self.protocol.transport.write(data)
-
-
-def get_implementation(version):
+def get_implementation(protocol):
     """
     Returns the implementation suitable for handling RTMP handshakes for the
     version specified. Will raise L{HandshakeError} if an invalid version is
     found.
     """
-    mod_name = _versions.get(version, None)
+    protocol_mod = 'rtmpy.protocol.%s' % (protocol,)
+    full_mod_path = protocol_mod + '.handshake'
 
-    if not mod_name:
-        raise HandshakeError('Unknown handshake version %r' % (version,))
-
-    full_mod_path = '.'.join([__name__, mod_name])
-
-    mod = __import__(full_mod_path, globals(), locals(), [mod_name], -1)
-    mod = getattr(mod, mod_name)
+    try:
+        mod = __import__(full_mod_path, globals(), locals(), [protocol_mod], -1)
+    except ImportError:
+        raise HandshakeError('Unknown handshake version %r' % (protocol,))
 
     return mod
