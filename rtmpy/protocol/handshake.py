@@ -42,9 +42,10 @@ class IHandshakeObserver(Interface):
     Observes handshake events.
     """
 
-    def handshakeSuccess():
+    def handshakeSuccess(data):
         """
-        Handshaking was successful.
+        Handshaking was successful. C{data} will contain any unconsumed bytes
+        from the handshaking process.
         """
 
 
@@ -274,7 +275,7 @@ class BaseNegotiator(object):
 
         # if we get here then a successful handshake has been negotiated.
         # inform the observer accordingly
-        self.observer.handshakeSuccess()
+        self.observer.handshakeSuccess(self.buffer.getvalue())
 
     def writeAck(self):
         """

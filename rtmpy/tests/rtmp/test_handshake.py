@@ -27,7 +27,7 @@ class HandshakeObserver(object):
     def write(self, data):
         self.buffer.write(data)
 
-    def handshakeSuccess(self):
+    def handshakeSuccess(self, data):
         self.test.succeeded = True
 
 

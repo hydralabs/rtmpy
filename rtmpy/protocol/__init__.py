@@ -19,10 +19,12 @@ packets are split up into fixed size body chunks.
 @since: 0.1
 """
 
+from twisted.internet import protocol
 from zope.interface import implements
 
 from rtmpy.protocol import interfaces, stream, status
 from rtmpy import util
+from rtmpy.protocol import handshake
 
 #: Set this to C{True} to force all rtmp.* instances to log debugging messages
 DEBUG = False
@@ -61,27 +63,7 @@ class VersionMismatch(BaseError):
         self.version = versionReceived
 
 
-class ErrorLoggingCodecObserver(object):
-    """
-    """
-
-    def __init__(self, protocol, codec):
-        self.protocol = protocol
-        self.codec = codec
-
-        self.codec.registerObserver(self)
-
-    def started(self):
-        """
-        """
-        self.codec.deferred.addErrback(self.protocol.logAndDisconnect)
-
-    def stopped(self):
-        """
-        """
-
-
-class BaseProtocol(object):
+class BaseProtocol(protocol.Protocol):
     """
     Provides basic handshaking and RTMP protocol support.
 
@@ -97,7 +79,6 @@ class BaseProtocol(object):
         interfaces.IStreamManager,
     )
 
-    VERSION = 'version'
     HANDSHAKE = 'handshake'
     STREAM = 'stream'
 
@@ -110,105 +91,49 @@ class BaseProtocol(object):
     def connectionMade(self):
         """
         """
-        protocol.Protocol.connectionMade(self)
+        self.state = BaseProtocol.HANDSHAKE
 
-        self.encoder = None
-        self.decoder = None
+        self.handshaker = self.factory.buildHandshakeNegotiator(self)
 
-        self.state = BaseProtocol.VERSION
-
-    def connectionLost(self, reason):
-        """
-        Called when the connection is lost for some reason.
-
-        Cleans up any timeouts/buffer etc.
-        """
-        protocol.Protocol.connectionLost(self, reason)
-
-        if self.debug or DEBUG:
-            log(self, "Lost connection (reason:%s)" % str(reason))
-
-        if self.decoder:
-            self.decoder.pause()
-
-        if self.encoder:
-            self.encoder.pause()
+        self.handshaker.start(0, 0)
 
     def decodeStream(self, data):
         """
         """
         self.decoder.dataReceived(data)
 
-    def logAndDisconnect(self, failure=None):
-        """
-        """
-        if failure is not None:
-            log(self, 'error %r' % (failure,))
-            log(self, failure.getBriefTraceback())
-
-        self.transport.loseConnection()
-
-    def versionReceived(self, version):
-        """
-        Called when the protocol version has been received.
-        """
-        if version != self.protocolVersion:
-            raise protocol.VersionMismatch(version)
-
     def dataReceived(self, data):
         """
         Called when data is received from the underlying L{transport}.
         """
-        if self.state == BaseProtocol.STREAM:
-            self.decodeStream(data)
-        elif self.state == BaseProtocol.HANDSHAKE:
-            self.decodeHandshake(data)
-        elif self.state == BaseProtocol.STREAM:
-            self.versionReceived(ord(data[0]))
+        dr = getattr(self, '_' + self.state + '_dataReceived', None)
 
-            data = data[1:]
-
-            if data:
-                self.dataReceived(data)
-        else:
+        try:
+            dr(data)
+        except:
             self.transport.loseConnection()
+
+            raise
+
+    def _stream_dataReceived(self, data):
+        print 'eh', repr(data)
+
+    def _handshake_dataReceived(self, data):
+        self.handshaker.dataReceived(data)
 
     # interfaces.IHandshakeObserver
 
-    def handshakeSuccess(self):
+    def handshakeSuccess(self, data):
         """
         Called when the RTMP handshake was successful. Once called, packet
         streaming can commence.
         """
-        from rtmpy.rtmp import codec
-
-        if self.debug or DEBUG:
-            log(self, "Successful handshake")
-
         self.state = self.STREAM
-        self.streams = {}
-        self.activeStreams = []
-
-        self.decoder = codec.Decoder(self)
-        self.encoder = codec.Encoder(self)
-
-        ErrorLoggingCodecObserver(self, self.decoder)
-        ErrorLoggingCodecObserver(self, self.encoder)
-
-        self.encoder.registerConsumer(self.transport)
 
         del self.handshaker
 
-
-    def handshakeFailure(self, reason):
-        """
-        Called when the RTMP handshake failed for some reason. Drops the
-        connection immediately.
-        """
-        if self.debug or DEBUG:
-            log(self, "Failed handshake (reason:%s)" % str(reason))
-
-        self.transport.loseConnection()
+        if data:
+            self.dataReceived(data)
 
     def writePacket(self, *args, **kwargs):
         """
