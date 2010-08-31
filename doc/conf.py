@@ -38,8 +38,6 @@ source_suffix = '.rst'
 # The encoding of source files.
 #source_encoding = 'utf-8-sig'
 
-# The master toctree document.
-master_doc = 'index'
 
 # create content template for the homepage
 from util import rst2html, copy_file
@@ -149,7 +147,9 @@ html_static_path = ['html/static']
 
 # Additional templates that should be rendered to pages, maps page names to
 # template names.
-#html_additional_pages = {}
+html_additional_pages = {
+    'index': 'defindex.html',
+}
 
 # If false, no module index is generated.
 #html_domain_indices = True
