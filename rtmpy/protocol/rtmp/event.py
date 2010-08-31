@@ -7,11 +7,7 @@ RTMP Channel type declarations.
 @since: 0.1
 """
 
-from zope.interface import implements
 import pyamf
-
-from rtmpy.util import BufferedByteStream
-from rtmpy.protocol import interfaces
 
 
 #: Changes the frame size for events
@@ -85,13 +81,13 @@ class BaseEvent(object):
     """
 
     def encode(self, buf):
-        raise NotImplementedError()
+        raise NotImplementedError
 
     def decode(self, buf):
-        raise NotImplementedError()
+        raise NotImplementedError
 
     def dispatch(self, listener, timestamp):
-        raise NotImplementedError()
+        raise NotImplementedError
 
 
 class FrameSize(BaseEvent):
@@ -179,14 +175,14 @@ class BytesRead(BaseEvent):
             raise EncodeError('Bytes read wrong type '
                 '(expected int, got %r)' % (type(self.bytes),))
 
-    def dispatch(self, listener):
+    def dispatch(self, listener, timestamp):
         """
         Dispatches an 'onBytesRead' event to the listener.
 
         @param listener: The event listener.
         @type listener: L{interfaces.IEventListener}
         """
-        return listener.onBytesRead(self.bytes)
+        return listener.onBytesRead(self.bytes, timestamp)
 
 
 class ControlEvent(BaseEvent):
@@ -398,7 +394,7 @@ class Notify(BaseEvent):
         return '<%s name=%r id=%r argv=%r at 0x%x>' % (
             self.__class__.__name__, self.name, self.id, self.argv, id(self))
 
-    def decode(self, buf, encoding):
+    def decode(self, buf, encoding=0):
         """
         Decode a notification event.
 
@@ -416,7 +412,7 @@ class Notify(BaseEvent):
 
         self.argv = list(gen)
 
-    def encode(self, buf, encoding):
+    def encode(self, buf, encoding=0):
         """
         Encode a notification event.
 

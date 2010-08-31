@@ -12,8 +12,7 @@ Utility/helper functions for encoding and decoding RTMP headers.
 @since: 0.1
 """
 
-from rtmpy import protocol, util
-from rtmpy.protocol import interfaces
+from rtmpy import protocol
 
 
 #: The header can come in one of four sizes: 12, 8, 4, or 1 byte(s).
@@ -211,8 +210,6 @@ def decodeHeader(stream):
     @rtype: L{Header}
     """
     size, channelId = decodeHeaderByte(stream.read_uchar())
-    relative = size != 12
-
     header = Header(channelId)
 
     if size == 1:
