@@ -369,13 +369,15 @@ class Decoder(ChannelDemuxer):
 
     def next(self):
         """
-        Iterates over the RTMP stream and dispatches messages to the
+        Iterates over the RTMP stream and dispatches decoded messages to the
         C{dispatcher}.
 
         This function does not return anything. Call it iteratively to pump RTMP
-        messages out of the stream. If C{IOError} is raised, something went
-        wrong decoding the stream, otherwise C{StopIteration} will be raised if
-        the end of the stream is reached.
+        messages out of the stream.
+
+        If C{IOError} is raised, something went wrong decoding the stream,
+        otherwise C{StopIteration} will be raised if the end of the stream is
+        reached.
         """
         data, meta = ChannelDemuxer.next(self)
 
