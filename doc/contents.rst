@@ -4,6 +4,8 @@
 
 .. toctree::
 
+   community/index.rst
+
    install.rst
    about.rst
    bugs.rst
