@@ -190,7 +190,7 @@ class BaseNegotiator(object):
         self.transport = transport
         self.started = False
 
-    def start(self, uptime, version):
+    def start(self, uptime=None, version=None):
         """
         Called to start the handshaking negotiations.
         """
@@ -326,7 +326,7 @@ class ClientNegotiator(BaseNegotiator):
     Negotiator for client initiating handshakes.
     """
 
-    def start(self, uptime, version):
+    def start(self, uptime=None, version=None):
         """
         Writes the handshake version and the syn packet.
         """
