@@ -1,16 +1,15 @@
-# Copyright (c) 2007-2009 The RTMPy Project.
-# See LICENSE for details.
+# Copyright The RTMPy Project.
+# See LICENSE.txt for details.
 
 """
-RTMP Channel type declarations.
-
-@since: 0.1
+RTMP message implementations.
 """
 
+from zope.interface import Interface, implements
 import pyamf
 
 
-#: Changes the frame size for events
+#: Changes the frame size for the RTMP stream
 FRAME_SIZE = 0x01
 # 0x02 is unknown
 #: Send every x bytes read by both sides
@@ -45,6 +44,135 @@ FLV_DATA = 0x16
 STREAMABLE_TYPES = [AUDIO_DATA, VIDEO_DATA]
 
 
+class IMessageListener(Interface):
+    """
+    Receives dispatched messages.
+    """
+
+    def onInvoke(invoke, timestamp):
+        """
+        Called when an invoke event have been received.
+
+        @param invoke: The object representing the call request. See
+            L{rtmpy.rtmp.event.Invoke} for an example implementation.
+        @param timestamp: The timestamp that this message was dispatched.
+        """
+
+    def onNotify(notify, timestamp):
+        """
+        Similar to L{onInvoke} but no response is expected and will be ignored.
+
+        @param notify: The object representing the notify request.
+        @param timestamp: The timestamp that this message was dispatched.
+        """
+
+    def onAudioData(data, timestamp):
+        """
+        Called when audio data is received.
+
+        @param data: The audio bytes received.
+        @param timestamp: The timestamp that this message was dispatched.
+        """
+
+    def onVideoData(data, timestamp):
+        """
+        Called when video data is received.
+
+        @param data: The video bytes received.
+        @param timestamp: The timestamp that this message was dispatched.
+        """
+
+    # These methods should only be called on the RTMP command stream.
+
+    def onFrameSize(size, timestamp):
+        """
+        Called when the RTMP frame size has changed.
+
+        @param size: The new size of any subsequent RTMP frames in the stream.
+        @param timestamp: The timestamp that this message was dispatched.
+        """
+
+    def onBytesRead(bytes, timestamp):
+        """
+        Called when the peer reports the number of raw bytes read from the
+        stream. This is a kind of 'keep-alive' packet.
+
+        @param bytes: The number of bytes read.
+        @type bytes: C{int}
+        @param timestamp: The timestamp that this message was dispatched.
+        """
+
+    def onControlMessage(message, timestamp):
+        """
+        Called when a control message is received by the peer.
+
+        This could probably be split out into constituent parts once we
+        understand what the various messages actually mean.
+
+        @param message: The received message.
+        @type message: L{rtmpy.rtmp.event.ControlMessage}
+        @param timestamp: The timestamp that this message was dispatched.
+        """
+
+    def onDownstreamBandwidth(bandwidth, timestamp):
+        """
+        Called when the connected endpoint reports its downstream bandwidth
+        limit.
+
+        @param bandwidth: The amount of bandwidth available (appears to be
+            measured in Kbps).
+        @type bandwidth: C{int}
+        @param timestamp: The timestamp that this message was dispatched.
+        """
+
+    def onUpstreamBandwidth(bandwidth, extra, timestamp):
+        """
+        Called when the connected endpoint reports its upstream bandwidth
+        limit.
+
+        @param bandwidth: The amount of bandwidth available (it appears to be
+            measured in Kbps).
+        @type bandwidth: C{int}
+        @param extra: Not quite sure what this represents atm.
+        @type extra: C{int}
+        @param timestamp: The timestamp that this message was dispatched.
+        """
+
+
+class IMessage(Interface):
+    """
+    An RTMP message in all its forms.
+
+    @see: U{RTMP datatypes on OSFlash<http://osflash.org/documentation/
+        rtmp#rtmp_datatypes>}
+    """
+
+    def encode(stream):
+        """
+        Encodes the event instance to C{stream}.
+
+        @type stream: L{pyamf.util.BufferedByteStream}
+        @raise EncodeError:
+        """
+
+    def decode(stream):
+        """
+        Decodes the event instance from C{stream}.
+
+        @type stream: L{pyamf.util.BufferedByteStream}
+        """
+
+    def dispatch(listener, timestamp):
+        """
+        Dispatch the event to the listener. Calls the correct method with the
+        correct args according to L{IEventListener}.
+
+        @param listener: Receives the event dispatch request.
+        @type listener: L{IEventListener}
+        @param timestamp: The timestamp that this message was dispatched.
+        """
+
+
 class BaseError(Exception):
     """
     Base error class for all things C{event}.
@@ -75,25 +203,57 @@ class UnknownEventType(BaseError):
     """
 
 
-class BaseEvent(object):
+class Message(object):
     """
-    An abstract class that all event types extend.
+    An abstract class that all message types extend.
     """
 
+    implements(IMessage)
+
     def encode(self, buf):
+        """
+        Called to encode the event to C{buf}.
+
+        @type buf: L{pyamf.util.BufferedByteStream}
+        """
         raise NotImplementedError
 
     def decode(self, buf):
+        """
+        Called to decode the event from C{buf}.
+
+        @type buf: L{pyamf.util.BufferedByteStream}
+        """
         raise NotImplementedError
 
     def dispatch(self, listener, timestamp):
+        """
+        Called to dispatch the event into listener.
+
+        @type listener: L{IEventListener}
+        """
         raise NotImplementedError
 
+    def __repr__(self):
+        t = self.__class__
+        keys = self.__dict__.keys()
+        keys.sorted()
 
-class FrameSize(BaseEvent):
+        s = '<%s.%s '
+
+        if keys:
+            for k in keys:
+                s += '%s=%r ' % (k, self.__dict__[k])
+
+        s += 'at 0x%x>'
+
+        return s % (t.__module__, t.__name__, id(self))
+
+
+class FrameSize(Message):
     """
-    A frame size event. This determines the number of bytes for the frame
-    body in the RTMP stream.
+    A frame size message. This determines the maximum number of bytes for the
+    frame body in the RTMP stream.
 
     @ivar size: Number of bytes for RTMP frame bodies.
     @type size: C{int}
@@ -104,20 +264,13 @@ class FrameSize(BaseEvent):
 
     def decode(self, buf):
         """
-        Decode a frame size event.
-
-        @param buf: Contains the encoded data.
-        @type buf: L{BufferedByteStream}
+        Decode a frame size message.
         """
         self.size = buf.read_ulong()
 
     def encode(self, buf):
         """
-        Encode a frame size event.
-
-        @param buf: Receives the encoded data.
-        @type buf: L{BufferedByteStream}
-        @raise EncodeError: Frame size not set or wrong type.
+        Encode a frame size message.
         """
         if self.size is None:
             raise EncodeError('Frame size not set')
@@ -130,17 +283,14 @@ class FrameSize(BaseEvent):
 
     def dispatch(self, listener, timestamp):
         """
-        Dispatches an 'onFrameSize' event to the listener.
-
-        @param listener: The listener to frame size events.
-        @type listener: L{interfaces.IEventListener}
+        Dispatches the message to the listener.
         """
-        return listener.onFrameSize(self.size, timestamp)
+        listener.onFrameSize(self.size, timestamp)
 
 
-class BytesRead(BaseEvent):
+class BytesRead(Message):
     """
-    A bytes read event.
+    A bytes read message.
 
     @param bytes: The number of bytes read.
     @type bytes: C{int}
@@ -151,20 +301,13 @@ class BytesRead(BaseEvent):
 
     def decode(self, buf):
         """
-        Decode a bytes read event.
-
-        @param buf: Contains the encoded data.
-        @type buf: L{BufferedByteStream}
+        Decode a bytes read message.
         """
         self.bytes = buf.read_ulong()
 
     def encode(self, buf):
         """
-        Encode a bytes read event.
-
-        @param buf: Receives the encoded data.
-        @type buf: L{BufferedByteStream}
-        @raise EncodeError: Bytes read not set or wrong type.
+        Encode a bytes read message.
         """
         if self.bytes is None:
             raise EncodeError('Bytes read not set')
@@ -177,17 +320,14 @@ class BytesRead(BaseEvent):
 
     def dispatch(self, listener, timestamp):
         """
-        Dispatches an 'onBytesRead' event to the listener.
-
-        @param listener: The event listener.
-        @type listener: L{interfaces.IEventListener}
+        Dispatches the message to the listener.
         """
-        return listener.onBytesRead(self.bytes, timestamp)
+        listener.onBytesRead(self.bytes, timestamp)
 
 
-class ControlEvent(BaseEvent):
+class ControlMessage(Message):
     """
-    A control event. Akin to Red5's Ping Event.
+    A control message. Akin to Red5's Ping event.
     """
 
     UNDEFINED = -1
@@ -200,17 +340,9 @@ class ControlEvent(BaseEvent):
         self.value2 = value2
         self.value3 = value3
 
-    def __repr__(self):
-        return '<%s type=%r value1=%r value2=%r value3=%r at 0x%x>' % (
-            self.__class__.__name__, self.type, self.value1, self.value2,
-            self.value3, id(self))
-
     def decode(self, buf):
         """
-        Decode a control message event.
-
-        @param buf: Contains the encoded data.
-        @type buf: L{BufferedByteStream}
+        Decode a control message.
         """
         self.type = buf.read_short()
         self.value1 = buf.read_long()
@@ -223,11 +355,7 @@ class ControlEvent(BaseEvent):
 
     def encode(self, buf):
         """
-        Encode a control message event.
-
-        @param buf: Receives the encoded data.
-        @type buf: L{BufferedByteStream}
-        @raise EncodeError: Type not set or unexpected type.
+        Encode a control message.
         """
         if self.type is None:
             raise EncodeError('Type not set')
@@ -260,17 +388,14 @@ class ControlEvent(BaseEvent):
 
     def dispatch(self, listener, timestamp):
         """
-        Dispatches an 'onControlMessage' event to the listener.
-
-        @param listener: The event listener.
-        @type listener: L{interfaces.IEventListener}
+        Dispatches the event to the listener.
         """
         return listener.onControlMessage(self, timestamp)
 
 
-class DownstreamBandwidth(BaseEvent):
+class DownstreamBandwidth(Message):
     """
-    A downstream bandwidth event.
+    A downstream bandwidth message.
     """
 
     def __init__(self, bandwidth=None):
@@ -278,21 +403,13 @@ class DownstreamBandwidth(BaseEvent):
 
     def decode(self, buf):
         """
-        Decode a downstream bandwidth event.
-
-        @param buf: Contains the encoded data.
-        @type buf: L{BufferedByteStream}
+        Decode a downstream bandwidth message.
         """
         self.bandwidth = buf.read_ulong()
 
     def encode(self, buf):
         """
-        Encode a downstream bandwidth event.
-
-        @param buf: Receives the encoded data.
-        @type buf: L{BufferedByteStream}
-        @raise EncodeError: Downstream bandwidth not set.
-        @raise EncodeError: C{TypeError} for downstream bandwidth.
+        Encode a downstream bandwidth message.
         """
         if self.bandwidth is None:
             raise EncodeError('Downstream bandwidth not set')
@@ -305,17 +422,14 @@ class DownstreamBandwidth(BaseEvent):
 
     def dispatch(self, listener, timestamp):
         """
-        Dispatches an 'onDownstreamBandwidth' event to the listener.
-
-        @param listener: The event listener.
-        @type listener: L{interfaces.IEventListener}
+        Dispatches the message to the listener.
         """
         return listener.onDownstreamBandwidth(self.bandwidth, timestamp)
 
 
-class UpstreamBandwidth(BaseEvent):
+class UpstreamBandwidth(Message):
     """
-    An upstream bandwidth event.
+    An upstream bandwidth message.
 
     @param bandwidth: The upstream bandwidth available.
     @type bandwidth: C{int}
@@ -328,23 +442,14 @@ class UpstreamBandwidth(BaseEvent):
 
     def decode(self, buf):
         """
-        Decode an upstream bandwidth event.
-
-        @param buf: Contains the encoded data.
-        @type buf: L{BufferedByteStream}
+        Decode an upstream bandwidth message.
         """
         self.bandwidth = buf.read_ulong()
         self.extra = buf.read_uchar()
 
     def encode(self, buf):
         """
-        Encode an upstream bandwidth event.
-
-        @param buf: Receives the encoded data.
-        @type buf: L{BufferedByteStream}
-        @raise EncodeError: Upstream bandwidth or L{extra} not set.
-        @raise EncodeError: C{TypeError} for upstream bandwidth or
-            L{extra}.
+        Encode an upstream bandwidth message.
         """
         if self.bandwidth is None:
             raise EncodeError('Upstream bandwidth not set')
@@ -366,21 +471,19 @@ class UpstreamBandwidth(BaseEvent):
 
     def dispatch(self, listener, timestamp):
         """
-        Dispatches an 'onUpstreamBandwidth' event to the listener.
-
-        @param listener: The event listener.
-        @type listener: L{interfaces.IEventListener}
+        Dispatches the message to the listener.
         """
-        return listener.onUpstreamBandwidth(self.bandwidth, self.extra, timestamp)
+        return listener.onUpstreamBandwidth(
+            self.bandwidth, self.extra, timestamp)
 
 
-class Notify(BaseEvent):
+class Notify(Message):
     """
-    A notification event.
+    A notification message.
 
     @param name: The method name to call.
     @type name: C{str}
-    @param id: The global identifier (per connection) for the call.
+    @param id: The global identifier (per stream) for the call.
     @type id: C{int}
     @param argv: A list of elements to represent the method arguments.
     """
@@ -390,52 +493,31 @@ class Notify(BaseEvent):
         self.id = id
         self.argv = list(args)
 
-    def __repr__(self):
-        return '<%s name=%r id=%r argv=%r at 0x%x>' % (
-            self.__class__.__name__, self.name, self.id, self.argv, id(self))
-
     def decode(self, buf, encoding=0):
         """
-        Decode a notification event.
-
-        @param buf: Contains the encoded data.
-        @type buf: L{BufferedByteStream}
-        @param encoding: The AMF encoding type. Defaults to AMF0.
-        @return: A L{defer.Deferred} that will `callback` when the decoding is
-            finished.
-        @rtype: L{defer.Deferred}
+        Decode a notification message.
         """
         gen = pyamf.decode(buf, encoding=encoding)
 
-        for a in ['name', 'id']:
-            setattr(self, a, gen.next())
+        self.name = gen.next()
+        self.id = gen.next()
 
         self.argv = list(gen)
 
     def encode(self, buf, encoding=0):
         """
-        Encode a notification event.
-
-        @param buf: Contains the encoded data.
-        @type buf: L{BufferedByteStream}
-        @param encoding: The AMF encoding type. Defaults to AMF0.
-        @return: A L{defer.Deferred} that will `callback` when the encoding is
-            finished.
-        @rtype: L{defer.Deferred}
+        Encode a notification message.
         """
         args = [self.name, self.id] + self.argv
 
         encoder = pyamf.get_encoder(encoding, buf)
 
         for a in args:
-            yield encoder.writeElement(a)
+            encoder.writeElement(a)
 
     def dispatch(self, listener, timestamp):
         """
-        Dispatches an 'onNotify' event to the listener.
-
-        @param listener: The event listener.
-        @type listener: L{interfaces.IEventListener}
+        Dispatches the message to the listener.
         """
         return listener.onNotify(self, timestamp)
 
@@ -447,19 +529,16 @@ class Invoke(Notify):
 
     def dispatch(self, listener, timestamp):
         """
-        Dispatches an 'onInvoke' event to the listener.
-
-        @param listener: The event listener.
-        @type listener: L{interfaces.IEventListener}
+        Dispatches the message to the listener.
         """
-        return listener.onInvoke(self, timestamp)
+        listener.onInvoke(self, timestamp)
 
 
-class BaseStreamingEvent(BaseEvent):
+class StreamingMessage(Message):
     """
-    An event containing streaming data.
+    An message containing streaming data.
 
-    @param data: The raw audio data.
+    @param data: The streaming data.
     @type data: C{str}
     """
 
@@ -468,21 +547,14 @@ class BaseStreamingEvent(BaseEvent):
 
     def decode(self, buf):
         """
-        Decode a streaming event.
-
-        @param buf: Contains the encoded data.
-        @type buf: L{BufferedByteStream}
+        Decode a streaming message.
         """
         if not buf.at_eof():
             self.data = buf.read()
 
     def encode(self, buf):
         """
-        Encode a streaming event.
-
-        @param buf: Receives the encoded data.
-        @type buf: L{BufferedByteStream}
-        @raise EncodeError: No L{data} set or C{TypeError} for L{data}.
+        Encode a streaming message.
         """
         if self.data is None:
             raise EncodeError('No data set')
@@ -494,33 +566,27 @@ class BaseStreamingEvent(BaseEvent):
                 type(self.data),))
 
 
-class AudioData(BaseStreamingEvent):
+class AudioData(StreamingMessage):
     """
-    A event containing audio data.
+    A message containing audio data.
     """
 
     def dispatch(self, listener, timestamp):
         """
-        Dispatches an 'onAudioData' event to the listener.
-
-        @param listener: The event listener.
-        @type listener: L{interfaces.IEventListener}
+        Dispatches the message to the listener.
         """
         if self.data:
-            return listener.onAudioData(self.data, timestamp)
+            listener.onAudioData(self.data, timestamp)
 
 
-class VideoData(BaseStreamingEvent):
+class VideoData(StreamingMessage):
     """
-    A event containing video data.
+    A message containing video data.
     """
 
     def dispatch(self, listener, timestamp):
         """
-        Dispatches an 'onVideoData' event to the listener.
-
-        @param listener: The event listener.
-        @type listener: L{interfaces.IEventListener}
+        Dispatches the message to the listener.
         """
         if self.data:
             return listener.onVideoData(self.data, timestamp)
@@ -530,7 +596,7 @@ class VideoData(BaseStreamingEvent):
 TYPE_MAP = {
     FRAME_SIZE: FrameSize,
     BYTES_READ: BytesRead,
-    CONTROL: ControlEvent,
+    CONTROL: ControlMessage,
     DOWNSTREAM_BANDWIDTH: DownstreamBandwidth,
     UPSTREAM_BANDWIDTH: UpstreamBandwidth,
     NOTIFY: Notify,
@@ -549,7 +615,8 @@ def get_type_class(datatype):
     @param datatype: The event type
     @type datatype: C{int}
     @return: The event class that is mapped to C{datatype}.
-    @rtype: C{class} implementing L{interfaces.IEvent}
+    @rtype: C{class} implementing L{interfaces.IMessage} for the given event
+        type.
     @raise UnknownEventType: Unknown event type for C{datatype}.
     """
     try:
