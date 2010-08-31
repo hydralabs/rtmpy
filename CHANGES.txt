@@ -8,5 +8,5 @@ versions of RTMPy.
 
 0.1.0 (unreleased)
 ------------------
- - Encoder and decoder for the RTMP protocol
- - Methods to construct and send RTMP packets
+- Encoder and decoder for the RTMP protocol
+- Methods to construct and send RTMP packets
