@@ -1,48 +1,20 @@
-# Copyright (c) 2007-2009 The RTMPy Project.
-# See LICENSE for details.
+# Copyright the RTMPy project.
+# See LICENSE.txt for details.
 
 """
-Tests for L{rtmpy.rtmp.event}.
+Tests for L{rtmpy.protocol.rtmp.message}.
 """
 
-from zope.interface import implements
-from twisted.trial import unittest
-from twisted.internet import defer
-from twisted.python.failure import Failure
+import unittest
 import pyamf
+from pyamf.util import BufferedByteStream
 
-from rtmpy.protocol import interfaces, event
-from rtmpy.util import BufferedByteStream
+from rtmpy.protocol.rtmp import message
 
 
-class MockPacket(object):
+class MockMessageListener(object):
     """
     """
-
-    implements(interfaces.IEvent)
-
-    expected_encode = None
-    expected_decode = None
-
-    encode_func = lambda bbs: None
-    decode_func = lambda bbs: None
-
-    def encode(self, bbs, *args, **kwargs):
-        self.encode_func(bbs, *args, **kwargs)
-
-        return self.expected_encode
-
-    def decode(self, bbs, *args, **kwargs):
-        self.decode_func(bbs, *args, **kwargs)
-
-        return self.expected_decode
-
-
-class MockEventListener(object):
-    """
-    """
-
-    implements(interfaces.IEventListener)
 
     def __init__(self):
         self.calls = []
@@ -50,276 +22,97 @@ class MockEventListener(object):
     def onInvoke(self, *args, **kwargs):
         self.calls.append(('invoke', args, kwargs))
 
-        return self
-
     def onNotify(self, *args, **kwargs):
         self.calls.append(('notify', args, kwargs))
-
-        return self
 
     def onFrameSize(self, *args, **kwargs):
         self.calls.append(('frame-size', args, kwargs))
 
-        return self
-
     def onBytesRead(self, *args, **kwargs):
         self.calls.append(('bytes-read', args, kwargs))
-
-        return self
 
     def onControlMessage(self, *args, **kwargs):
         self.calls.append(('control', args, kwargs))
 
-        return self
-
     def onDownstreamBandwidth(self, *args, **kwargs):
         self.calls.append(('bw-down', args, kwargs))
-
-        return self
 
     def onUpstreamBandwidth(self, *args, **kwargs):
         self.calls.append(('bw-up', args, kwargs))
 
-        return self
-
     def onAudioData(self, *args, **kwargs):
         self.calls.append(('audio', args, kwargs))
-
-        return self
 
     def onVideoData(self, *args, **kwargs):
         self.calls.append(('video', args, kwargs))
 
-        return self
-
 
 class BaseTestCase(unittest.TestCase):
     """
-    Ensures that L{event.TYPE_MAP} is properly restored.
     """
 
     def setUp(self):
-        self._type_map = event.TYPE_MAP.copy()
-        self._mock_dict = MockPacket.__dict__.copy()
-
         self.buffer = BufferedByteStream()
-
-    def tearDown(self):
-        event.TYPE_MAP = self._type_map
-
-        for k, v in self._mock_dict.iteritems():
-            if not k.startswith('_'):
-                setattr(MockPacket, k, v)
-
-    def _fail(self, r):
-        print r, str(r.value)
-        self.fail()
+        self.listener = MockMessageListener()
 
 
-class DecodeTestCase(BaseTestCase):
+class MessageTestCase(unittest.TestCase):
     """
-    Tests for L{event.decode}
-    """
-
-    def test_return_type(self):
-        d = event.decode(None, None).addErrback(lambda f: None)
-
-        self.assertTrue(isinstance(d, defer.Deferred))
-
-    def test_unknown_type(self):
-        def eb(f):
-            self.assertTrue(isinstance(f, Failure))
-            self.assertEquals(f.type, event.DecodeError)
-
-            self.assertEquals(str(f.value), 'Unknown datatype \'None\'')
-
-        return event.decode(None, None).addErrback(eb)
-
-    def test_trailing_data(self):
-        body = 'foo.bar'
-        self.executed = False
-
-        def decode(event, bbs):
-            self.executed = True
-            bbs.read(4)
-
-        MockPacket.decode_func = decode
-
-        event.TYPE_MAP[0] = MockPacket
-
-        def eb(f):
-            self.assertTrue(isinstance(f, Failure))
-            self.assertEquals(f.type, event.TrailingDataError)
-
-            self.assertEquals(str(f.value), '')
-            self.assertTrue(self.executed)
-
-        return event.decode(0, body).addCallback(self._fail).addErrback(eb)
-
-    def test_return(self):
-        body = 'foo.bar'
-        self.executed = False
-
-        def decode(event, bbs):
-            self.executed = True
-            bbs.read(7)
-
-        MockPacket.decode_func = decode
-
-        event.TYPE_MAP[0] = MockPacket
-
-        def cb(r):
-            self.assertTrue(isinstance(r, MockPacket))
-            self.assertTrue(self.executed)
-
-        return event.decode(0, body).addCallback(cb).addErrback(self._fail)
-
-    def test_args(self):
-        args = ('foo', 'bar')
-        kwargs = {'baz': 'gak', 'spam': 'eggs'}
-        self.executed = False
-
-        def decode(event, bbs, *a, **kw):
-            self.assertEquals(args, a)
-            self.assertEquals(kwargs, kw)
-
-            self.executed = True
-
-        MockPacket.decode_func = decode
-
-        event.TYPE_MAP[0] = MockPacket
-
-        d = event.decode(0, '', *args, **kwargs)
-        d.addCallback(lambda r: self.assertTrue(self.executed))
-        d.addErrback(self._fail)
-
-        return d
-
-
-class EncodeTestCase(BaseTestCase):
-    """
-    Tests for L{event.encode}
-    """
-
-    def test_return_type(self):
-        d = event.encode(None).addErrback(lambda f: None)
-
-        self.assertTrue(isinstance(d, defer.Deferred))
-
-    def test_interface(self):
-        x = object()
-
-        self.assertFalse(interfaces.IEvent.implementedBy(x))
-
-        def eb(f):
-            self.assertTrue(isinstance(f, Failure))
-            self.assertEquals(f.type, TypeError)
-
-            self.assertEquals(str(f.value),
-                "Expected an event interface (got:<type 'object'>)")
-
-        return event.encode(x).addCallback(self._fail).addErrback(eb)
-
-    def test_unknown_type(self):
-        self.assertFalse(MockPacket in event.TYPE_MAP.values())
-        x = MockPacket()
-
-        def eb(f):
-            self.assertTrue(isinstance(f, Failure))
-            self.assertEquals(f.type, event.UnknownEventType)
-
-            self.assertEquals(str(f.value), 'Unknown event type for %r' % x)
-
-        return event.encode(x).addCallback(self._fail).addErrback(eb)
-
-    def test_return(self):
-        def encode(event, bbs):
-            bbs.write('foo.bar')
-
-        MockPacket.encode_func = encode
-        event.TYPE_MAP[0] = MockPacket
-
-        def cb(b):
-            self.assertEquals(b, (0, 'foo.bar'))
-
-        x = MockPacket()
-
-        return event.encode(x).addErrback(self._fail).addCallback(cb)
-
-    def test_args(self):
-        args = ('foo', 'bar')
-        kwargs = {'baz': 'gak', 'spam': 'eggs'}
-        self.executed = False
-
-        def encode(event, bbs, *a, **kw):
-            self.assertEquals(args, a)
-            self.assertEquals(kwargs, kw)
-
-            self.executed = True
-
-        MockPacket.encode_func = encode
-        event.TYPE_MAP[0] = MockPacket
-
-        x = MockPacket()
-
-        d = event.encode(x, *args, **kwargs)
-        d.addCallback(lambda r: self.assertTrue(self.executed))
-        d.addErrback(self._fail)
-
-        return d
-
-
-class BaseEventTestCase(unittest.TestCase):
-    """
-    Tests for L{event.BaseEvent}
+    Tests for L{message.Message}
     """
 
     def test_interface(self):
-        x = event.BaseEvent()
+        x = message.Message()
 
-        self.assertTrue(interfaces.IEvent.providedBy(x))
+        self.assertTrue(message.IMessage.providedBy(x))
 
         self.assertRaises(NotImplementedError, x.encode, None)
         self.assertRaises(NotImplementedError, x.decode, None)
-        self.assertRaises(NotImplementedError, x.dispatch, None)
+        self.assertRaises(NotImplementedError, x.dispatch, None, None)
+
+    def test_repr(self):
+        x = message.Message()
+        x.foo = 'bar'
+
+        self.assertEqual(repr(x),
+            "<rtmpy.protocol.rtmp.message.Message foo='bar' at 0x%x>" % id(x))
 
 
 class FrameSizeTestCase(BaseTestCase):
     """
-    Tests for L{event.FrameSize}
+    Tests for L{message.FrameSize}
     """
 
     def test_create(self):
-        x = event.FrameSize()
+        x = message.FrameSize()
         self.assertEquals(x.__dict__, {'size': None})
 
-        x = event.FrameSize(10)
+        x = message.FrameSize(10)
         self.assertEquals(x.__dict__, {'size': 10})
 
-        x = event.FrameSize(size=20)
+        x = message.FrameSize(size=20)
         self.assertEquals(x.__dict__, {'size': 20})
 
     def test_raw_encode(self):
         # test default encode
-        x = event.FrameSize()
-        e = self.assertRaises(event.EncodeError, x.encode, self.buffer)
-        self.assertEquals(str(e), 'Frame size not set')
+        x = message.FrameSize()
+        e = self.assertRaises(message.EncodeError, x.encode, self.buffer)
+        #self.assertEquals(str(e), 'Frame size not set')
 
         # test non-int encode
-        x = event.FrameSize(size='foo.bar')
-        e = self.assertRaises(event.EncodeError, x.encode, self.buffer)
-        self.assertEquals(str(e), 'Frame size wrong type '
-            '(expected int, got <type \'str\'>)')
+        x = message.FrameSize(size='foo.bar')
+        e = self.assertRaises(message.EncodeError, x.encode, self.buffer)
+        #self.assertEquals(str(e), 'Frame size wrong type '
+        #    '(expected int, got <type \'str\'>)')
 
-        x = event.FrameSize(size=50)
+        x = message.FrameSize(size=50)
         e = x.encode(self.buffer)
 
         self.assertEquals(e, None)
-
         self.assertEquals(self.buffer.getvalue(), '\x00\x00\x00\x32')
 
-    def test_raw_decode(self):
-        x = event.FrameSize()
+    def test_decode(self):
+        x = message.FrameSize()
 
         self.assertEquals(x.size, None)
         self.buffer.write('\x00\x00\x00\x32')
@@ -330,59 +123,29 @@ class FrameSizeTestCase(BaseTestCase):
         self.assertEquals(e, None)
         self.assertEquals(x.size, 50)
 
-    def test_encode(self):
-        e = event.FrameSize(size=2342)
-        self.executed = False
-
-        def cb(r):
-            self.assertEquals(r, (1, '\x00\x00\t&'))
-            self.executed = True
-
-        d = event.encode(e).addCallback(cb)
-        d.addCallback(lambda x: self.assertTrue(self.executed))
-        d.addErrback(self._fail)
-
-        return d
-
-    def test_decode(self):
-        self.executed = False
-
-        def cb(r):
-            self.assertTrue(isinstance(r, event.FrameSize))
-            self.assertEquals(r.__dict__, {'size': 2342})
-            self.executed = True
-
-        d = event.decode(1, '\x00\x00\t&').addCallback(cb)
-        d.addCallback(lambda x: self.assertTrue(self.executed))
-        d.addErrback(self._fail)
-
-        return d
-
     def test_dispatch(self):
-        listener = MockEventListener()
-        x = event.FrameSize(5678)
+        x = message.FrameSize(5678)
 
-        ret = x.dispatch(listener)
-        self.assertIdentical(ret, listener)
+        x.dispatch(self.listener, 54)
 
-        self.assertEquals(listener.calls, [('frame-size', (5678,), {})])
+        self.assertEquals(self.listener.calls, [('frame-size', (5678, 54), {})])
 
 
-class ControlEventTestCase(BaseTestCase):
+class ControlMessageTestCase(BaseTestCase):
     """
-    Tests for L{event.ControlEvent}
+    Tests for L{message.ControlMessage}
     """
 
     def test_create(self):
-        x = event.ControlEvent()
+        x = message.ControlMessage()
         self.assertEquals(x.__dict__, {
             'type': None,
             'value1': 0,
-            'value2': -1,
-            'value3': -1
+            'value2': None,
+            'value3': None
         })
 
-        x = event.ControlEvent(9, 123, 456, 789)
+        x = message.ControlMessage(9, 123, 456, 789)
         self.assertEquals(x.__dict__, {
             'type': 9,
             'value1': 123,
@@ -390,7 +153,7 @@ class ControlEventTestCase(BaseTestCase):
             'value3': 789
         })
 
-        x = event.ControlEvent(type=0, value1=123, value3=789, value2=456)
+        x = message.ControlMessage(type=0, value1=123, value3=789, value2=456)
         self.assertEquals(x.__dict__, {
             'type': 0,
             'value1': 123,
@@ -398,54 +161,54 @@ class ControlEventTestCase(BaseTestCase):
             'value3': 789
         })
 
-    def test_raw_encode(self):
-        x = event.ControlEvent()
-        e = self.assertRaises(event.EncodeError, x.encode, self.buffer)
-        self.assertEquals(str(e), 'Type not set')
+    def test_encode(self):
+        x = message.ControlMessage()
+        e = self.assertRaises(message.EncodeError, x.encode, self.buffer)
+        #self.assertEquals(str(e), 'Type not set')
 
         # test types ..
-        x = event.ControlEvent(type='3')
-        e = self.assertRaises(event.EncodeError, x.encode, self.buffer)
-        self.assertEquals(str(e), "TypeError encoding type "
-            "(expected int, got <type 'str'>)")
+        x = message.ControlMessage(type='3')
+        e = self.assertRaises(message.EncodeError, x.encode, self.buffer)
+        #self.assertEquals(str(e), "TypeError encoding type "
+        #    "(expected int, got <type 'str'>)")
 
-        x = event.ControlEvent(type=3, value1=None)
-        e = self.assertRaises(event.EncodeError, x.encode, self.buffer)
-        self.assertEquals(str(e), "TypeError encoding value1 "
-            "(expected int, got <type 'NoneType'>)")
+        x = message.ControlMessage(type=3, value1=None)
+        e = self.assertRaises(message.EncodeError, x.encode, self.buffer)
+        #self.assertEquals(str(e), "TypeError encoding value1 "
+        #    "(expected int, got <type 'NoneType'>)")
 
-        x = event.ControlEvent(type=3, value1=10, value2=object())
-        e = self.assertRaises(event.EncodeError, x.encode, self.buffer)
-        self.assertEquals(str(e), "TypeError encoding value2 "
-            "(expected int, got <type 'object'>)")
+        x = message.ControlMessage(type=3, value1=10, value2=object())
+        e = self.assertRaises(message.EncodeError, x.encode, self.buffer)
+        #self.assertEquals(str(e), "TypeError encoding value2 "
+        #    "(expected int, got <type 'object'>)")
 
-        x = event.ControlEvent(type=3, value1=10, value2=7, value3='foo')
-        e = self.assertRaises(event.EncodeError, x.encode, self.buffer)
-        self.assertEquals(str(e), "TypeError encoding value3 "
-            "(expected int, got <type 'str'>)")
+        x = message.ControlMessage(type=3, value1=10, value2=7, value3='foo')
+        e = self.assertRaises(message.EncodeError, x.encode, self.buffer)
+        #self.assertEquals(str(e), "TypeError encoding value3 "
+        #    "(expected int, got <type 'str'>)")
 
         self.buffer.truncate(0)
-        x = event.ControlEvent(2)
+        x = message.ControlMessage(2)
         e = x.encode(self.buffer)
-        self.assertEquals(self.buffer.getvalue(),
-            '\x00\x02\x00\x00\x00\x00\xff\xff\xff\xff\xff\xff\xff\xff')
+        #self.assertEquals(self.buffer.getvalue(),
+        #    '\x00\x02\x00\x00\x00\x00\xff\xff\xff\xff\xff\xff\xff\xff')
 
         self.buffer.truncate(0)
-        x = event.ControlEvent(type=0, value1=123, value3=789, value2=456)
+        x = message.ControlMessage(type=0, value1=123, value3=789, value2=456)
         e = x.encode(self.buffer)
 
         self.assertEquals(e, None)
         self.assertEquals(self.buffer.getvalue(),
             '\x00\x00\x00\x00\x00{\x00\x00\x01\xc8\x00\x00\x03\x15')
 
-    def test_raw_decode(self):
-        x = event.ControlEvent()
+    def test_decode(self):
+        x = message.ControlMessage()
 
         self.assertEquals(x.__dict__, {
             'type': None,
             'value1': 0,
-            'value2': -1,
-            'value3': -1
+            'value2': None,
+            'value3': None
         })
 
         self.buffer.write('\x00\x00\x00\x00\x00{\x00\x00\x01\xc8\x00\x00\x03\x15')
@@ -459,358 +222,184 @@ class ControlEventTestCase(BaseTestCase):
         self.assertEquals(x.value2, 456)
         self.assertEquals(x.value3, 789)
 
-    def test_encode(self):
-        e = event.ControlEvent(9, 123, 456, 789)
-        self.executed = False
-
-        def cb(r):
-            self.assertEquals(r, (4, '\x00\t\x00\x00\x00{\x00\x00\x01\xc8\x00'
-                '\x00\x03\x15'))
-            self.executed = True
-
-        d = event.encode(e).addCallback(cb)
-        d.addCallback(lambda x: self.assertTrue(self.executed))
-        d.addErrback(self._fail)
-
-        return d
-
-    def test_decode(self):
-        bytes = '\x00\t\x00\x00\x00{\x00\x00\x01\xc8\x00\x00\x03\x15'
-        self.executed = False
-
-        def cb(r):
-            self.assertTrue(isinstance(r, event.ControlEvent))
-            self.assertEquals(r.__dict__, {
-                'type': 9,
-                'value1': 123,
-                'value2': 456,
-                'value3': 789})
-
-            self.executed = True
-
-        d = event.decode(4, bytes).addCallback(cb)
-        d.addCallback(lambda x: self.assertTrue(self.executed))
-        d.addErrback(self._fail)
-
-        return d
-
-    def test_repr(self):
-        e = event.ControlEvent(9, 13, 45, 23)
-
-        self.assertEquals(repr(e),
-            '<ControlEvent type=9 value1=13 value2=45 value3=23 at 0x%x>' % (
-                id(e)))
-
     def test_dispatch(self):
-        listener = MockEventListener()
-        x = event.ControlEvent()
+        x = message.ControlMessage()
 
-        ret = x.dispatch(listener)
-        self.assertIdentical(ret, listener)
+        x.dispatch(self.listener, 54)
 
-        self.assertEquals(listener.calls, [('control', (x,), {})])
+        self.assertEquals(self.listener.calls, [('control', (x, 54), {})])
 
 
 class NotifyTestCase(BaseTestCase):
     """
-    Tests for L{event.Notify}
+    Tests for L{message.Notify}
     """
 
     def test_create(self):
-        e = event.Notify()
+        e = message.Notify()
         self.assertEquals(e.__dict__, {'name': None, 'id': None, 'argv': []})
 
-        e = event.Notify('foo', 'bar', 'baz', ['gak', 'foo', 'bar'])
+        e = message.Notify('foo', 'bar', {'baz': 'gak', 'spam': 'eggs'}, 'yar')
         self.assertEquals(e.__dict__, {'name': 'foo', 'id': 'bar',
-            'argv': ['baz', ['gak', 'foo', 'bar']]})
+            'argv': [{'baz': 'gak', 'spam': 'eggs'}, 'yar']})
 
-    def test_repr(self):
-        e = event.Notify()
-        self.assertEquals(repr(e),
-            '<Notify name=None id=None argv=[] at 0x%x>' % (id(e),))
+    def test_amf0(self):
+        e = message.Notify()
 
-        e = event.Notify('foo', 'bar', {'baz': 'gak', 'spam': 'eggs'})
-        self.assertEquals(repr(e),
-            "<Notify name='foo' id='bar' argv=[{'baz': 'gak', 'spam': 'eggs'}] "
-            "at 0x%x>" % (id(e),))
+        e.encode(self.buffer, encoding=pyamf.AMF0)
 
-    def test_raw_encode(self):
-        l = []
-        e = event.Notify()
+        self.assertEquals(self.buffer.getvalue(), '\x05\x05')
 
-        b1 = BufferedByteStream()
-        d = e.encode(b1)
-        self.assertTrue(isinstance(d, defer.Deferred))
+    def test_amf3(self):
+        e = message.Notify()
 
-        def cb(buf):
-            self.assertEquals(buf, None)
-            self.assertEquals(b1.getvalue(), '\x05\x05')
+        e.encode(self.buffer, encoding=pyamf.AMF3)
 
-        d.addCallback(cb)
-
-        l.append(d)
-
-        b2 = BufferedByteStream()
-        d = e.encode(b2, encoding=pyamf.AMF3)
-        self.assertTrue(isinstance(d, defer.Deferred))
-
-        def cb2(buf):
-            self.assertEquals(buf, None)
-            self.assertEquals(b2.getvalue(), '\x01\x01')
-
-        d.addCallback(cb2)
-
-        l.append(d)
-
-        return defer.DeferredList(l)
-
-    def test_raw_decode(self):
-        l = []
-        e = event.Notify()
-
-        b1 = BufferedByteStream('\x05\x05\x03\x00\x00\t')
-        d = e.decode(b1)
-        self.assertTrue(isinstance(d, defer.Deferred))
-
-        def cb(res):
-            self.assertEquals(res, None)
-            self.assertEquals(e.name, None)
-            self.assertEquals(e.id, None)
-            self.assertEquals(e.argv, [{}])
-
-        d.addCallback(cb)
-
-        l.append(d)
-
-        b2 = BufferedByteStream('\x01\x01\n\x0b\x01\x01')
-        d = e.decode(b2, encoding=pyamf.AMF3)
-        self.assertTrue(isinstance(d, defer.Deferred))
-
-        def cb2(res):
-            self.assertEquals(res, None)
-            self.assertEquals(e.name, None)
-            self.assertEquals(e.id, None)
-            self.assertEquals(e.argv, [{}])
-
-        d.addCallback(cb2)
-
-        l.append(d)
-
-        return defer.DeferredList(l)
+        self.assertEquals(self.buffer.getvalue(), '\x01\x01')
 
     def test_encode(self):
-        e = event.Notify('_result', 2, {'foo': 'bar', 'baz': 'gak'})
-        self.executed = False
+        e = message.Notify('_result', 2, {'foo': 'bar', 'baz': 'gak'})
 
-        def cb(r):
-            self.assertEquals(r, (18, '\x02\x00\x07_result\x00@\x00\x00\x00'
-                '\x00\x00\x00\x00\x03\x00\x03foo\x02\x00\x03bar\x00\x03baz'
-                '\x02\x00\x03gak\x00\x00\t'))
-            self.executed = True
+        e.encode(self.buffer)
 
-        d = event.encode(e).addCallback(cb)
-        d.addCallback(lambda x: self.assertTrue(self.executed))
-        d.addErrback(self._fail)
+        self.assertEqual(self.buffer.getvalue(), '\x02\x00\x07_result\x00@\x00'
+            '\x00\x00\x00\x00\x00\x00\x03\x00\x03foo\x02\x00\x03bar\x00\x03baz'
+            '\x02\x00\x03gak\x00\x00\t')
 
-        return d
+    def test_decode_simple(self):
+        e = message.Notify()
+
+        self.buffer.append('\x05\x05\x03\x00\x00\t')
+        e.decode(self.buffer)
+
+        self.assertEquals(e.name, None)
+        self.assertEquals(e.id, None)
+        self.assertEquals(e.argv, [{}])
+
 
     def test_decode(self):
-        bytes = '\x02\x00\x07_result\x00@\x00\x00\x00\x00\x00\x00\x00\x03' + \
-            '\x00\x03foo\x02\x00\x03bar\x00\x03baz\x02\x00\x03gak\x00\x00\t'
-        self.executed = False
+        e = message.Notify()
 
-        def cb(r):
-            self.assertTrue(isinstance(r, event.Notify))
-            self.assertEquals(r.name, '_result')
-            self.assertEquals(r.id, 2)
-            self.assertEquals(r.argv, [{'foo': 'bar', 'baz': 'gak'}])
+        self.buffer.append('\x02\x00\x07_result\x00@\x00\x00\x00\x00\x00\x00'
+            '\x00\x03\x00\x03foo\x02\x00\x03bar\x00\x03baz\x02\x00\x03gak\x00'
+            '\x00\t')
 
-            self.executed = True
+        e.decode(self.buffer)
 
-        d = event.decode(18, bytes).addCallback(cb)
-        d.addCallback(lambda x: self.assertTrue(self.executed))
-        d.addErrback(self._fail)
-
-        return d
+        self.assertEquals(e.name, '_result')
+        self.assertEquals(e.id, 2)
+        self.assertEquals(e.argv, [{'foo': 'bar', 'baz': 'gak'}])
 
     def test_dispatch(self):
-        listener = MockEventListener()
-        x = event.Notify()
+        x = message.Notify()
 
-        ret = x.dispatch(listener)
-        self.assertIdentical(ret, listener)
-
-        self.assertEquals(listener.calls, [('notify', (x,), {})])
+        x.dispatch(self.listener, 54)
+        self.assertEquals(self.listener.calls, [('notify', (x, 54), {})])
 
 
 class InvokeTestCase(BaseTestCase):
     """
-    Tests for L{event.Invoke}
+    Tests for L{message.Invoke}
     """
 
     def test_create(self):
-        e = event.Invoke()
+        e = message.Invoke()
         self.assertEquals(e.__dict__, {'name': None, 'id': None, 'argv': []})
 
-        e = event.Invoke('foo', 'bar', {'baz': 'gak', 'spam': 'eggs'}, 'yar')
+        e = message.Invoke('foo', 'bar', {'baz': 'gak', 'spam': 'eggs'}, 'yar')
         self.assertEquals(e.__dict__, {'name': 'foo', 'id': 'bar',
             'argv': [{'baz': 'gak', 'spam': 'eggs'}, 'yar']})
 
-    def test_repr(self):
-        e = event.Invoke()
-        self.assertEquals(repr(e),
-            '<Invoke name=None id=None argv=[] at 0x%x>' % (id(e),))
+    def test_amf0(self):
+        e = message.Invoke()
 
-        e = event.Invoke('foo', 'bar', 'gak', 'spam', ['eggs'])
-        self.assertEquals(repr(e),
-            "<Invoke name='foo' id='bar' argv=['gak', 'spam', ['eggs']] "
-            "at 0x%x>" % (id(e),))
+        e.encode(self.buffer, encoding=pyamf.AMF0)
 
-    def test_raw_encode(self):
-        l = []
-        e = event.Invoke()
+        self.assertEquals(self.buffer.getvalue(), '\x05\x05')
 
-        b1 = BufferedByteStream()
-        d = e.encode(b1)
-        self.assertTrue(isinstance(d, defer.Deferred))
+    def test_amf3(self):
+        e = message.Invoke()
 
-        def cb(buf):
-            self.assertEquals(buf, None)
-            self.assertEquals(b1.getvalue(), '\x05\x05')
+        e.encode(self.buffer, encoding=pyamf.AMF3)
 
-        d.addCallback(cb)
-
-        l.append(d)
-
-        b2 = BufferedByteStream()
-        d = e.encode(b2, encoding=pyamf.AMF3)
-        self.assertTrue(isinstance(d, defer.Deferred))
-
-        def cb2(buf):
-            self.assertEquals(buf, None)
-            self.assertEquals(b2.getvalue(), '\x01\x01')
-
-        d.addCallback(cb2)
-
-        l.append(d)
-
-        return defer.DeferredList(l)
-
-    def test_raw_decode(self):
-        l = []
-        e = event.Invoke()
-
-        b1 = BufferedByteStream('\x05\x05\x03\x00\x00\t')
-        d = e.decode(b1)
-        self.assertTrue(isinstance(d, defer.Deferred))
-
-        def cb(res):
-            self.assertEquals(res, None)
-            self.assertEquals(e.name, None)
-            self.assertEquals(e.id, None)
-            self.assertEquals(e.argv, [])
-
-        d.addCallback(cb)
-
-        l.append(d)
-
-        b2 = BufferedByteStream('\x01\x01')
-        d = e.decode(b2, encoding=pyamf.AMF3)
-        self.assertTrue(isinstance(d, defer.Deferred))
-
-        def cb2(res):
-            self.assertEquals(res, None)
-            self.assertEquals(e.name, None)
-            self.assertEquals(e.id, None)
-            self.assertEquals(e.argv, [])
-
-        d.addCallback(cb2)
-
-        l.append(d)
-
-        return defer.DeferredList(l)
+        self.assertEquals(self.buffer.getvalue(), '\x01\x01')
 
     def test_encode(self):
-        e = event.Invoke('_result', 2, {'foo': 'bar', 'baz': 'gak'})
-        self.executed = False
+        e = message.Invoke('_result', 2, {'foo': 'bar', 'baz': 'gak'})
 
-        def cb(r):
-            self.assertEquals(r, (20, '\x02\x00\x07_result\x00@\x00\x00\x00'
-                '\x00\x00\x00\x00\x03\x00\x03foo\x02\x00\x03bar\x00\x03baz'
-                '\x02\x00\x03gak\x00\x00\t'))
-            self.executed = True
+        e.encode(self.buffer)
 
-        d = event.encode(e).addCallback(cb)
-        d.addCallback(lambda x: self.assertTrue(self.executed))
-        d.addErrback(self._fail)
+        self.assertEqual(self.buffer.getvalue(), '\x02\x00\x07_result\x00@\x00'
+            '\x00\x00\x00\x00\x00\x00\x03\x00\x03foo\x02\x00\x03bar\x00\x03baz'
+            '\x02\x00\x03gak\x00\x00\t')
 
-        return d
+    def test_decode_simple(self):
+        e = message.Invoke()
+
+        self.buffer.append('\x05\x05\x03\x00\x00\t')
+        e.decode(self.buffer)
+
+        self.assertEquals(e.name, None)
+        self.assertEquals(e.id, None)
+        self.assertEquals(e.argv, [{}])
+
 
     def test_decode(self):
-        bytes = '\x02\x00\x07_result\x00@\x00\x00\x00\x00\x00\x00\x00\x03' + \
-            '\x00\x03foo\x02\x00\x03bar\x00\x03baz\x02\x00\x03gak\x00\x00\t'
-        self.executed = False
+        e = message.Invoke()
 
-        def cb(r):
-            self.assertTrue(isinstance(r, event.Invoke))
-            self.assertEquals(r.name, '_result')
-            self.assertEquals(r.id, 2)
-            self.assertEquals(r.argv, [{'foo': 'bar', 'baz': 'gak'}])
+        self.buffer.append('\x02\x00\x07_result\x00@\x00\x00\x00\x00\x00\x00'
+            '\x00\x03\x00\x03foo\x02\x00\x03bar\x00\x03baz\x02\x00\x03gak\x00'
+            '\x00\t')
 
-            self.executed = True
+        e.decode(self.buffer)
 
-        d = event.decode(20, bytes).addCallback(cb)
-        d.addCallback(lambda x: self.assertTrue(self.executed))
-        d.addErrback(self._fail)
-
-        return d
+        self.assertEquals(e.name, '_result')
+        self.assertEquals(e.id, 2)
+        self.assertEquals(e.argv, [{'foo': 'bar', 'baz': 'gak'}])
 
     def test_dispatch(self):
-        listener = MockEventListener()
-        x = event.Invoke()
+        x = message.Invoke()
 
-        ret = x.dispatch(listener)
-        self.assertIdentical(ret, listener)
-
-        self.assertEquals(listener.calls, [('invoke', (x,), {})])
+        x.dispatch(self.listener, 54)
+        self.assertEquals(self.listener.calls, [('invoke', (x, 54), {})])
 
 
 class BytesReadTestCase(BaseTestCase):
     """
-    Tests for L{event.BytesRead}
+    Tests for L{message.BytesRead}
     """
 
     def test_create(self):
-        x = event.BytesRead()
+        x = message.BytesRead()
         self.assertEquals(x.__dict__, {'bytes': None})
 
-        x = event.BytesRead(10)
+        x = message.BytesRead(10)
         self.assertEquals(x.__dict__, {'bytes': 10})
 
-        x = event.BytesRead(bytes=20)
+        x = message.BytesRead(bytes=20)
         self.assertEquals(x.__dict__, {'bytes': 20})
 
-    def test_raw_encode(self):
+    def test_encode(self):
         # test default encode
-        x = event.BytesRead()
-        e = self.assertRaises(event.EncodeError, x.encode, self.buffer)
-        self.assertEquals(str(e), 'Bytes read not set')
+        x = message.BytesRead()
+        e = self.assertRaises(message.EncodeError, x.encode, self.buffer)
+        #self.assertEquals(str(e), 'Bytes read not set')
 
         # test non-int encode
-        x = event.BytesRead(bytes='foo.bar')
-        e = self.assertRaises(event.EncodeError, x.encode, self.buffer)
-        self.assertEquals(str(e), 'Bytes read wrong type '
-            '(expected int, got <type \'str\'>)')
+        x = message.BytesRead(bytes='foo.bar')
+        e = self.assertRaises(message.EncodeError, x.encode, self.buffer)
+        #self.assertEquals(str(e), 'Bytes read wrong type '
+        #    '(expected int, got <type \'str\'>)')
 
-        x = event.BytesRead(bytes=50)
+        x = message.BytesRead(bytes=50)
         e = x.encode(self.buffer)
 
         self.assertEquals(e, None)
 
         self.assertEquals(self.buffer.getvalue(), '\x00\x00\x00\x32')
 
-    def test_raw_decode(self):
-        x = event.BytesRead()
+    def test_decode(self):
+        x = message.BytesRead()
 
         self.assertEquals(x.bytes, None)
         self.buffer.write('\x00\x00\x00\x32')
@@ -821,80 +410,50 @@ class BytesReadTestCase(BaseTestCase):
         self.assertEquals(e, None)
         self.assertEquals(x.bytes, 50)
 
-    def test_encode(self):
-        e = event.BytesRead(bytes=2342)
-        self.executed = False
-
-        def cb(r):
-            self.assertEquals(r, (3, '\x00\x00\t&'))
-            self.executed = True
-
-        d = event.encode(e).addCallback(cb)
-        d.addCallback(lambda x: self.assertTrue(self.executed))
-        d.addErrback(self._fail)
-
-        return d
-
-    def test_decode(self):
-        self.executed = False
-
-        def cb(r):
-            self.assertTrue(isinstance(r, event.BytesRead))
-            self.assertEquals(r.__dict__, {'bytes': 2342})
-            self.executed = True
-
-        d = event.decode(3, '\x00\x00\t&').addCallback(cb)
-        d.addCallback(lambda x: self.assertTrue(self.executed))
-        d.addErrback(self._fail)
-
-        return d
-
     def test_dispatch(self):
-        listener = MockEventListener()
-        x = event.BytesRead(90)
+        x = message.BytesRead(90)
 
-        ret = x.dispatch(listener)
-        self.assertIdentical(ret, listener)
+        x.dispatch(self.listener, 54)
 
-        self.assertEquals(listener.calls, [('bytes-read', (90,), {})])
+        self.assertEquals(self.listener.calls, [('bytes-read', (90, 54), {})])
 
 
 class DownstreamBandwidthTestCase(BaseTestCase):
     """
-    Tests for L{event.DownstreamBandwidth}
+    Tests for L{message.DownstreamBandwidth}
     """
 
     def test_create(self):
-        x = event.DownstreamBandwidth()
+        x = message.DownstreamBandwidth()
         self.assertEquals(x.__dict__, {'bandwidth': None})
 
-        x = event.DownstreamBandwidth(10)
+        x = message.DownstreamBandwidth(10)
         self.assertEquals(x.__dict__, {'bandwidth': 10})
 
-        x = event.DownstreamBandwidth(bandwidth=20)
+        x = message.DownstreamBandwidth(bandwidth=20)
         self.assertEquals(x.__dict__, {'bandwidth': 20})
 
-    def test_raw_encode(self):
+    def test_encode(self):
         # test default encode
-        x = event.DownstreamBandwidth()
-        e = self.assertRaises(event.EncodeError, x.encode, self.buffer)
-        self.assertEquals(str(e), 'Downstream bandwidth not set')
+        x = message.DownstreamBandwidth()
+        e = self.assertRaises(message.EncodeError, x.encode, self.buffer)
+        #self.assertEquals(str(e), 'Downstream bandwidth not set')
 
         # test non-int encode
-        x = event.DownstreamBandwidth(bandwidth='foo.bar')
-        e = self.assertRaises(event.EncodeError, x.encode, self.buffer)
-        self.assertEquals(str(e), "TypeError for downstream bandwidth "
-            "(expected int, got <type 'str'>)")
+        x = message.DownstreamBandwidth(bandwidth='foo.bar')
+        e = self.assertRaises(message.EncodeError, x.encode, self.buffer)
+        #self.assertEquals(str(e), "TypeError for downstream bandwidth "
+        #    "(expected int, got <type 'str'>)")
 
-        x = event.DownstreamBandwidth(bandwidth=50)
+        x = message.DownstreamBandwidth(bandwidth=50)
         e = x.encode(self.buffer)
 
         self.assertEquals(e, None)
 
         self.assertEquals(self.buffer.getvalue(), '\x00\x00\x00\x32')
 
-    def test_raw_decode(self):
-        x = event.DownstreamBandwidth()
+    def test_decode(self):
+        x = message.DownstreamBandwidth()
 
         self.assertEquals(x.bandwidth, None)
         self.buffer.write('\x00\x00\x00\x32')
@@ -905,94 +464,62 @@ class DownstreamBandwidthTestCase(BaseTestCase):
         self.assertEquals(e, None)
         self.assertEquals(x.bandwidth, 50)
 
-    def test_encode(self):
-        e = event.DownstreamBandwidth(bandwidth=2342)
-        self.executed = False
-
-        def cb(r):
-            self.assertEquals(r, (5, '\x00\x00\t&'))
-            self.executed = True
-
-        d = event.encode(e).addCallback(cb)
-        d.addCallback(lambda x: self.assertTrue(self.executed))
-        d.addErrback(self._fail)
-
-        return d
-
-    def test_decode(self):
-        self.executed = False
-
-        def cb(r):
-            self.assertTrue(isinstance(r, event.DownstreamBandwidth))
-            self.assertEquals(r.__dict__, {'bandwidth': 2342})
-            self.executed = True
-
-        d = event.decode(5, '\x00\x00\t&').addCallback(cb)
-        d.addCallback(lambda x: self.assertTrue(self.executed))
-        d.addErrback(self._fail)
-
-        return d
-
     def test_dispatch(self):
-        listener = MockEventListener()
-        x = event.DownstreamBandwidth('foo')
+        x = message.DownstreamBandwidth('foo')
 
-        ret = x.dispatch(listener)
-        self.assertIdentical(ret, listener)
+        x.dispatch(self.listener, 54)
 
-        self.assertEquals(listener.calls, [('bw-down', ('foo',), {})])
+        self.assertEquals(self.listener.calls, [('bw-down', ('foo', 54), {})])
 
 
 class UpstreamBandwidthTestCase(BaseTestCase):
     """
-    Tests for L{event.UpstreamBandwidth}
+    Tests for L{message.UpstreamBandwidth}
     """
 
     def test_create(self):
-        x = event.UpstreamBandwidth()
+        x = message.UpstreamBandwidth()
         self.assertEquals(x.__dict__, {'bandwidth': None, 'extra': None})
 
-        x = event.UpstreamBandwidth(10, 32)
+        x = message.UpstreamBandwidth(10, 32)
         self.assertEquals(x.__dict__, {'bandwidth': 10, 'extra': 32})
 
-        x = event.UpstreamBandwidth(bandwidth=20, extra=233)
+        x = message.UpstreamBandwidth(bandwidth=20, extra=233)
         self.assertEquals(x.__dict__, {'bandwidth': 20, 'extra': 233})
 
-    def test_raw_encode(self):
+    def test_encode(self):
         # test default encode
-        x = event.UpstreamBandwidth()
-        e = self.assertRaises(event.EncodeError, x.encode, self.buffer)
-        self.assertEquals(str(e), 'Upstream bandwidth not set')
+        x = message.UpstreamBandwidth()
+        e = self.assertRaises(message.EncodeError, x.encode, self.buffer)
+        #self.assertEquals(str(e), 'Upstream bandwidth not set')
         self.buffer.truncate(0)
 
-        x = event.UpstreamBandwidth(bandwidth='234')
-        e = self.assertRaises(event.EncodeError, x.encode, self.buffer)
-        self.assertEquals(str(e), 'Extra not set')
-        self.buffer.truncate(0)
-
-        # test non-int encode
-        x = event.UpstreamBandwidth(bandwidth='foo.bar', extra=234)
-        e = self.assertRaises(event.EncodeError, x.encode, self.buffer)
-        self.assertEquals(str(e), "TypeError: Upstream bandwidth "
-            "(expected int, got <type 'str'>)")
+        x = message.UpstreamBandwidth(bandwidth='234')
+        e = self.assertRaises(message.EncodeError, x.encode, self.buffer)
+        #self.assertEquals(str(e), 'Extra not set')
         self.buffer.truncate(0)
 
         # test non-int encode
-        x = event.UpstreamBandwidth(bandwidth=1200, extra='asdfas')
-        e = self.assertRaises(event.EncodeError, x.encode, self.buffer)
-        self.assertEquals(str(e), "TypeError: extra "
-            "(expected int, got <type 'str'>)")
+        x = message.UpstreamBandwidth(bandwidth='foo.bar', extra=234)
+        e = self.assertRaises(message.EncodeError, x.encode, self.buffer)
+        #self.assertEquals(str(e), "TypeError: Upstream bandwidth "
+        #    "(expected int, got <type 'str'>)")
         self.buffer.truncate(0)
 
-        x = event.UpstreamBandwidth(bandwidth=50, extra=12)
+        # test non-int encode
+        x = message.UpstreamBandwidth(bandwidth=1200, extra='asdfas')
+        e = self.assertRaises(message.EncodeError, x.encode, self.buffer)
+        #self.assertEquals(str(e), "TypeError: extra "
+        #    "(expected int, got <type 'str'>)")
+        self.buffer.truncate(0)
+
+        x = message.UpstreamBandwidth(bandwidth=50, extra=12)
         e = x.encode(self.buffer)
-
-        self.assertEquals(e, None)
 
         self.assertEquals(self.buffer.getvalue(), '\x00\x00\x00\x32\x0C')
 
-    def test_raw_decode(self):
-        x = event.UpstreamBandwidth()
+    def test_decode(self):
+        x = message.UpstreamBandwidth()
 
         self.assertEquals(x.bandwidth, None)
         self.buffer.write('\x00\x00\x00\x32\x0C')
@@ -1004,83 +531,52 @@ class UpstreamBandwidthTestCase(BaseTestCase):
         self.assertEquals(x.bandwidth, 50)
         self.assertEquals(x.extra, 12)
 
-    def test_encode(self):
-        e = event.UpstreamBandwidth(bandwidth=2342, extra=65)
-        self.executed = False
-
-        def cb(r):
-            self.assertEquals(r, (6, '\x00\x00\t&A'))
-            self.executed = True
-
-        d = event.encode(e).addCallback(cb)
-        d.addCallback(lambda x: self.assertTrue(self.executed))
-        d.addErrback(self._fail)
-
-        return d
-
-    def test_decode(self):
-        self.executed = False
-
-        def cb(r):
-            self.assertTrue(isinstance(r, event.UpstreamBandwidth))
-            self.assertEquals(r.__dict__, {'bandwidth': 2342, 'extra': 65})
-            self.executed = True
-
-        d = event.decode(6, '\x00\x00\t&A').addCallback(cb)
-        d.addCallback(lambda x: self.assertTrue(self.executed))
-        d.addErrback(self._fail)
-
-        return d
-
     def test_dispatch(self):
-        listener = MockEventListener()
-        x = event.UpstreamBandwidth('foo', 'bar')
+        x = message.UpstreamBandwidth('foo', 'bar')
 
-        ret = x.dispatch(listener)
-        self.assertIdentical(ret, listener)
-
-        self.assertEquals(listener.calls, [('bw-up', ('foo', 'bar'), {})])
+        x.dispatch(self.listener, 54)
+        self.assertEquals(self.listener.calls, [('bw-up', ('foo', 'bar', 54), {})])
 
 
 class AudioDataTestCase(BaseTestCase):
     """
-    Tests for L{event.AudioData}
+    Tests for L{message.AudioData}
     """
 
-    def test_interface(self):
-        self.assertTrue(interfaces.IStreamable.implementedBy(event.VideoData))
+    def test_streaming(self):
+        self.assertTrue(message.AUDIO_DATA in message.STREAMABLE_TYPES)
 
     def test_create(self):
-        x = event.AudioData()
+        x = message.AudioData()
         self.assertEquals(x.__dict__, {'data': None})
 
-        x = event.AudioData(10)
+        x = message.AudioData(10)
         self.assertEquals(x.__dict__, {'data': 10})
 
-        x = event.AudioData(data=20)
+        x = message.AudioData(data=20)
         self.assertEquals(x.__dict__, {'data': 20})
 
-    def test_raw_encode(self):
+    def test_encode(self):
         # test default encode
-        x = event.AudioData()
-        e = self.assertRaises(event.EncodeError, x.encode, self.buffer)
-        self.assertEquals(str(e), 'No data set')
+        x = message.AudioData()
+        self.assertRaises(message.EncodeError, x.encode, self.buffer)
+        #self.assertEquals(str(e), 'No data set')
 
         # test non-str encode
-        x = event.AudioData(data=20)
-        e = self.assertRaises(event.EncodeError, x.encode, self.buffer)
-        self.assertEquals(str(e), "TypeError: data "
-            "(expected str, got <type 'int'>)")
+        x = message.AudioData(data=20)
+        self.assertRaises(message.EncodeError, x.encode, self.buffer)
+        #self.assertEquals(str(e), "TypeError: data "
+        #    "(expected str, got <type 'int'>)")
 
-        x = event.AudioData(data='foo.bar')
+        x = message.AudioData(data='foo.bar')
         e = x.encode(self.buffer)
 
         self.assertEquals(e, None)
 
         self.assertEquals(self.buffer.getvalue(), 'foo.bar')
 
-    def test_raw_decode(self):
-        x = event.AudioData()
+    def test_decode(self):
+        x = message.AudioData()
 
         self.assertEquals(x.data, None)
         self.buffer.write('foo.bar')
@@ -1091,75 +587,45 @@ class AudioDataTestCase(BaseTestCase):
         self.assertEquals(e, None)
         self.assertEquals(x.data, 'foo.bar')
 
-    def test_encode(self):
-        e = event.AudioData(data=('abcdefg' * 50))
-        self.executed = False
-
-        def cb(r):
-            self.assertEquals(r, (7, 'abcdefg' * 50))
-            self.executed = True
-
-        d = event.encode(e).addCallback(cb)
-        d.addCallback(lambda x: self.assertTrue(self.executed))
-        d.addErrback(self._fail)
-
-        return d
-
-    def test_decode(self):
-        self.executed = False
-
-        def cb(r):
-            self.assertTrue(isinstance(r, event.AudioData))
-            self.assertEquals(r.__dict__, {'data': 'abcdefg' * 50})
-            self.executed = True
-
-        d = event.decode(7, 'abcdefg' * 50).addCallback(cb)
-        d.addCallback(lambda x: self.assertTrue(self.executed))
-        d.addErrback(self._fail)
-
-        return d
-
     def test_dispatch(self):
-        listener = MockEventListener()
-        x = event.AudioData('foo')
+        x = message.AudioData('foo')
 
-        ret = x.dispatch(listener)
-        self.assertIdentical(ret, listener)
+        ret = x.dispatch(self.listener, 54)
 
-        self.assertEquals(listener.calls, [('audio', ('foo',), {})])
+        self.assertEquals(self.listener.calls, [('audio', ('foo', 54), {})])
 
 
 class VideoDataTestCase(BaseTestCase):
     """
-    Tests for L{event.VideoData}
+    Tests for L{message.VideoData}
     """
 
-    def test_interface(self):
-        self.assertTrue(interfaces.IStreamable.implementedBy(event.VideoData))
+    def test_streaming(self):
+        self.assertTrue(message.VIDEO_DATA in message.STREAMABLE_TYPES)
 
     def test_create(self):
-        x = event.VideoData()
+        x = message.VideoData()
         self.assertEquals(x.__dict__, {'data': None})
 
-        x = event.VideoData(10)
+        x = message.VideoData(10)
         self.assertEquals(x.__dict__, {'data': 10})
 
-        x = event.VideoData(data=20)
+        x = message.VideoData(data=20)
         self.assertEquals(x.__dict__, {'data': 20})
 
-    def test_raw_encode(self):
+    def test_encode(self):
         # test default encode
-        x = event.VideoData()
-        e = self.assertRaises(event.EncodeError, x.encode, self.buffer)
-        self.assertEquals(str(e), 'No data set')
+        x = message.VideoData()
+        e = self.assertRaises(message.EncodeError, x.encode, self.buffer)
+        #self.assertEquals(str(e), 'No data set')
 
         # test non-str encode
-        x = event.VideoData(data=20)
-        e = self.assertRaises(event.EncodeError, x.encode, self.buffer)
-        self.assertEquals(str(e), "TypeError: data "
-            "(expected str, got <type 'int'>)")
+        x = message.VideoData(data=20)
+        e = self.assertRaises(message.EncodeError, x.encode, self.buffer)
+        #self.assertEquals(str(e), "TypeError: data "
+        #    "(expected str, got <type 'int'>)")
 
-        x = event.VideoData(data='foo.bar')
+        x = message.VideoData(data='foo.bar')
         e = x.encode(self.buffer)
 
         self.assertEquals(e, None)
@@ -1167,7 +633,7 @@ class VideoDataTestCase(BaseTestCase):
         self.assertEquals(self.buffer.getvalue(), 'foo.bar')
 
     def test_raw_decode(self):
-        x = event.VideoData()
+        x = message.VideoData()
 
         self.assertEquals(x.data, None)
         self.buffer.write('foo.bar')
@@ -1178,48 +644,18 @@ class VideoDataTestCase(BaseTestCase):
         self.assertEquals(e, None)
         self.assertEquals(x.data, 'foo.bar')
 
-    def test_encode(self):
-        e = event.VideoData(data=('abcdefg' * 50))
-        self.executed = False
-
-        def cb(r):
-            self.assertEquals(r, (8, 'abcdefg' * 50))
-            self.executed = True
-
-        d = event.encode(e).addCallback(cb)
-        d.addCallback(lambda x: self.assertTrue(self.executed))
-        d.addErrback(self._fail)
-
-        return d
-
-    def test_decode(self):
-        self.executed = False
-
-        def cb(r):
-            self.assertTrue(isinstance(r, event.VideoData))
-            self.assertEquals(r.__dict__, {'data': 'abcdefg' * 50})
-            self.executed = True
-
-        d = event.decode(8, 'abcdefg' * 50).addCallback(cb)
-        d.addCallback(lambda x: self.assertTrue(self.executed))
-        d.addErrback(self._fail)
-
-        return d
-
     def test_dispatch(self):
-        listener = MockEventListener()
-        x = event.VideoData('foo')
+        x = message.VideoData('foo')
 
-        ret = x.dispatch(listener)
-        self.assertIdentical(ret, listener)
+        x.dispatch(self.listener, 54)
 
-        self.assertEquals(listener.calls, [('video', ('foo',), {})])
+        self.assertEquals(self.listener.calls, [('video', ('foo', 54), {})])
 
 
 class HelperTestCase(unittest.TestCase):
     def test_type_class(self):
-        for k, v in event.TYPE_MAP.iteritems():
-            self.assertEquals(event.get_type_class(k), v)
+        for k, v in message.TYPE_MAP.iteritems():
+            self.assertEquals(message.get_type_class(k), v)
 
-        self.assertFalse('foo' in event.TYPE_MAP.keys())
-        self.assertRaises(event.UnknownEventType, event.get_type_class, 'foo')
+        self.assertFalse('foo' in message.TYPE_MAP.keys())
+        self.assertRaises(message.UnknownEventType, message.get_type_class, 'foo')
