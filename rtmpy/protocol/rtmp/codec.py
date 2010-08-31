@@ -183,33 +183,22 @@ class Channel(object):
         )
 
 
-class Encoder(object):
+class Codec(object):
     """
-    Interlaces all active channels to form one stream.
-    """
+    Generic channels and frame operations.
 
-
-class FrameReader(object):
-    """
-    A generator object that decodes RTMP frames from a data stream. Feed it data
-    via L{send} and then iteratively call L{next}.
-
-    A frame consists of a header and then a chunk of data. Each header will
-    contain the channel that the frame is destined for. RTMP allows multiple
-    channels to be interleaved together.
-
-    @ivar frameSize: The maximum size for an individual frame. Read-only, use
-        L{setFrameSize} instead.
     @ivar stream: The underlying buffer containing the raw bytes.
     @type stream: L{BufferedByteStream}
     @ivar channels: A L{dict} of L{Channel} objects that are awaiting data.
+    @ivar frameSize: The maximum size for an individual frame. Read-only, use
+        L{setFrameSize} instead.
     """
-
-    frameSize = 128
 
     def __init__(self, stream=None):
         self.stream = stream or BufferedByteStream()
+
         self.channels = {}
+        self.frameSize = FRAME_SIZE
 
     def setFrameSize(self, size):
         """
@@ -219,14 +208,6 @@ class FrameReader(object):
 
         for channel in self.channels.values():
             channel.frameSize = size
-
-    def readHeader(self):
-        """
-        Reads an RTMP header from the stream.
-
-        @rtype: L{header.Header}
-        """
-        return header.decodeHeader(self.stream)
 
     def getChannel(self, channelId):
         """
@@ -249,6 +230,25 @@ class FrameReader(object):
         channel = self.channels[channelId] = Channel(self, self.stream)
 
         return channel
+
+
+class FrameReader(Codec):
+    """
+    A generator object that decodes RTMP frames from a data stream. Feed it data
+    via L{send} and then iteratively call L{next}.
+
+    A frame consists of a header and then a chunk of data. Each header will
+    contain the channel that the frame is destined for. RTMP allows multiple
+    channels to be interleaved together.
+    """
+
+    def readHeader(self):
+        """
+        Reads an RTMP header from the stream.
+
+        @rtype: L{header.Header}
+        """
+        return header.decodeHeader(self.stream)
 
     def send(self, data):
         """
@@ -388,3 +388,18 @@ class Decoder(ChannelDemuxer):
 
         self.dispatcher.dispatchMessage(
             stream, meta.datatype, stream.timestamp, data)
+
+
+class Encoder(object):
+    """
+    """
+
+    def __init__(self, stream=None):
+        self.messages = []
+
+    def send(streamId, datatype, timestamp, data):
+        self.messages.append((streamId, datatype, timestamp, data))
+
+    def next(self):
+        for message in messages:
+            pass
