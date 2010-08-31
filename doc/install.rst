@@ -34,6 +34,16 @@ use::
 Manual Installation
 ===================
 
+Prerequisites
+-------------
+
+The following software packages are prerequisites:
+
+- **Twisted** 2.5 or newer
+- **PyAMF** 0.6b2 or newer
+- **zope.interface** 3.3.0 or newer
+- **PyWin32** b210 or newer (for Windows only)
+
 Step 1
 ------
 
