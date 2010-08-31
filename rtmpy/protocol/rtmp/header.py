@@ -1,25 +1,19 @@
-# -*- test-case-name: rtmpy.tests.codec.test_header -*-
-
-# Copyright (c) 2007-2009 The RTMPy Project.
-# See LICENSE for details.
+# Copyright the RTMPy project.
+# See LICENSE.txt for details.
 
 """
 Utility/helper functions for encoding and decoding RTMP headers.
 
-@see: U{RTMP Packet Structure on OSFlash
-    (external)<http://osflash.org/documentation/rtmp#rtmp_packet_structure>}
-
-@since: 0.1
+@see: U{RTMP Packet Structure on OSFlash<http://osflash.org/documentation/rtmp
+    #rtmp_packet_structure>}
 """
-
-from rtmpy import protocol
 
 
 #: The header can come in one of four sizes: 12, 8, 4, or 1 byte(s).
 HEADER_SIZES = [12, 8, 4, 1]
 
 
-class HeaderError(protocol.BaseError):
+class HeaderError(Exception):
     """
     Raised if a header related operation failed.
     """
