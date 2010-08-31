@@ -16,31 +16,6 @@ from rtmpy.protocol import interfaces, status
 from rtmpy import util
 
 
-class BufferingChannelObserver(object):
-    """
-    """
-
-    def __init__(self, stream, channel):
-        self.stream = stream
-        self.channel = channel
-        self.buffer = util.BufferedByteStream()
-
-    def dataReceived(self, data):
-        """
-        """
-        self.buffer.write(data)
-
-    def bodyComplete(self):
-        """
-        """
-        self.stream.eventReceived(self.channel, self.buffer.getvalue())
-        self.buffer.truncate()
-
-    def headerChanged(self, header):
-        """
-        """
-
-
 class BaseStream(object):
     """
     """
