@@ -5,7 +5,7 @@
 Handshaking specific to C{RTMP}.
 """
 
-from rtmpy.protocol import handshake
+from rtmpy.protocol import handshake, version
 from rtmpy import util
 
 __all__ = [
