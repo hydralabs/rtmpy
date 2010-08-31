@@ -237,7 +237,7 @@ class Message(object):
     def __repr__(self):
         t = self.__class__
         keys = self.__dict__.keys()
-        keys.sorted()
+        keys = sorted(keys)
 
         s = '<%s.%s '
 
