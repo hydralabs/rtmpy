@@ -1,7 +1,7 @@
 # -*- coding: utf-8 -*-
 #
-# RTMPy documentation build configuration file, created by
-# sphinx-quickstart on Wed Sep  1 00:07:31 2010.
+# Copyright (c) The RTMPy Project.
+# See LICENSE.txt for details.
 #
 # This file is execfile()d with the current directory set to its containing dir.
 #
@@ -11,24 +11,26 @@
 # All configuration values have a default; values that are commented out
 # serve to show the default.
 
-import sys, os
+import sys, os, time
 
 # If extensions (or modules to document with autodoc) are in another directory,
 # add these directories to sys.path here. If the directory is relative to the
 # documentation root, use os.path.abspath to make it absolute, like shown here.
-#sys.path.insert(0, os.path.abspath('.'))
+sys.path.insert(0, os.path.abspath('..'))
+sys.path.append(os.path.abspath('.'))
+sys.path.append(os.path.abspath('html'))
 
 # -- General configuration -----------------------------------------------------
 
 # If your documentation needs a minimal Sphinx version, state it here.
-#needs_sphinx = '1.0'
+needs_sphinx = '1.0'
 
 # Add any Sphinx extension module names here, as strings. They can be extensions
 # coming with Sphinx (named 'sphinx.ext.*') or your custom ones.
 extensions = ['sphinx.ext.autodoc', 'sphinx.ext.intersphinx', 'sphinx.ext.ifconfig']
 
 # Add any paths that contain templates here, relative to this directory.
-templates_path = ['_templates']
+templates_path = ['html']
 
 # The suffix of source filenames.
 source_suffix = '.rst'
@@ -39,9 +41,17 @@ source_suffix = '.rst'
 # The master toctree document.
 master_doc = 'index'
 
+# create content template for the homepage
+from util import rst2html, copy_file
+readme = rst2html('../README.txt', 'html/intro.html')
+readme = copy_file('../CHANGES.txt', 'changelog.rst')
+
 # General information about the project.
-project = u'RTMPy'
-copyright = u'2010, The RTMPy Project.'
+project = 'RTMPy'
+url = 'http://rtmpy.org'
+description = 'RTMP for Python'
+copyright = "Copyright &#169; 2007-%s The <a href='%s'>%s</a> Project. All rights reserved." % (
+            time.strftime('%Y'), url, project)
 
 # The version info for the project you're documenting, acts as replacement for
 # |version| and |release|, also used in various other places throughout the
@@ -60,11 +70,11 @@ release = '1.0'
 # non-false value, then it is used:
 #today = ''
 # Else, today_fmt is used as the format for a strftime call.
-#today_fmt = '%B %d, %Y'
+today_fmt = '%B %d, %Y'
 
 # List of patterns, relative to source directory, that match files and
 # directories to ignore when looking for source files.
-exclude_patterns = ['_build']
+exclude_patterns = ['_build', 'tutorials/examples']
 
 # The reST default role (used for this markup: `text`) to use for all documents.
 #default_role = None
@@ -91,7 +101,11 @@ pygments_style = 'sphinx'
 
 # The theme to use for HTML and HTML Help pages.  See the documentation for
 # a list of builtin themes.
-html_theme = 'default'
+#
+# Note: you can download the 'beam' theme from:
+# http://github.com/collab-project/sphinx-themes
+# and place it in a 'themes' directory relative to this config file.
+html_theme = 'beam'
 
 # Theme options are theme-specific and customize the look and feel of a theme
 # further.  For a list of options available for each theme, see the
@@ -99,11 +113,11 @@ html_theme = 'default'
 #html_theme_options = {}
 
 # Add any paths that contain custom themes here, relative to this directory.
-#html_theme_path = []
+html_theme_path = ['themes']
 
 # The name for this set of Sphinx documents.  If None, it defaults to
 # "<project> v<release> documentation".
-#html_title = None
+html_title = '%s - %s' % (project, description)
 
 # A shorter title for the navigation bar.  Default is the same as html_title.
 #html_short_title = None
@@ -120,7 +134,7 @@ html_theme = 'default'
 # Add any paths that contain custom static files (such as style sheets) here,
 # relative to this directory. They are copied after the builtin static files,
 # so a file named "default.css" will overwrite the builtin "default.css".
-html_static_path = ['_static']
+html_static_path = ['html/static']
 
 # If not '', a 'Last updated on:' timestamp is inserted at every page bottom,
 # using the given strftime format.
@@ -178,8 +192,8 @@ htmlhelp_basename = 'RTMPydoc'
 # Grouping the document tree into LaTeX files. List of tuples
 # (source start file, target name, title, author, documentclass [howto/manual]).
 latex_documents = [
-  ('index', 'RTMPy.tex', u'RTMPy Documentation',
-   u'The RTMPy Project.', 'manual'),
+  ('index', 'RTMPy.tex', html_title,
+   copyright, 'manual'),
 ]
 
 # The name of an image file (relative to this directory) to place at the top of
@@ -211,8 +225,8 @@ latex_documents = [
 # One entry per manual page. List of tuples
 # (source start file, name, description, authors, manual section).
 man_pages = [
-    ('index', 'rtmpy', u'RTMPy Documentation',
-     [u'The RTMPy Project.'], 1)
+    ('index', 'rtmpy', html_title,
+     [copyright], 1)
 ]
 
 
