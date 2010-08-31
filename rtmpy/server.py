@@ -1,23 +1,19 @@
-# -*- test-case-name: rtmpy.tests.test_server -*-
-#
-# Copyright (c) 2007-2009 The RTMPy Project.
-# See LICENSE for details.
+# Copyright the RTMPy project.
+# See LICENSE.txt for details.
 
 """
 Server implementation.
-
-@since: 0.1.0
 """
 
 from zope.interface import Interface, Attribute, implements
 from twisted.internet import protocol, defer, reactor
 import pyamf
 
-from rtmpy import rtmp, util
-from rtmpy.rtmp import handshake, scheduler, stream, event, status
+from rtmpy import util
+from rtmpy.protocol import rtmp, handshake, version
 
 
-class ServerControlStream(stream.BaseStream):
+class ServerControlStream(object):
     """
     """
 
@@ -322,7 +318,7 @@ class Application(object):
         self.disconnect(client)
 
 
-class ServerProtocol(rtmp.BaseProtocol):
+class ServerProtocol(object):
     """
     A basic RTMP protocol that will act like a server.
     """
@@ -496,7 +492,8 @@ class ServerFactory(protocol.ServerFactory):
     RTMP server protocol factory.
     """
 
-    protocol = ServerProtocol
+    protocol = rtmp.RTMPProtocol
+    protocolVersion = version.RTMP
 
     upstreamBandwidth = 2500000L
     downstreamBandwidth = 2500000L
@@ -560,3 +557,10 @@ class ServerFactory(protocol.ServerFactory):
         d.addBoth(cb)
 
         return d
+
+    def buildHandshakeNegotiator(self, protocol):
+        """
+        """
+        i = handshake.get_implementation(self.protocolVersion)
+
+        return i.ServerNegotiator(protocol, protocol.transport)
