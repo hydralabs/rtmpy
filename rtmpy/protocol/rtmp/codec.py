@@ -11,7 +11,7 @@ RTMP codecs. Encoders and decoders for rtmp streams.
 from zope.interface import Interface, Attribute
 from pyamf.util import BufferedByteStream
 
-from rtmpy.protocol.rtmp import header, event
+from rtmpy.protocol.rtmp import header, message
 
 
 #: The default number of bytes per RTMP frame (excluding header)
@@ -333,7 +333,7 @@ class ChannelDemuxer(FrameReader):
         """
         data, complete, meta = FrameReader.next(self)
 
-        if meta.datatype in event.STREAMABLE_TYPES:
+        if meta.datatype in message.STREAMABLE_TYPES:
             # don't buffer the data, pass it right on through
             return data, meta
 

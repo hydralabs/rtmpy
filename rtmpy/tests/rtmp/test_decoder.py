@@ -7,7 +7,7 @@ Tests for L{rtmpy.rtmp.codec}.
 
 import unittest
 
-from rtmpy.protocol.rtmp import codec, event, header
+from rtmpy.protocol.rtmp import codec, header
 
 
 class MockChannel(object):
@@ -285,20 +285,22 @@ class DeMuxerTestCase(unittest.TestCase):
         """
         Ensure that when reading 'streamable' types, no buffering occurs
         """
+        from rtmpy.protocol.rtmp import message
+
         self.add_events(
-            ('audio', False, ChannelMeta(datatype=event.AUDIO_DATA, channelId=3)),
-            ('video', False, ChannelMeta(datatype=event.VIDEO_DATA, channelId=54)))
+            ('audio', False, ChannelMeta(datatype=message.AUDIO_DATA, channelId=3)),
+            ('video', False, ChannelMeta(datatype=message.VIDEO_DATA, channelId=54)))
 
         data, meta = self.demuxer.next()
 
         self.assertEqual(data, 'audio')
-        self.assertEqual(meta.datatype, event.AUDIO_DATA)
+        self.assertEqual(meta.datatype, message.AUDIO_DATA)
         self.assertEqual(self.demuxer.bucket, {})
 
         data, meta = self.demuxer.next()
 
         self.assertEqual(data, 'video')
-        self.assertEqual(meta.datatype, event.VIDEO_DATA)
+        self.assertEqual(meta.datatype, message.VIDEO_DATA)
         self.assertEqual(self.demuxer.bucket, {})
 
     def test_iter(self):
