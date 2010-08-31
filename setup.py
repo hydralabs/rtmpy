@@ -70,7 +70,7 @@ def get_install_requirements():
     Returns a list of dependencies for RTMPy to function correctly on the
     target platform.
     """
-    install_requires = ['Twisted>=2.5.0', 'PyAMF>=0.6b2']
+    install_requires = ['Twisted>=2.5.0', 'PyAMF>=0.6,<=0.6b2']
 
     if sys.platform.startswith('win'):
         install_requires.append('PyWin32')
