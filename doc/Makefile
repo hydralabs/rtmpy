@@ -1,4 +1,7 @@
-# Makefile for Sphinx documentation
+# Copyright (c) The RTMPy Project.
+# See LICENSE.txt for details.
+#
+# Makefile for RTMPy documentation
 #
 
 # You can set these variables from the command line.
