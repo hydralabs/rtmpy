@@ -5,6 +5,7 @@
 .. toctree::
 
    community/index.rst
+   whatsnew/index.rst
 
    install.rst
    about.rst
