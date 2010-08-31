@@ -1,11 +1,11 @@
-# Copyright The RTMPy Project
+# Copyright the RTMPy project
 # See LICENSE.txt for details
 
 """
 Handshaking specific to C{RTMP}.
 """
 
-from rtmpy.protocol import handshake, version
+from rtmpy.protocol import handshake
 from rtmpy import util
 
 __all__ = [
