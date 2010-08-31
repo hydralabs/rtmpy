@@ -1,5 +1,5 @@
 # Copyright The RTMPy Project.
-# See LICENSE for details.
+# See LICENSE.txt for details.
 
 """
 RTMP handshake support.
