@@ -71,5 +71,5 @@ list.
 ----
 
 `Subscribe <http://lists.rtmpy.org/mailman/listinfo/rtmpy-builds>`__ -
-`Archives <http://lists.rtmpy.org/archives/rtmpy-builds>`__ -
+`Archives <http://lists.rtmpy.org/archives/rtmpy-builds>`__
 
