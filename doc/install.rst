@@ -39,10 +39,10 @@ Prerequisites
 
 The following software packages are prerequisites:
 
-- **Twisted** 2.5 or newer
-- **PyAMF** 0.6b2 or newer
-- **zope.interface** 3.3.0 or newer
-- **PyWin32** b210 or newer (for Windows only)
+- Twisted_ 2.5 or newer
+- PyAMF_ 0.6b2 or newer
+- `zope.interface`_ 3.3.0 or newer
+- PyWin32_ b210 or newer (for Windows only)
 
 Step 1
 ------
@@ -116,20 +116,24 @@ Windows users can run the make.bat file instead::
 
     make.bat
 
-This will generate the HTML documentation in the ``rtmpy/doc/_build/html``
+This will generate the HTML documentation in the ``rtmpy/doc/build/html``
 folder. This documentation is identical to the content on the main RTMPy
 website_.
 
 **Note**: if you don't have the `make` tool installed then you can invoke
 Sphinx from the ``rtmpy/doc`` directory directly like this::
 
-    sphinx-build -b html . _build
+    sphinx-build -b html . build
 
 
 .. _Python: 	http://www.python.org
 .. _setuptools:	http://peak.telecommunity.com/DevCenter/setuptools
 .. _easy_install: http://peak.telecommunity.com/DevCenter/EasyInstall#installing-easy-install
 .. _ez_setup.py: http://github.com/hydralabs/rtmpy/blob/master/ez_setup.py
+.. _Twisted:	http://twistedmatrix.com
+.. _PyAMF:	http://pyamf.org
+.. _zope.interface: http://pypi.python.org/pypi/zope.interface
+.. _PyWin32:	http://sourceforge.net/projects/pywin32
 .. _unittest2:	http://pypi.python.org/pypi/unittest2
 .. _nose:	http://somethingaboutorange.com/mrl/projects/nose
 .. _Trial:	http://twistedmatrix.com/trac/wiki/TwistedTrial
