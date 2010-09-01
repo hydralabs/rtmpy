@@ -1,5 +1,5 @@
-# Copyright the RTMPy Project.
-# See LICENSE for details.
+# Copyright (c) The RTMPy Project.
+# See LICENSE.txt for details.
 
 """
 RTMP codecs. Encoders and decoders for rtmp streams.
@@ -105,8 +105,8 @@ class Channel(object):
         Otherwise the new values will be applied to the existing header.
         Setting the header requires a registered manager.
 
-        @param header: The header to apply to this channel.
-        @type header: L{interfaces.IHeader}
+        @param new: The header to apply to this channel.
+        @type new: L{interfaces.IHeader}
         """
         old_header = self.header
 
@@ -259,12 +259,12 @@ class FrameReader(object):
     def next(self):
         """
         Called to pull the next RTMP frame out of the stream. A tuple containing
-        three items is returned:
+        three items is returned::
 
-        * the raw bytes for the frame
-        * whether the channel is considered complete (i.e. all the data has been
+         * the raw bytes for the frame
+         * whether the channel is considered complete (i.e. all the data has been
             received)
-        * An L{IChannelMeta} instance.
+         * An L{IChannelMeta} instance.
 
         If an attempt to read from the stream comes to a natural end then
         C{StopIteration} is raised, otherwise C{IOError}.

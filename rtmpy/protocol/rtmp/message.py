@@ -1,4 +1,4 @@
-# Copyright the RTMPy project.
+# Copyright (c) The RTMPy Project.
 # See LICENSE.txt for details.
 
 """
@@ -485,7 +485,7 @@ class Notify(Message):
     @type name: C{str}
     @param id: The global identifier (per stream) for the call.
     @type id: C{int}
-    @param argv: A list of elements to represent the method arguments.
+    @param args: A list of elements to represent the method arguments.
     """
 
     def __init__(self, name=None, id=None, *args):

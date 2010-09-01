@@ -1,5 +1,5 @@
-# Copyright the RTMPy project
-# See LICENSE.txt for details
+# Copyright (c) The RTMPy Project.
+# See LICENSE.txt for details.
 
 """
 Handshaking specific to C{RTMP}.

@@ -1,5 +1,5 @@
-RTMPy Changelog
-===============
+Changelog
+=========
 
 This file contains information about the changes between the different
 versions of RTMPy.

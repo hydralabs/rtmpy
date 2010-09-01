@@ -1,5 +1,5 @@
-# Copyright The RTMPy Project.
-# See LICENSE for details.
+# Copyright (c) The RTMPy Project.
+# See LICENSE.txt for details.
 
 """
 Tests for L{rtmpy.protocol.handshake}.
