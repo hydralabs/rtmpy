@@ -102,7 +102,10 @@ To install RTMPy to a custom location::
 Documentation
 =============
 
-To build the documentation you need:
+Sphinx
+------
+
+To build the Sphinx documentation you need:
 
 - Sphinx_ 1.0 or newer
 - a :doc:`copy <community/download>` of the RTMPy source distribution
@@ -125,6 +128,22 @@ Sphinx from the ``rtmpy/doc`` directory directly like this::
 
     sphinx-build -b html . build
 
+Epydoc
+------
+
+To build the Epydoc API documentation you need:
+
+- Epydoc_ 3.0 or newer
+- a :doc:`copy <community/download>` of the RTMPy source distribution
+
+Run the command below in the root ``rtmpy`` directory to create the
+HTML version of the RTMPy API documentation::
+
+    epydoc --config=setup.cfg
+
+This will generate the HTML documentation in the ``rtmpy/doc/build/api``
+folder.
+
 
 .. _Python: 	http://www.python.org
 .. _setuptools:	http://peak.telecommunity.com/DevCenter/setuptools
@@ -134,6 +153,7 @@ Sphinx from the ``rtmpy/doc`` directory directly like this::
 .. _PyAMF:	http://pyamf.org
 .. _zope.interface: http://pypi.python.org/pypi/zope.interface
 .. _PyWin32:	http://sourceforge.net/projects/pywin32
+.. _Epydoc:	http://epydoc.sourceforge.net
 .. _unittest2:	http://pypi.python.org/pypi/unittest2
 .. _nose:	http://somethingaboutorange.com/mrl/projects/nose
 .. _Trial:	http://twistedmatrix.com/trac/wiki/TwistedTrial
