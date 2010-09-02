@@ -34,7 +34,6 @@ class IProtocolImplementation(Interface):
         'Implements IHandshakeNegotiator for client handshakes')
     ServerNegotiator = Attribute(
         'Implements IHandshakeNegotiator for server handshakes')
-    HandshakeObserver = Attribute('Implements IHandshakeObserver')
 
 
 class IHandshakeObserver(Interface):
