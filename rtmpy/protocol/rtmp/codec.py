@@ -18,10 +18,10 @@ from rtmpy.protocol.rtmp import header, message
 
 #: The default number of bytes per RTMP frame (excluding header)
 FRAME_SIZE = 128
-
 #: Maximum number of channels that can be active per RTMP stream
 MAX_CHANNELS = 64
-
+#: ...
+MIN_CHANNEL_ID = 3
 
 class BaseError(Exception):
     """
@@ -404,16 +404,26 @@ class Encoder(Codec):
     @ivar channelsInUse: Number of RTMP channels currently in use.
     """
 
-    minChannelId = 3
-
     def __init__(self, foo=None, stream=None):
         Codec.__init__(self, stream=stream)
 
+        self.minChannelId = MIN_CHANNEL_ID
         self.pending = []
         self.availableChannels = collections.deque(xrange(self.minChannelId, MAX_CHANNELS))
         self.activeChannels = []
         self.activeChannelsIndex = {}
         self.channelsInUse = 0
+
+    @apply
+    def minChannelId():
+        def fget(self):
+            return self._minChannelId
+
+        def fset(self, value):
+            self._minChannelId = value
+            self._maxChannels = MAX_CHANNELS - value
+
+        return property(**locals())
 
     def aquireChannel(self):
         """
@@ -460,23 +470,25 @@ class Encoder(Codec):
         self.availableChannels.appendleft(channelId)
         self.channelsInUse -= 1
 
-    def send(self, data, datatype, streamId, timestamp=None):
-        if self.channelsInUse == MAX_CHANNELS:
+    def send(self, data, datatype, streamId, timestamp=0):
+        if self.channelsInUse == self._maxChannels:
             self.pending.append((streamId, datatype, timestamp, data))
 
             return
 
-        channel = self._nextChannel()
-        h = header.Header(channelId=channelId, streamId=streamId,
+        channel = self.aquireChannel()
+        h = header.Header(channel.channelId, streamId=streamId,
             datatype=datatype, timestamp=timestamp, bodyLength=len(data))
 
+        channel.setHeader(h)
+
     def next(self):
-        for i, channel in enumerate(self.activeChannels):
+        # 61 active channels might be too larger chunk of work for 1 iteration
+        for channel in self.activeChannels:
             self.writeHeader(channel)
             channel.writeFrame()
 
             if channel.complete:
-                self.activeChannels.remove(i)
                 self.releaseChannel(channel.channelId)
 
         if not self.pending:

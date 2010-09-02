@@ -18,8 +18,8 @@ class BaseTestCase(unittest.TestCase):
     """
 
     def setUp(self):
-        self.stream = BufferedByteStream()
-        self.encoder = codec.Encoder(stream=self.stream)
+        self.encoder = codec.Encoder()
+        self.stream = self.encoder.stream
 
 
 class EncoderTestCase(BaseTestCase):
@@ -61,6 +61,7 @@ class AquireChannelTestCase(BaseTestCase):
 
 class ReleaseChannelTestCase(BaseTestCase):
     """
+    Tests for L{codec.Encoder.releaseChannel}
     """
 
     def test_not_aquired(self):
@@ -74,3 +75,15 @@ class ReleaseChannelTestCase(BaseTestCase):
         self.encoder.releaseChannel(c.channelId)
 
         self.assertEqual(self.encoder.channelsInUse, 0)
+
+
+class WritingTestCase(BaseTestCase):
+    """
+    """
+
+    def test_simple(self):
+        self.encoder.send('foobar', 0, 1)
+
+        self.encoder.next()
+
+        print repr(self.stream.getvalue())
