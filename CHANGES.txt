@@ -1,5 +1,5 @@
-RTMPy Changelog
-===============
+Changelog
+=========
 
 This file contains information about the changes between the different
 versions of RTMPy.
@@ -8,5 +8,5 @@ versions of RTMPy.
 
 0.1.0 (unreleased)
 ------------------
- - Encoder and decoder for the RTMP protocol
- - Methods to construct and send RTMP packets
+- Encoder and decoder for the RTMP protocol
+- Methods to construct and send RTMP packets

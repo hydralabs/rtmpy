@@ -1,8 +1,8 @@
-# Copyright (c) 2007-2009 The RTMPy Project.
-# See LICENSE for details.
+# Copyright (c) The RTMPy Project.
+# See LICENSE.txt for details.
 
 """
-Tests for L{rtmpy.rtmp.codec}.
+Decoding tests for L{rtmpy.rtmp.codec}.
 """
 
 import unittest

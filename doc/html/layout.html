@@ -1,0 +1,33 @@
+{% extends "beam/layout.html" %}
+
+{% block sidebartoc %}
+<h3>Download</h3>
+<ul>
+	<li><a href="{{ pathto('community/download') }}#latest-development-source-code">Source</a> <font color='black'>|</font> <a href="http://github.com/hydralabs/rtmpy">Browse</a></li>
+</ul>
+<h3>Documentation</h3>
+<ul>
+	{% if current_page_name != 'index' %}
+	<li><a href="{{ pathto('index') }}">Home</a></li>
+	{% endif %}
+	<li><a href="{{ pathto('architecture/overview') }}">Features</a></li>
+        <li><a href="{{ pathto("install") }}">Installation</a></li>
+	<li><a href="{{ pathto('license') }}">License</a></li>
+	<li><a href="{{ pathto('changelog') }}">Changelog</a></li>
+</ul>
+<h3>Community</h3>
+<ul>
+	<li><a href="{{ pathto('community/mailinglist') }}">Mailing Lists</a></li>
+	<li><a href="{{ pathto('community/irc') }}">IRC Channel</a></li>
+	<li><a href="{{ pathto('community/team') }}">Team</a></li>
+</ul>
+
+<h3>Development</h3>
+<ul>
+	<li><a href="http://dev.rtmpy.org/roadmap">Roadmap</a></li>
+	<li><a href="http://dev.rtmpy.org/timeline">Timeline</a></li>
+        <li><a href="http://dev.rtmpy.org/report">View Tickets</a></li>
+	<li><a href="{{ pathto('bugs') }}">Reporting bugs</a></li>
+	<li><a href="http://dev.rtmpy.org/newticket">New Ticket</a></li>
+</ul>
+{% endblock %}

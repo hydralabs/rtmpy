@@ -1,8 +1,8 @@
-# Copyright (c) 2007-2009 The RTMPy Project.
-# See LICENSE for details.
+# Copyright (c) The RTMPy Project.
+# See LICENSE.txt for details.
 
 """
-Mock classes for testing sections of L{rtmpy.rtmp}
+Mock classes for testing sections of L{rtmpy.rtmp}.
 """
 
 from zope.interface import implements

@@ -1,5 +1,5 @@
-# Copyright (c) 2007-2009 The RTMPy Project.
-# See LICENSE for details.
+# Copyright (c) The RTMPy Project.
+# See LICENSE.txt for details.
 
 from ez_setup import use_setuptools
 
@@ -70,7 +70,7 @@ def get_install_requirements():
     Returns a list of dependencies for RTMPy to function correctly on the
     target platform.
     """
-    install_requires = ['Twisted>=2.5.0', 'PyAMF>=0.6b2']
+    install_requires = ['Twisted>=2.5.0', 'PyAMF>=0.6,<=0.6b2']
 
     if sys.platform.startswith('win'):
         install_requires.append('PyWin32')
@@ -109,9 +109,9 @@ setup(name = "RTMPy",
         "License :: OSI Approved :: MIT License",
         "Operating System :: OS Independent",
         "Programming Language :: Python",
-        "Programming Language :: Python :: 2.3",
         "Programming Language :: Python :: 2.4",
         "Programming Language :: Python :: 2.5",
         "Programming Language :: Python :: 2.6",
+        "Programming Language :: Python :: 2.7",
         "Topic :: Software Development :: Libraries :: Python Modules",
     ])
