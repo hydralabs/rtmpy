@@ -85,7 +85,8 @@ class Channel(object):
     @type frameRemaining: C{int}
     """
 
-    def __init__(self, codec, stream):
+    def __init__(self, channelId, codec, stream):
+        self.channelId = channelId
         self.header = None
         self.codec = codec
         self.stream = stream
@@ -114,11 +115,6 @@ class Channel(object):
             if new.relative is True:
                 raise header.HeaderError(
                     'Tried to set a relative header as absolute')
-        else:
-            if new.channelId != self.header.channelId:
-                raise header.HeaderError('Tried to assign a header from a '
-                    'different channel (original:%r, new:%r)' % (
-                        self.header.channelId, new.channelId))
 
         if new.relative:
             self.header = header.mergeHeaders(self.header, new)
@@ -146,7 +142,7 @@ class Channel(object):
         """
         Reads an RTMP frame from the stream and returns the content of the body.
 
-        If ther is not enough data to fulfill the frame requirements then
+        If there is not enough data to fulfill the frame requirements then
         C{IOError} will be raised.
         """
         l = min(self.frameRemaining, self.frameSize, self.bodyRemaining)
@@ -158,6 +154,13 @@ class Channel(object):
         self._adjustFrameRemaining(l)
 
         return bytes
+
+    @property
+    def complete(self):
+        """
+        Whether this channel has completed its content length requirements.
+        """
+        return not self.bodyRemaining
 
     def __repr__(self):
         s = []
@@ -227,7 +230,7 @@ class Codec(object):
             raise IndexError('Attempted to get channelId %d which is > %d' % (
                 channelId, MAX_CHANNELS))
 
-        channel = self.channels[channelId] = Channel(self, self.stream)
+        channel = self.channels[channelId] = Channel(channelId, self, self.stream)
 
         return channel
 
@@ -279,12 +282,10 @@ class FrameReader(Codec):
 
             bytes = channel.readFrame()
 
-            complete = channel.bodyRemaining == 0
-
-            if complete:
+            if channel.complete:
                 channel.reset()
 
-            return bytes, complete, channel.header
+            return bytes, channel.complete, channel.header
         except IOError:
             self.stream.seek(pos, 0)
 
