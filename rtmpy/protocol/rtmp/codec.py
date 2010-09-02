@@ -8,6 +8,8 @@ RTMP codecs. Encoders and decoders for rtmp streams.
 @since: 0.1
 """
 
+import collections
+
 from zope.interface import Interface, Attribute
 from pyamf.util import BufferedByteStream
 
@@ -393,16 +395,98 @@ class Decoder(ChannelDemuxer):
             stream, meta.datatype, stream.timestamp, data)
 
 
-class Encoder(object):
+class Encoder(Codec):
     """
+    @ivar pending: An fifo queue of messages that are waiting to be assigned a
+        channel.
+    @ivar availableChannels: A list of channel ids that are available.
+    @type availableChannels: C{collections.deque}
+    @ivar channelsInUse: Number of RTMP channels currently in use.
     """
 
-    def __init__(self, stream=None):
-        self.messages = []
+    minChannelId = 3
 
-    def send(streamId, datatype, timestamp, data):
-        self.messages.append((streamId, datatype, timestamp, data))
+    def __init__(self, foo=None, stream=None):
+        Codec.__init__(self, stream=stream)
+
+        self.pending = []
+        self.availableChannels = collections.deque(xrange(self.minChannelId, MAX_CHANNELS))
+        self.activeChannels = []
+        self.activeChannelsIndex = {}
+        self.channelsInUse = 0
+
+    def aquireChannel(self):
+        """
+        Aquires and returns the next available L{Channel} or C{None}.
+
+        In this context, aquire means to make the channel unavailable until the
+        corresponding L{releaseChannel} call is made.
+
+        There is no control over which channel you are going to be returned.
+
+        @rtype: L{Channel} or C{None}
+        """
+        try:
+            channelId = self.availableChannels.popleft()
+        except IndexError:
+            return None
+
+        self.channelsInUse += 1
+
+        c = self.getChannel(channelId)
+
+        self.activeChannels.append(c)
+        self.activeChannelsIndex[c] = len(self.activeChannels) - 1
+
+        return c
+
+    def releaseChannel(self, channelId):
+        """
+        Releases the channel such that a call to C{acquireChannel} will
+        eventually return it.
+
+        @param channelId: The id of the channel being released.
+        """
+        c = self.getChannel(channelId)
+
+        try:
+            idx = self.activeChannelsIndex.pop(c)
+        except KeyError:
+            raise EncodeError('Attempted to release channel %r but that '
+                'channel is not active' % (channelId,))
+
+        del self.activeChannels[idx]
+
+        self.availableChannels.appendleft(channelId)
+        self.channelsInUse -= 1
+
+    def send(self, data, datatype, streamId, timestamp=None):
+        if self.channelsInUse == MAX_CHANNELS:
+            self.pending.append((streamId, datatype, timestamp, data))
+
+            return
+
+        channel = self._nextChannel()
+        h = header.Header(channelId=channelId, streamId=streamId,
+            datatype=datatype, timestamp=timestamp, bodyLength=len(data))
 
     def next(self):
-        for message in messages:
-            pass
+        for i, channel in enumerate(self.activeChannels):
+            self.writeHeader(channel)
+            channel.writeFrame()
+
+            if channel.complete:
+                self.activeChannels.remove(i)
+                self.releaseChannel(channel.channelId)
+
+        if not self.pending:
+            if not self.activeChannels:
+                raise StopIteration
+
+            return
+
+        while True:
+            if not self.pending or self.channelsInUse == MAX_CHANNELS:
+                break
+
+            ChannelMuxer.send(*self.pending.pop(0))
