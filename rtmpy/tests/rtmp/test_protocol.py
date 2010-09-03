@@ -21,8 +21,16 @@ class MockHandshakeNegotiator(object):
         self.procotol = protocol
         self.started = False
 
+        self.data = None
+
     def start(self, uptime, version):
         self.started = True
+
+    def dataReceived(self, data):
+        if self.data is None:
+            self.data = data
+        else:
+            self.data += data
 
 
 class MockFactory(object):
@@ -213,3 +221,22 @@ class DataReceivedTestCase(ProtocolTestCase):
         self.assertEqual(self.protocol.state, 'handshake')
 
         self.protocol.dataReceived('woot')
+        self.assertEqual(self.handshaker.data, 'woot')
+
+        self.protocol.dataReceived('slartybartfarst')
+        self.assertEqual(self.handshaker.data, 'wootslartybartfarst')
+
+    def test_stream(self):
+        self.connect()
+        self.protocol.handshakeSuccess('')
+
+        decoder = self.protocol.decoder
+
+        self.assertEqual(self.protocol.decoder_task, None)
+        self.protocol.dataReceived('woot')
+        self.assertNotEqual(self.protocol.decoder_task, None)
+
+        self.assertEqual(decoder.stream.getvalue(), 'woot')
+
+        self.protocol.decoder_task.addErrback(lambda x: None)
+
