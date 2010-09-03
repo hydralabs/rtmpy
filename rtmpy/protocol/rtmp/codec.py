@@ -395,24 +395,21 @@ class Decoder(ChannelDemuxer):
             stream, meta.datatype, stream.timestamp, data)
 
 
-class Encoder(Codec):
+        
+class ChannelMuxer(Codec):
     """
-    @ivar pending: An fifo queue of messages that are waiting to be assigned a
-        channel.
-    @ivar availableChannels: A list of channel ids that are available.
-    @type availableChannels: C{collections.deque}
-    @ivar channelsInUse: Number of RTMP channels currently in use.
     """
 
-    def __init__(self, foo=None, stream=None):
+    def __init__(self, stream=None):
         Codec.__init__(self, stream=stream)
 
         self.minChannelId = MIN_CHANNEL_ID
-        self.pending = []
-        self.availableChannels = collections.deque(xrange(self.minChannelId, MAX_CHANNELS))
+        self.availableChannels = collections.deque(
+            xrange(self.minChannelId, MAX_CHANNELS))
         self.activeChannels = []
         self.activeChannelsIndex = {}
         self.channelsInUse = 0
+
 
     @apply
     def minChannelId():
@@ -470,13 +467,18 @@ class Encoder(Codec):
         self.availableChannels.appendleft(channelId)
         self.channelsInUse -= 1
 
-    def send(self, data, datatype, streamId, timestamp=0):
-        if self.channelsInUse == self._maxChannels:
-            self.pending.append((streamId, datatype, timestamp, data))
+    def isFull(self):
+        """
+        Need a better name for this
+        """
+        return self.channelsInUse == self._maxChannels
 
-            return
-
+    def send(self, data, datatype, streamId, timestamp):
         channel = self.aquireChannel()
+
+        if not channel:
+            raise EncodeError('Could not allocate channel')
+
         h = header.Header(channel.channelId, streamId=streamId,
             datatype=datatype, timestamp=timestamp, bodyLength=len(data))
 
@@ -491,6 +493,32 @@ class Encoder(Codec):
             if channel.complete:
                 self.releaseChannel(channel.channelId)
 
+        
+class Encoder(ChannelMuxer):
+    """
+    @ivar pending: An fifo queue of messages that are waiting to be assigned a
+        channel.
+    @ivar availableChannels: A list of channel ids that are available.
+    @type availableChannels: C{collections.deque}
+    @ivar channelsInUse: Number of RTMP channels currently in use.
+    """
+
+    def __init__(self, foo=None, stream=None):
+        ChannelMuxer.__init__(self, stream=stream)
+
+        self.pending = []
+
+    def send(self, data, datatype, streamId, timestamp=0):
+        if self.isFull():
+            self.pending.append((streamId, datatype, timestamp, data))
+
+            return
+
+        ChannelMuxer.send(self, data, datatype, streamId, timestamp)
+
+    def next(self):
+        ChannelMuxer.next(self)
+
         if not self.pending:
             if not self.activeChannels:
                 raise StopIteration
@@ -498,7 +526,7 @@ class Encoder(Codec):
             return
 
         while True:
-            if not self.pending or self.channelsInUse == MAX_CHANNELS:
+            if not self.pending or self.isFull():
                 break
 
             ChannelMuxer.send(*self.pending.pop(0))
