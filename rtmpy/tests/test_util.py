@@ -89,3 +89,6 @@ if not sys.platform.startswith('win32'):
 
 if not sys.platform.startswith('darwin'):
     DarwinUptimeTestCase.skip = 'Tested platform is not darwin'
+
+UnknownPlatformUptimeTestCase = None
+DarwinUptimeTestCase = None
