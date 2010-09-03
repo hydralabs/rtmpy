@@ -101,6 +101,7 @@ class Channel(object):
         self.reset()
 
     def reset(self):
+        self.data = ''
         self.bytes = 0
         self.bodyRemaining = None
         self.frameRemaining = self.frameSize
@@ -131,8 +132,8 @@ class Channel(object):
 
         return old_header
 
-    def setData(self, data):
-        self.data = data
+    def append(self, data):
+        self.data += data
 
     def _adjustFrameRemaining(self, l):
         """
@@ -523,7 +524,7 @@ class ChannelMuxer(Codec):
             datatype=datatype, timestamp=timestamp, bodyLength=len(data))
 
         self.nextHeaders[channel] = h
-        channel.setData(data)
+        channel.append(data)
 
     def next(self):
         # 61 active channels might be too larger chunk of work for 1 iteration
@@ -537,6 +538,7 @@ class ChannelMuxer(Codec):
             channel.writeFrame()
 
             if channel.complete:
+                channel.reset()
                 to_release.append(channel)
 
         [self.releaseChannel(channel.channelId) for channel in to_release]
@@ -555,7 +557,7 @@ class Encoder(ChannelMuxer):
 
     def send(self, data, datatype, streamId, timestamp=0):
         if self.isFull():
-            self.pending.append((streamId, datatype, timestamp, data))
+            self.pending.append((data, datatype, streamId, timestamp))
 
             return
 

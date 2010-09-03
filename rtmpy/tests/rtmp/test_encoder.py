@@ -29,7 +29,21 @@ class EncoderTestCase(BaseTestCase):
     def test_emtpy(self):
         self.assertRaises(StopIteration, self.encoder.next)
 
+    def test_full(self):
+        while not self.encoder.isFull():
+            self.encoder.send('foo', 5, 6)
 
+        self.encoder.send('bar', 1, 2, 3)
+
+        self.assertEqual(self.encoder.pending, [('bar', 1, 2, 3)])
+
+        self.encoder.next()
+
+        self.assertEqual(self.encoder.pending, [('bar', 1, 2, 3)])
+
+        self.encoder.next()
+
+        self.assertEqual(self.encoder.pending, [])
 
 class AquireChannelTestCase(BaseTestCase):
     """
@@ -156,4 +170,23 @@ class WritingTestCase(BaseTestCase):
         self.assertTrue(self.stream.at_eof())
 
     def test_reappropriate_channel(self):
-        pass
+        self.encoder.send('a' * 2, 4, 5)
+
+        self.encoder.next()
+
+        self.stream.seek(0)
+        self.assertEqual(self.stream.read(12), '\x03\x00\x00\x00\x00\x00\x02\x04\x05\x00\x00\x00')
+        self.assertEqual(self.stream.read(2), 'a' * 2)
+
+        self.assertTrue(self.stream.at_eof())
+        self.stream.consume()
+
+        self.encoder.send('b' * 2, 6, 7)
+
+        self.encoder.next()
+
+        self.stream.seek(0)
+        self.assertEqual(self.stream.read(12), '\x03\x00\x00\x00\x00\x00\x02\x06\x07\x00\x00\x00')
+        self.assertEqual(self.stream.read(2), 'b' * 2)
+
+        self.assertTrue(self.stream.at_eof())
