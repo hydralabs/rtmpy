@@ -231,8 +231,8 @@ def decodeHeader(stream):
 def diffHeaders(old, new):
     """
     Returns a header based on the differences between two headers. Both C{old}
-    and C{new} must implement L{interfaces.IHeader}, be from the same channel and be
-    absolute.
+    and C{new} must implement L{interfaces.IHeader}, be from the same channel
+    and be absolute.
 
     @param old: The first header to compare.
     @type old: L{interfaces.IHeader}
@@ -252,21 +252,26 @@ def diffHeaders(old, new):
     if old.channelId != new.channelId:
         raise HeaderError("The two headers are not for the same channel")
 
-    header = Header(channelId=old.channelId)
+    diff = Header(channelId=old.channelId)
 
     if new.timestamp != old.timestamp:
-        header.timestamp = new.timestamp
+        diff.timestamp = new.timestamp
 
     if new.datatype != old.datatype:
-        header.datatype = new.datatype
+        diff.datatype = new.datatype
 
     if new.bodyLength != old.bodyLength:
-        header.bodyLength = new.bodyLength
+        diff.bodyLength = new.bodyLength
+    elif diff.datatype is not None:
+        diff.bodyLength = old.bodyLength
 
     if new.streamId != old.streamId:
-        header.streamId = new.streamId
+        diff.streamId = new.streamId
 
-    return header
+    if diff.timestamp is None and diff.datatype is not None and diff.bodyLength is not None:
+        diff.timestamp = 0
+
+    return diff
 
 
 def mergeHeaders(old, new):

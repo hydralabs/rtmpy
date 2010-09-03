@@ -417,8 +417,8 @@ class DiffHeadersTestCase(unittest.TestCase):
         h = header.diffHeaders(old, new)
 
         self.assertTrue(h.relative)
-        self.assertEquals(h.timestamp, None)
-        self.assertEquals(h.bodyLength, None)
+        self.assertEquals(h.timestamp, 0)
+        self.assertEquals(h.bodyLength, 2000)
         self.assertEquals(h.datatype, 0)
         self.assertEquals(h.streamId, None)
         self.assertEquals(h.channelId, 3)
