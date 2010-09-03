@@ -6,7 +6,8 @@ Tests for L{rtmpy.protocol.rtmp}
 """
 
 from twisted.trial import unittest
-from twisted.internet import error
+from twisted.internet import error, defer, task
+from twisted.test.proto_helpers import StringTransportWithDisconnection
 
 from rtmpy.protocol import rtmp
 
@@ -88,14 +89,6 @@ class StateTest(ProtocolTestCase):
         self.assertEqual(self.protocol.streams, {})
         self.assertEquals(self.protocol.application, None)
 
-    def test_stream_task(self):
-        self.connect()
-        self.protocol.handshakeSuccess('')
-
-        self.assertNotEqual(self.protocol.decoder_task, None)
-
-        return self.protocol.decoder_task.whenDone()
-
 
 class ConnectionLostTestCase(ProtocolTestCase):
     """
@@ -122,6 +115,7 @@ class ConnectionLostTestCase(ProtocolTestCase):
 
     def test_decode_task(self):
         self.protocol.handshakeSuccess('')
+        self.protocol._startDecoding()
         self.executed = False
 
         def pause(*args, **kwargs):
@@ -153,4 +147,59 @@ class ConnectionLostTestCase(ProtocolTestCase):
         self.protocol.application = MockApplication(self, self.protocol)
 
         self.protocol.connectionLost(error.ConnectionDone())
+
+
+class CooperateTestCase(ProtocolTestCase):
+    """
+    Tests for encoding/decoding cooperation
+    """
+
+    def setUp(self):
+        ProtocolTestCase.setUp(self)
+
+        self.transport = self.protocol.transport = StringTransportWithDisconnection()
+        self.transport.protocol = self.protocol
+        self.connect()
+        self.protocol.handshakeSuccess('')
+
+    def test_fail_decode(self):
+        def boom(*args):
+            raise RuntimeError
+
+        self.patch(self.protocol.decoder, 'next', boom)
+
+        def eb(f):
+            f.trap(RuntimeError)
+
+            self.assertFalse(self.transport.connected)
+
+        d = self.protocol._startDecoding().addErrback(eb)
+
+        return d
+
+    def test_fail_encode(self):
+        def boom(*args):
+            raise RuntimeError
+
+        self.patch(self.protocol.encoder, 'next', boom)
+
+        def eb(f):
+            f.trap(RuntimeError)
+
+            self.assertFalse(self.transport.connected)
+
+        d = self.protocol._startEncoding().addErrback(eb)
+
+        return d
+
+    def test_resume_decode(self):
+        d = self.protocol._startDecoding()
+
+        def resume(res):
+            self.assertTrue(self.transport.connected)
+            return self.protocol._startDecoding()
+
+        d.addCallback(resume)
+
+        return d
 

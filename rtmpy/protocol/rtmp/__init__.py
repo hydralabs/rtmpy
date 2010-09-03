@@ -95,15 +95,16 @@ class RTMPProtocol(protocol.Protocol):
     #: This value is based on tcp dumps from FME <-> FMS 3.5
     bytesReadInterval = 1251810L
 
-    def logAndDisconnect(self, result, *args, **kwargs):
+    def logAndDisconnect(self, reason, *args, **kwargs):
         """
         Called when something fatal has occurred. Logs any errors and closes the
         connection.
         """
-        log.err()
+        # weirdly, if log.err is used - trial breaks?!
+        log.msg(failure=reason)
         self.transport.loseConnection()
 
-        return result
+        return reason
 
     def connectionMade(self):
         """
@@ -164,36 +165,48 @@ class RTMPProtocol(protocol.Protocol):
         self.decoder.send(data)
 
         if self.decoder_task is None:
-            self._setupDecoder()
+            self._startDecoding()
 
     def _handshake_dataReceived(self, data):
         self.handshaker.dataReceived(data)
 
-    def _cullDecoderTask(self, *args):
-        self.decoder_task = None
-
-    def _cullEncoderTask(self, *args):
-        self.encoder_task = None
-
     def _startDecoding(self):
         """
+        Called to start asynchronously iterate the decoder.
+
+        @return: A C{Deferred} which will kill the task once the decoding is
+            done or on error will kill the connection.
         """
-        self.decoder_task = task.cooperate(self.decoder)
+        def cullTask(result):
+            self.decoder_task = None
 
-        d = self.decoder_task.whenDone()
+            return result
 
-        d.addCallback(self._cullDecoderTask)
-        d.addErrback(self.logAndDisconnect)
+        self.decoder_task = task.coiterate(self.decoder)
 
-        return d
+        self.decoder_task.addBoth(cullTask)
+        self.decoder_task.addErrback(self.logAndDisconnect)
+
+        return self.decoder_task
 
     def _startEncoding(self):
-        self.encoder_task = task.cooperate(self.encoder)
+        """
+        Called to start asynchronously iterate the encoder.
 
-        d = self.encoder_task.whenDone()
+        @return: A C{Deferred} which will kill the task once the encoder is
+            done or on error will kill the connection.
+        """
+        def cullTask(result):
+            self.encoder_task = None
 
-        d.addCallback(self._cullEncoderTask)
-        d.addErrback(self.logAndDisconnect)
+            return result
+
+        self.encoder_task = task.coiterate(self.encoder)
+
+        self.encoder_task.addBoth(cullTask)
+        self.encoder_task.addErrback(self.logAndDisconnect)
+
+        return self.encoder_task
 
     def handshakeSuccess(self, data):
         """
@@ -219,8 +232,10 @@ class RTMPProtocol(protocol.Protocol):
 
         self.decoder = codec.Decoder(self, self)
         self.encoder = codec.Encoder(self)
+        self.cooperator = task.Cooperator()
 
-        self._startDecoding()
+        self.decoder_task = None
+        self.encoder_task = None
 
     # IStreamFactory
     def getStream(self, streamId):
