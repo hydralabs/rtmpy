@@ -81,9 +81,79 @@ class WritingTestCase(BaseTestCase):
     """
     """
 
-    def test_simple(self):
-        self.encoder.send('foobar', 0, 1)
+    def test_less_than_frame(self):
+        self.encoder.send('foobar', 10, 1)
 
         self.encoder.next()
 
-        print repr(self.stream.getvalue())
+        self.assertEqual(self.stream.getvalue(),
+            '\x03\x00\x00\x00\x00\x00\x06\n\x01\x00\x00\x00foobar')
+
+        self.assertRaises(StopIteration, self.encoder.next)
+
+    def test_multiple_frames(self):
+        # 3 and a bit frames at 128 bytes per frame
+        self.encoder.send('a' * (128 * 3 + 50), 10, 1)
+
+        self.encoder.next()
+
+        self.stream.seek(0)
+        self.assertEqual(self.stream.read(12), '\x03\x00\x00\x00\x00\x01\xb2\n\x01\x00\x00\x00')
+        self.assertEqual(self.stream.read(), 'a' * 128)
+        self.assertTrue(self.stream.at_eof())
+
+        self.stream.consume()
+
+        self.encoder.next()
+
+        self.stream.seek(0)
+        self.assertEqual(self.stream.read(1), '\xc3')
+        self.assertEqual(self.stream.read(), 'a' * 128)
+        self.assertTrue(self.stream.at_eof())
+
+        self.stream.consume()
+
+        self.encoder.next()
+
+        self.stream.seek(0)
+        self.assertEqual(self.stream.read(1), '\xc3')
+        self.assertEqual(self.stream.read(), 'a' * 128)
+        self.assertTrue(self.stream.at_eof())
+
+        self.stream.consume()
+
+        self.encoder.next()
+
+        self.stream.seek(0)
+        self.assertEqual(self.stream.read(1), '\xc3')
+        self.assertEqual(self.stream.read(), 'a' * 50)
+        self.assertTrue(self.stream.at_eof())
+
+        self.assertRaises(StopIteration, self.encoder.next)
+
+    def test_interleave(self):
+        # dispatch two messages
+        self.encoder.send('a' * (128 + 1), 15, 7)
+        self.encoder.send('b' * (128 + 50), 3, 0xfffe)
+
+        self.encoder.next()
+
+        self.stream.seek(0)
+        self.assertEqual(self.stream.read(12), '\x03\x00\x00\x00\x00\x00\x81\x0f\x07\x00\x00\x00')
+        self.assertEqual(self.stream.read(128), 'a' * 128)
+        self.assertEqual(self.stream.read(12), '\x04\x00\x00\x00\x00\x00\xb2\x03\xfe\xff\x00\x00')
+        self.assertEqual(self.stream.read(128), 'b' * 128)
+        self.assertTrue(self.stream.at_eof())
+        self.stream.consume()
+
+        self.encoder.next()
+
+        self.stream.seek(0)
+        self.assertEqual(self.stream.read(1), '\xc3')
+        self.assertEqual(self.stream.read(1), 'a')
+        self.assertEqual(self.stream.read(1), '\xc4')
+        self.assertEqual(self.stream.read(50), 'b' * 50)
+        self.assertTrue(self.stream.at_eof())
+
+    def test_reappropriate_channel(self):
+        pass

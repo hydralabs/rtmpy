@@ -20,8 +20,12 @@ from rtmpy.protocol.rtmp import header, message
 FRAME_SIZE = 128
 #: Maximum number of channels that can be active per RTMP stream
 MAX_CHANNELS = 64
-#: ...
+#: RTMP streams seem to skip channel 0->2 for some arcane reason. More
+#: exploration is required
 MIN_CHANNEL_ID = 3
+
+#: A list of encoded header
+_ENCODED_CONTINUATION_HEADERS = []
 
 class BaseError(Exception):
     """
@@ -125,6 +129,11 @@ class Channel(object):
 
         self.bodyRemaining = self.header.bodyLength - self.bytes
 
+        return old_header
+
+    def setData(self, data):
+        self.data = data
+
     def _adjustFrameRemaining(self, l):
         """
         Adjusts the C{frameRemaining} attributes based on the supplied length.
@@ -156,6 +165,20 @@ class Channel(object):
         self._adjustFrameRemaining(l)
 
         return bytes
+
+    def writeFrame(self):
+        """
+        """
+        l = min(self.frameRemaining, self.frameSize, self.bodyRemaining)
+
+        frame = self.data[:l]
+        self.data = self.data[l:]
+
+        self.bytes += l
+        self.bodyRemaining -= l
+        self._adjustFrameRemaining(l)
+
+        self.stream.write(frame)
 
     @property
     def complete(self):
@@ -395,9 +418,13 @@ class Decoder(ChannelDemuxer):
             stream, meta.datatype, stream.timestamp, data)
 
 
-        
 class ChannelMuxer(Codec):
     """
+    @ivar availableChannels: A list of channel ids that are available.
+    @type availableChannels: C{collections.deque}
+    @ivar channelsInUse: Number of RTMP channels currently in use.
+    @ivar activeChannels: A list of L{Channel} objects that are active (and
+        therefore unavailable)
     """
 
     def __init__(self, stream=None):
@@ -407,9 +434,9 @@ class ChannelMuxer(Codec):
         self.availableChannels = collections.deque(
             xrange(self.minChannelId, MAX_CHANNELS))
         self.activeChannels = []
-        self.activeChannelsIndex = {}
         self.channelsInUse = 0
 
+        self.nextHeaders = {}
 
     @apply
     def minChannelId():
@@ -443,7 +470,6 @@ class ChannelMuxer(Codec):
         c = self.getChannel(channelId)
 
         self.activeChannels.append(c)
-        self.activeChannelsIndex[c] = len(self.activeChannels) - 1
 
         return c
 
@@ -457,12 +483,11 @@ class ChannelMuxer(Codec):
         c = self.getChannel(channelId)
 
         try:
-            idx = self.activeChannelsIndex.pop(c)
-        except KeyError:
+            # FIXME: this is expensive
+            self.activeChannels.remove(c)
+        except ValueError:
             raise EncodeError('Attempted to release channel %r but that '
                 'channel is not active' % (channelId,))
-
-        del self.activeChannels[idx]
 
         self.availableChannels.appendleft(channelId)
         self.channelsInUse -= 1
@@ -473,6 +498,21 @@ class ChannelMuxer(Codec):
         """
         return self.channelsInUse == self._maxChannels
 
+    def writeHeader(self, channel):
+        """
+        """
+        h = self.nextHeaders.pop(channel, None)
+
+        if h is None:
+            self.stream.write(_ENCODED_CONTINUATION_HEADERS[channel.channelId])
+        else:
+            old_header = channel.setHeader(h)
+
+            if old_header:
+                h = header.diffHeaders(old_header, h)
+
+            header.encodeHeader(self.stream, h)
+
     def send(self, data, datatype, streamId, timestamp):
         channel = self.aquireChannel()
 
@@ -482,25 +522,30 @@ class ChannelMuxer(Codec):
         h = header.Header(channel.channelId, streamId=streamId,
             datatype=datatype, timestamp=timestamp, bodyLength=len(data))
 
-        channel.setHeader(h)
+        self.nextHeaders[channel] = h
+        channel.setData(data)
 
     def next(self):
         # 61 active channels might be too larger chunk of work for 1 iteration
+        if not self.activeChannels:
+            raise StopIteration
+
+        to_release = []
+
         for channel in self.activeChannels:
             self.writeHeader(channel)
             channel.writeFrame()
 
             if channel.complete:
-                self.releaseChannel(channel.channelId)
+                to_release.append(channel)
 
-        
+        [self.releaseChannel(channel.channelId) for channel in to_release]
+
+
 class Encoder(ChannelMuxer):
     """
     @ivar pending: An fifo queue of messages that are waiting to be assigned a
         channel.
-    @ivar availableChannels: A list of channel ids that are available.
-    @type availableChannels: C{collections.deque}
-    @ivar channelsInUse: Number of RTMP channels currently in use.
     """
 
     def __init__(self, foo=None, stream=None):
@@ -517,16 +562,24 @@ class Encoder(ChannelMuxer):
         ChannelMuxer.send(self, data, datatype, streamId, timestamp)
 
     def next(self):
+        while self.pending and not self.isFull():
+            ChannelMuxer.send(self, *self.pending.pop(0))
+
         ChannelMuxer.next(self)
 
-        if not self.pending:
-            if not self.activeChannels:
-                raise StopIteration
 
-            return
+def build_header_continuations():
+    global _ENCODED_CONTINUATION_HEADERS
 
-        while True:
-            if not self.pending or self.isFull():
-                break
+    s = BufferedByteStream()
 
-            ChannelMuxer.send(*self.pending.pop(0))
+    for i in xrange(0, 64):
+        h = header.Header(i)
+
+        header.encodeHeader(s, h)
+
+        _ENCODED_CONTINUATION_HEADERS.append(s.getvalue())
+        s.consume()
+
+
+build_header_continuations()
