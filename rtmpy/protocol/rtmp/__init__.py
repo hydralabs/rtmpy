@@ -17,7 +17,7 @@ into fixed size body chunks.
 @see: U{RTMP<http://dev.rtmpy.org/wiki/RTMP>}
 """
 
-from twisted.python import log
+from twisted.python import log, failure
 from twisted.internet import protocol, task
 from pyamf.util import BufferedByteStream
 
@@ -111,6 +111,7 @@ class RTMPProtocol(protocol.Protocol):
         Called when this a connection has been made.
         """
         self.state = self.HANDSHAKE
+        self.dataReceived = self._handshake_dataReceived
 
         self.handshaker = self.factory.buildHandshakeNegotiator(self)
 
@@ -150,25 +151,20 @@ class RTMPProtocol(protocol.Protocol):
             if hasattr(self, 'encoder') and self.encoder:
                 del self.encoder
 
-    def dataReceived(self, data):
-        """
-        Called when data is received from the underlying C{transport}.
-        """
-        dr = getattr(self, '_' + self.state + '_dataReceived', None)
-
-        try:
-            dr(data)
-        except:
-            self.logAndDisconnect()
-
     def _stream_dataReceived(self, data):
-        self.decoder.send(data)
+        try:
+            self.decoder.send(data)
 
-        if self.decoder_task is None:
-            self._startDecoding()
+            if self.decoder_task is None:
+                self._startDecoding()
+        except:
+            self.logAndDisconnect(failure.Failure())
 
     def _handshake_dataReceived(self, data):
-        self.handshaker.dataReceived(data)
+        try:
+            self.handshaker.dataReceived(data)
+        except:
+            self.logAndDisconnect(failure.Failure())
 
     def _startDecoding(self):
         """
@@ -216,6 +212,7 @@ class RTMPProtocol(protocol.Protocol):
         """
         self.state = self.STREAM
 
+        self.dataReceived = self._stream_dataReceived
         del self.handshaker
 
         self.startStreaming()
@@ -232,7 +229,6 @@ class RTMPProtocol(protocol.Protocol):
 
         self.decoder = codec.Decoder(self, self)
         self.encoder = codec.Encoder(self)
-        self.cooperator = task.Cooperator()
 
         self.decoder_task = None
         self.encoder_task = None

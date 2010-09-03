@@ -58,6 +58,8 @@ class ProtocolTestCase(unittest.TestCase):
     def setUp(self):
         self.protocol = rtmp.RTMPProtocol()
         self.handshaker = MockHandshakeNegotiator(self, self.protocol)
+        self.transport = self.protocol.transport = StringTransportWithDisconnection()
+        self.transport.protocol = self.protocol
 
     def connect(self):
         self.protocol.factory = MockFactory(self, self.protocol)
@@ -157,8 +159,6 @@ class CooperateTestCase(ProtocolTestCase):
     def setUp(self):
         ProtocolTestCase.setUp(self)
 
-        self.transport = self.protocol.transport = StringTransportWithDisconnection()
-        self.transport.protocol = self.protocol
         self.connect()
         self.protocol.handshakeSuccess('')
 
@@ -203,3 +203,13 @@ class CooperateTestCase(ProtocolTestCase):
 
         return d
 
+
+class DataReceivedTestCase(ProtocolTestCase):
+    """
+    """
+
+    def test_handshake(self):
+        self.connect()
+        self.assertEqual(self.protocol.state, 'handshake')
+
+        self.protocol.dataReceived('woot')
