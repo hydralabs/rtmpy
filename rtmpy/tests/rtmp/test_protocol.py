@@ -6,6 +6,7 @@ Tests for L{rtmpy.protocol.rtmp}
 """
 
 from twisted.trial import unittest
+from twisted.internet import error
 
 from rtmpy.protocol import rtmp
 
@@ -35,6 +36,19 @@ class MockFactory(object):
         self.test.assertIdentical(protocol, self.protocol)
 
         return self.test.handshaker
+
+
+class MockApplication(object):
+    """
+    """
+
+    def __init__(self, test, protocol):
+        self.test = test
+        self.protocol = protocol
+
+    def clientDisconnected(self, client, reason):
+        self.test.assertIdentical(client, self.protocol)
+
 
 class ProtocolTestCase(unittest.TestCase):
     """
@@ -81,3 +95,62 @@ class StateTest(ProtocolTestCase):
         self.assertNotEqual(self.protocol.decoder_task, None)
 
         return self.protocol.decoder_task.whenDone()
+
+
+class ConnectionLostTestCase(ProtocolTestCase):
+    """
+    Tests for losing connection at various states of the protocol
+    """
+
+    def setUp(self):
+        ProtocolTestCase.setUp(self)
+
+        self.connect()
+
+    def test_handshake(self):
+        self.protocol.connectionLost(error.ConnectionDone())
+
+        self.assertFalse(hasattr(self.protocol, 'handshaker'))
+
+    def test_stream(self):
+        self.protocol.handshakeSuccess('')
+
+        self.protocol.connectionLost(error.ConnectionDone())
+
+        self.assertFalse(hasattr(self.protocol, 'decoder'))
+        self.assertFalse(hasattr(self.protocol, 'encoder'))
+
+    def test_decode_task(self):
+        self.protocol.handshakeSuccess('')
+        self.executed = False
+
+        def pause(*args, **kwargs):
+            self.executed = True
+
+        self.patch(self.protocol.decoder_task, 'pause', pause)
+
+        self.protocol.connectionLost(error.ConnectionDone())
+
+        self.assertTrue(self.executed)
+
+    def test_encode_task(self):
+        self.protocol.handshakeSuccess('')
+        self.executed = False
+
+        self.protocol._startEncoding()
+
+        def pause(*args, **kwargs):
+            self.executed = True
+
+        self.patch(self.protocol.encoder_task, 'pause', pause)
+
+        self.protocol.connectionLost(error.ConnectionDone())
+
+        self.assertTrue(self.executed)
+
+    def test_inform_application(self):
+        self.protocol.handshakeSuccess('')
+        self.protocol.application = MockApplication(self, self.protocol)
+
+        self.protocol.connectionLost(error.ConnectionDone())
+

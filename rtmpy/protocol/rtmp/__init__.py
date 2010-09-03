@@ -116,6 +116,39 @@ class RTMPProtocol(protocol.Protocol):
         # TODO: apply uptime, version to the handshaker instead of 0, 0
         self.handshaker.start(0, 0)
 
+    def connectionLost(self, reason):
+        """
+        Called when the connection has been lost.
+
+        @param reason: The reason for the disconnection
+        """
+        if self.state == self.HANDSHAKE:
+            try:
+                del self.handshaker
+            except:
+                pass
+        elif self.state == self.STREAM:
+            if hasattr(self, 'application') and self.application:
+                self.application.clientDisconnected(self, reason)
+
+            if hasattr(self, 'decoder_task'):
+                if self.decoder_task:
+                    self.decoder_task.pause()
+
+                del self.decoder_task
+
+            if hasattr(self, 'decoder') and self.decoder:
+                del self.decoder
+
+            if hasattr(self, 'encoder_task'):
+                if self.encoder_task:
+                    self.encoder_task.pause()
+
+                del self.encoder_task
+
+            if hasattr(self, 'encoder') and self.encoder:
+                del self.encoder
+
     def dataReceived(self, data):
         """
         Called when data is received from the underlying C{transport}.
