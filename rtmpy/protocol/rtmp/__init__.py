@@ -17,6 +17,7 @@ into fixed size body chunks.
 @see: U{RTMP<http://dev.rtmpy.org/wiki/RTMP>}
 """
 
+from twisted.python import log
 from twisted.internet import protocol, task
 from pyamf.util import BufferedByteStream
 
@@ -26,6 +27,7 @@ from rtmpy.protocol.rtmp import message, codec
 
 #: Maximum number of streams that can be active per RTMP stream
 MAX_STREAMS = 0xffff
+
 
 class Stream(object):
     timestamp = 0
@@ -93,11 +95,15 @@ class RTMPProtocol(protocol.Protocol):
     #: This value is based on tcp dumps from FME <-> FMS 3.5
     bytesReadInterval = 1251810L
 
-    def logAndDisconnect(self, *args):
-        from twisted.python import log
-
+    def logAndDisconnect(self, result, *args, **kwargs):
+        """
+        Called when something fatal has occurred. Logs any errors and closes the
+        connection.
+        """
         log.err()
         self.transport.loseConnection()
+
+        return result
 
     def connectionMade(self):
         """
@@ -107,11 +113,12 @@ class RTMPProtocol(protocol.Protocol):
 
         self.handshaker = self.factory.buildHandshakeNegotiator(self)
 
+        # TODO: apply uptime, version to the handshaker instead of 0, 0
         self.handshaker.start(0, 0)
 
     def dataReceived(self, data):
         """
-        Called when data is received from the underlying L{transport}.
+        Called when data is received from the underlying C{transport}.
         """
         dr = getattr(self, '_' + self.state + '_dataReceived', None)
 
@@ -128,22 +135,6 @@ class RTMPProtocol(protocol.Protocol):
 
     def _handshake_dataReceived(self, data):
         self.handshaker.dataReceived(data)
-
-    def handshakeSuccess(self, data):
-        """
-        Called when the RTMP handshake was successful. Once called, message
-        streaming can commence.
-        """
-        from rtmpy.protocol.rtmp import codec
-
-        self.state = self.STREAM
-
-        del self.handshaker
-
-        self.startStreaming()
-
-        if data:
-            self.dataReceived(data)
 
     def _cullDecoderTask(self, *args):
         self.decoder_task = None
@@ -171,17 +162,32 @@ class RTMPProtocol(protocol.Protocol):
         d.addCallback(self._cullEncoderTask)
         d.addErrback(self.logAndDisconnect)
 
+    def handshakeSuccess(self, data):
+        """
+        Handshaking was successful, streaming now commences.
+
+        @param data: Any data left over from the handshake negotiations.
+        """
+        self.state = self.STREAM
+
+        del self.handshaker
+
+        self.startStreaming()
+
+        if data:
+            self.dataReceived(data)
+
     def startStreaming(self):
         """
-        Called to prep the protocol to accept and produce RTMP messages.
+        Handshaking was successful, streaming now commences.
         """
         self.streams = {}
         self.application = None
 
         self.decoder = codec.Decoder(self, self)
         self.encoder = codec.Encoder(self)
+
         self._startDecoding()
-        self._startEncoding()
 
     # IStreamFactory
     def getStream(self, streamId):
