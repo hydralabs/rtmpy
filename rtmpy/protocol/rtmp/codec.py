@@ -1,11 +1,10 @@
-# Copyright (c) The RTMPy Project.
+# Copyright the RTMPy project.
 # See LICENSE.txt for details.
 
 """
 RTMP codecs. Encoders and decoders for rtmp streams.
 
-@see: U{RTMP<http://rtmpy.org/wiki/RTMP>}
-@since: 0.1
+@see: U{RTMP<http://dev.rtmpy.org/wiki/RTMP>}
 """
 
 import collections
@@ -15,39 +14,39 @@ from pyamf.util import BufferedByteStream
 
 from rtmpy.protocol.rtmp import header, message
 
+__all__ = [
+    'Encoder',
+    'Decoder'
+]
+
 
 #: The default number of bytes per RTMP frame (excluding header)
 FRAME_SIZE = 128
 #: Maximum number of channels that can be active per RTMP stream
 MAX_CHANNELS = 64
-#: RTMP streams seem to skip channel 0->2 for some arcane reason. More
+#: RTMP streams seem to skip channel 0->2 for some awesome reason. More
 #: exploration is required
 MIN_CHANNEL_ID = 3
 
-#: A list of encoded header
+#: A list of encoded headers
 _ENCODED_CONTINUATION_HEADERS = []
+
 
 class BaseError(Exception):
     """
-    Base error class for all things `codec`.
+    Base error class for all things C{codec}.
     """
 
 
 class DecodeError(BaseError):
     """
-    Raised if there is an error decoding an RTMP bytestream.
+    Raised if there is an error decoding an RTMP byte stream.
     """
 
 
 class EncodeError(BaseError):
     """
-    Raised if there is an error encoding an RTMP bytestream.
-    """
-
-
-class ProtocolError(BaseError):
-    """
-    Raised if an error occurs whilst handling the protocol.
+    Raised if there is an error encoding an RTMP byte stream.
     """
 
 
@@ -63,58 +62,56 @@ class IChannelMeta(Interface):
     streamId = Attribute("An C{int} representing the linked stream.")
 
 
-class IMessageDelegate(Interface):
+class BaseChannel(object):
     """
-    """
+    Marshals data in and out of RTMP frames.
 
-    def getStream(streamId):
-        """
-        """
-
-    def dispatchMessage(stream, datatype, timestamp, data):
-        """
-        """
-
-
-class Channel(object):
-    """
-    Acts as a container for an RTMP channel. Does not know anything of
-    encoding or decoding channels, it is literally meant as a proxy between
-    the byte stream and an observer.
-
+    @ivar channelId: The id that this channel has been assigned (duh?!)
+    @type channelId: C{int}
     @ivar header: The calculated header for this channel. RTMP can send
         relative headers, which will be merged with the previous headers to
         calculate the absolute values for the header.
-    @type header: L{interfaces.IHeader} or C{None}
+    @type header: L{header.Header} or C{None}
+    @ivar stream: The byte container which frames are marshalled.
+    @type stream: L{BufferedByteStream}
+    @ivar frameSize: The maximum number of bytes of an RTMP frame.
+    @type frameSize: C{int}
     @ivar frameRemaining: The amount of data that needs to be received before
         a frame can be considered complete.
     @type frameRemaining: C{int}
+    @ivar bytes: The total number of bytes that this channel has read/written
+        since the last reset.
     """
 
-    def __init__(self, channelId, codec, stream):
+    def __init__(self, channelId, stream, frameSize):
         self.channelId = channelId
-        self.header = None
-        self.codec = codec
         self.stream = stream
-        self.frameSize = self.codec.frameSize
+        self.frameSize = frameSize
 
-        self.reset()
+        self.header = None
 
     def reset(self):
-        self.data = ''
         self.bytes = 0
-        self.bodyRemaining = None
+        self._bodyRemaining = -1
         self.frameRemaining = self.frameSize
+
+    @property
+    def complete(self):
+        """
+        Whether this channel has completed its content length requirements.
+        """
+        return self._bodyRemaining == 0
 
     def setHeader(self, new):
         """
         Applies a new header to this channel. If this channel has no previous
-        header then the new header must be absolute (C{relative=True}).
+        header then the new header must be absolute (C{relative=False}).
         Otherwise the new values will be applied to the existing header.
-        Setting the header requires a registered manager.
 
         @param new: The header to apply to this channel.
-        @type new: L{interfaces.IHeader}
+        @type new: L{header.Header}
+        @return: The previous header, if there is one.
+        @rtype: L{header.Header} or C{None}
         """
         old_header = self.header
 
@@ -123,79 +120,57 @@ class Channel(object):
                 raise header.HeaderError(
                     'Tried to set a relative header as absolute')
 
-        if new.relative:
-            self.header = header.mergeHeaders(self.header, new)
+        if not new.relative:
+            h = self.header = new
         else:
-            self.header = new
+            h = self.header = header.mergeHeaders(self.header, new)
 
-        self.bodyRemaining = self.header.bodyLength - self.bytes
+        self._bodyRemaining = h.bodyLength - self.bytes
 
         return old_header
 
-    def append(self, data):
-        self.data += data
-
     def _adjustFrameRemaining(self, l):
         """
-        Adjusts the C{frameRemaining} attributes based on the supplied length.
+        Adjusts the C{frameRemaining} attribute based on the supplied length.
         """
         size = self.frameSize
 
         while l >= size:
             l -= size
 
-        if l >= self.frameRemaining:
-            l -= self.frameRemaining
-            self.frameRemaining = size
-
         self.frameRemaining -= l
 
-    def readFrame(self):
+    def marshallFrame(self, size):
         """
-        Reads an RTMP frame from the stream and returns the content of the body.
+        Marshalls an RTMP frame. Must be implemented by subclasses.
 
-        If there is not enough data to fulfill the frame requirements then
-        C{IOError} will be raised.
+        @param size: The number of bytes to be marshalled.
         """
-        l = min(self.frameRemaining, self.frameSize, self.bodyRemaining)
+        raise NotImplementedError
 
-        bytes = self.stream.read(l)
+    def marshallOneFrame(self):
+        """
+        Marshalls one RTMP frame and adjusts counters accordingly. Calls
+        C{marshallFrame} which subclasses must implement.
+        """
+        l = min(self.frameRemaining, self.frameSize, self._bodyRemaining)
+
+        ret = self.marshallFrame(l)
 
         self.bytes += l
-        self.bodyRemaining -= l
+        self._bodyRemaining -= l
         self._adjustFrameRemaining(l)
 
-        return bytes
-
-    def writeFrame(self):
-        """
-        """
-        l = min(self.frameRemaining, self.frameSize, self.bodyRemaining)
-
-        frame = self.data[:l]
-        self.data = self.data[l:]
-
-        self.bytes += l
-        self.bodyRemaining -= l
-        self._adjustFrameRemaining(l)
-
-        self.stream.write(frame)
-
-    @property
-    def complete(self):
-        """
-        Whether this channel has completed its content length requirements.
-        """
-        return not self.bodyRemaining
+        return ret
 
     def __repr__(self):
         s = []
-        attrs = ['frameRemaining', 'frames', 'bytes', 'bodyRemaining']
+        attrs = ['channelId', 'frameRemaining', 'bytes']
 
         if self.header is None:
             s.append('header=None')
         else:
-            s.append('channelId=%r' % (self.header.channelId,))
+            s.append('channelId=%r' % (self.channelId,))
             s.append('datatype=%r' % (self.header.datatype,))
 
         for a in attrs:
@@ -212,13 +187,60 @@ class Channel(object):
         )
 
 
+class ConsumingChannel(BaseChannel):
+    """
+    Reads RTMP frames.
+    """
+
+    def marshallFrame(self, size):
+        """
+        Reads an RTMP frame from the stream and returns the content of the body.
+
+        If there is not enough data to fulfill the frame requirements then
+        C{IOError} will be raised.
+        """
+        return self.stream.read(size)
+
+
+class ProducingChannel(BaseChannel):
+    """
+    Writes RTMP frames.
+
+    @ivar buffer: Any data waiting to be written to the underlying stream.
+    @type buffer: L{BufferedByteStream}
+    """
+
+    def __init__(self, channelId, stream, frameSize):
+        BaseChannel.__init__(self, channelId, stream, frameSize)
+
+        self.buffer = BufferedByteStream()
+
+    def reset(self):
+        """
+        Called when the channel has completed writing the buffer.
+        """
+        BaseChannel.reset(self)
+
+        self.buffer.seek(0)
+        self.buffer.truncate()
+
+    def append(self, data):
+        """
+        Appends
+        """
+        self.buffer.append(data)
+
+    def marshallFrame(self, size):
+        self.stream.write(self.buffer.read(size))
+
+
 class Codec(object):
     """
     Generic channels and frame operations.
 
     @ivar stream: The underlying buffer containing the raw bytes.
     @type stream: L{BufferedByteStream}
-    @ivar channels: A L{dict} of L{Channel} objects that are awaiting data.
+    @ivar channels: A L{dict} of L{BaseChannel} objects that are handling data.
     @ivar frameSize: The maximum size for an individual frame. Read-only, use
         L{setFrameSize} instead.
     """
@@ -231,7 +253,7 @@ class Codec(object):
 
     def setFrameSize(self, size):
         """
-        Set the size of the next frame to be read.
+        Set the size of the next frame to be handled.
         """
         self.frameSize = size
 
@@ -256,7 +278,10 @@ class Codec(object):
             raise IndexError('Attempted to get channelId %d which is > %d' % (
                 channelId, MAX_CHANNELS))
 
-        channel = self.channels[channelId] = Channel(channelId, self, self.stream)
+        channel = self.channel_class(channelId, self.stream, self.frameSize)
+        self.channels[channelId] = channel
+
+        channel.reset()
 
         return channel
 
@@ -270,6 +295,8 @@ class FrameReader(Codec):
     contain the channel that the frame is destined for. RTMP allows multiple
     channels to be interleaved together.
     """
+
+    channel_class = ConsumingChannel
 
     def readHeader(self):
         """
@@ -306,12 +333,14 @@ class FrameReader(Codec):
             channel = self.getChannel(h.channelId)
             channel.setHeader(h)
 
-            bytes = channel.readFrame()
+            bytes = channel.marshallOneFrame()
 
-            if channel.complete:
+            complete = channel.complete
+
+            if complete:
                 channel.reset()
 
-            return bytes, channel.complete, channel.header
+            return bytes, complete, channel.header
         except IOError:
             self.stream.seek(pos, 0)
 
@@ -388,6 +417,8 @@ class Decoder(ChannelDemuxer):
     @ivar stream_factory: Builds stream listener objects.
     """
 
+    channel_class = ConsumingChannel
+
     def __init__(self, dispatcher, stream_factory, stream=None):
         ChannelDemuxer.__init__(self, stream=stream)
 
@@ -427,6 +458,8 @@ class ChannelMuxer(Codec):
     @ivar activeChannels: A list of L{Channel} objects that are active (and
         therefore unavailable)
     """
+
+    channel_class = ProducingChannel
 
     def __init__(self, stream=None):
         Codec.__init__(self, stream=stream)
@@ -535,7 +568,7 @@ class ChannelMuxer(Codec):
 
         for channel in self.activeChannels:
             self.writeHeader(channel)
-            channel.writeFrame()
+            channel.marshallOneFrame()
 
             if channel.complete:
                 channel.reset()

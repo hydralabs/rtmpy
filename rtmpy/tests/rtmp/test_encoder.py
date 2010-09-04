@@ -45,6 +45,7 @@ class EncoderTestCase(BaseTestCase):
 
         self.assertEqual(self.encoder.pending, [])
 
+
 class AquireChannelTestCase(BaseTestCase):
     """
     """
@@ -54,7 +55,7 @@ class AquireChannelTestCase(BaseTestCase):
 
         c = self.encoder.aquireChannel()
 
-        self.assertTrue(isinstance(c, codec.Channel))
+        self.assertTrue(isinstance(c, codec.ProducingChannel))
 
         self.assertEqual(c.channelId, 3)
         self.assertEqual(c.header, None)
