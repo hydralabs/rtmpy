@@ -581,9 +581,9 @@ class ChannelMuxer(Codec):
 
             if channel.complete:
                 channel.reset()
-                to_release.append(channel)
+                to_release.append(channel.channelId)
 
-        [self.releaseChannel(channel.channelId) for channel in to_release]
+        [self.releaseChannel(channelId) for channelId in to_release]
 
 
 class Encoder(ChannelMuxer):
