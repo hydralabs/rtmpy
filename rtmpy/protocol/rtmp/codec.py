@@ -22,10 +22,8 @@ __all__ = [
 
 #: The default number of bytes per RTMP frame (excluding header)
 FRAME_SIZE = 128
-#: Maximum number of channels that can be active per RTMP stream
-MAX_CHANNELS = 64
-#: RTMP streams seem to skip channel 0->2 for some awesome reason. More
-#: exploration is required
+#: Maximum number of channels that can be active per RTMP connection
+MAX_CHANNELS = 0xffff + 64
 MIN_CHANNEL_ID = 3
 
 #: A list of encoded headers
@@ -471,6 +469,7 @@ class ChannelMuxer(Codec):
         self.channelsInUse = 0
 
         self.nextHeaders = {}
+        self.timestamps = {}
 
     @apply
     def minChannelId():
@@ -538,7 +537,11 @@ class ChannelMuxer(Codec):
         h = self.nextHeaders.pop(channel, None)
 
         if h is None:
-            self.stream.write(_ENCODED_CONTINUATION_HEADERS[channel.channelId])
+            if channel.channelId < 64:
+                self.stream.write(
+                    _ENCODED_CONTINUATION_HEADERS[channel.channelId])
+            else:
+                header.encodeHeader(self.stream, h)
         else:
             old_header = channel.setHeader(h)
 
@@ -553,9 +556,13 @@ class ChannelMuxer(Codec):
         if not channel:
             raise EncodeError('Could not allocate channel')
 
-        h = header.Header(channel.channelId, streamId=streamId,
-            datatype=datatype, timestamp=timestamp, bodyLength=len(data))
+        lastTimestamp = self.timestamps.get(streamId, 0)
 
+        h = header.Header(channel.channelId, streamId=streamId,
+            datatype=datatype, bodyLength=len(data),
+            timestamp=timestamp - lastTimestamp)
+
+        self.timestamps[streamId] = timestamp
         self.nextHeaders[channel] = h
         channel.append(data)
 
@@ -583,12 +590,15 @@ class Encoder(ChannelMuxer):
         channel.
     """
 
-    def __init__(self, foo=None, stream=None):
+    def __init__(self, output, stream=None):
         ChannelMuxer.__init__(self, stream=stream)
 
         self.pending = []
+        self.output = output
 
-    def send(self, data, datatype, streamId, timestamp=0):
+    def send(self, data, datatype, streamId, timestamp):
+        """
+        """
         if self.isFull():
             self.pending.append((data, datatype, streamId, timestamp))
 
@@ -602,12 +612,16 @@ class Encoder(ChannelMuxer):
 
         ChannelMuxer.next(self)
 
+        self.output.write(self.stream.getvalue())
+        self.stream.consume()
+
 
 def build_header_continuations():
     global _ENCODED_CONTINUATION_HEADERS
 
     s = BufferedByteStream()
 
+    # only generate the first 64 as it is likely that is all we will ever need
     for i in xrange(0, 64):
         h = header.Header(i)
 
