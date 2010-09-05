@@ -450,8 +450,8 @@ class Decoder(ChannelDemuxer):
 
 class ChannelMuxer(Codec):
     """
-    @ivar availableChannels: A list of channel ids that are available.
-    @type availableChannels: C{collections.deque}
+    @ivar releasedChannels: A list of channel ids that have been released.
+    @type releasedChannels: C{collections.deque}
     @ivar channelsInUse: Number of RTMP channels currently in use.
     @ivar activeChannels: A list of L{Channel} objects that are active (and
         therefore unavailable)
@@ -463,8 +463,7 @@ class ChannelMuxer(Codec):
         Codec.__init__(self, stream=stream)
 
         self.minChannelId = MIN_CHANNEL_ID
-        self.availableChannels = collections.deque(
-            xrange(self.minChannelId, MAX_CHANNELS))
+        self.releasedChannels = collections.deque()
         self.activeChannels = []
         self.channelsInUse = 0
 
@@ -494,9 +493,12 @@ class ChannelMuxer(Codec):
         @rtype: L{Channel} or C{None}
         """
         try:
-            channelId = self.availableChannels.popleft()
+            channelId = self.releasedChannels.popleft()
         except IndexError:
-            return None
+            channelId = self.channelsInUse + self._minChannelId
+
+            if channelId >= MAX_CHANNELS:
+                return None
 
         self.channelsInUse += 1
 
@@ -522,7 +524,7 @@ class ChannelMuxer(Codec):
             raise EncodeError('Attempted to release channel %r but that '
                 'channel is not active' % (channelId,))
 
-        self.availableChannels.appendleft(channelId)
+        self.releasedChannels.appendleft(channelId)
         self.channelsInUse -= 1
 
     def isFull(self):
