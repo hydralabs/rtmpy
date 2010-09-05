@@ -497,12 +497,12 @@ class Notify(Message):
         """
         Decode a notification message.
         """
-        gen = pyamf.decode(buf, encoding=encoding)
+        decoder = pyamf.get_decoder(encoding, stream=buf)
 
-        self.name = gen.next()
-        self.id = gen.next()
+        self.name = decoder.next()
+        self.id = decoder.next()
 
-        self.argv = list(gen)
+        self.argv = [x for x in decoder]
 
     def encode(self, buf, encoding=0):
         """
@@ -531,7 +531,7 @@ class Invoke(Notify):
         """
         Dispatches the message to the listener.
         """
-        listener.onInvoke(self, timestamp)
+        listener.onInvoke(self.name, self.id, self.argv, timestamp)
 
 
 class StreamingMessage(Message):

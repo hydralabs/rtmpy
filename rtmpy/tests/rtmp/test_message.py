@@ -361,7 +361,8 @@ class InvokeTestCase(BaseTestCase):
         x = message.Invoke()
 
         x.dispatch(self.listener, 54)
-        self.assertEquals(self.listener.calls, [('invoke', (x, 54), {})])
+        self.assertEquals(self.listener.calls,
+            [('invoke', (None, None, [], 54), {})])
 
 
 class BytesReadTestCase(BaseTestCase):
