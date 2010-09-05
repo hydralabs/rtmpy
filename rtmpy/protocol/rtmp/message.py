@@ -623,3 +623,11 @@ def get_type_class(datatype):
         return TYPE_MAP[datatype]
     except KeyError:
         raise UnknownEventType('Unknown event type %r' % (datatype,))
+
+
+def is_command_type(datatype):
+    """
+    Determines if the data type supplied is a command type. This means that the
+    related RTMP message must be marshalled on channel id = 2.
+    """
+    return datatype <= UPSTREAM_BANDWIDTH

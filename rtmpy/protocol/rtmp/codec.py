@@ -552,8 +552,16 @@ class ChannelMuxer(Codec):
 
             header.encodeHeader(self.stream, h)
 
+    def flush(self):
+        raise NotImplementedError
+
     def send(self, data, datatype, streamId, timestamp):
-        channel = self.aquireChannel()
+        if message.is_command_type(datatype):
+            # we have to special case command types because a channel be busy
+            # with one message at a time
+            channel = self.getChannel(2)
+        else:
+            channel = self.aquireChannel()
 
         if not channel:
             raise EncodeError('Could not allocate channel')
@@ -567,6 +575,17 @@ class ChannelMuxer(Codec):
         self.timestamps[streamId] = timestamp
         self.nextHeaders[channel] = h
         channel.append(data)
+
+        if channel.channelId == 2:
+            while True:
+                self.writeHeader(channel)
+                channel.marshallOneFrame()
+
+                if channel.complete:
+                    break
+
+            channel.reset()
+            self.flush()
 
     def next(self):
         # 61 active channels might be too larger chunk of work for 1 iteration
@@ -614,6 +633,11 @@ class Encoder(ChannelMuxer):
 
         ChannelMuxer.next(self)
 
+        self.flush()
+
+    def flush(self):
+        """
+        """
         self.output.write(self.stream.getvalue())
         self.stream.consume()
 

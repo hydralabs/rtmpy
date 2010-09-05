@@ -9,7 +9,7 @@ import unittest
 
 from pyamf.util import BufferedByteStream
 
-from rtmpy.protocol.rtmp import codec
+from rtmpy.protocol.rtmp import codec, message
 
 
 class BaseTestCase(unittest.TestCase):
@@ -36,15 +36,15 @@ class EncoderTestCase(BaseTestCase):
         """
         self.encoder.channelsInUse = 0xffff
         while not self.encoder.isFull():
-            self.encoder.send('foo', 5, 6, 0)
+            self.encoder.send('foo', 8, 6, 0)
 
-        self.encoder.send('bar', 1, 2, 3)
+        self.encoder.send('bar', 12, 2, 3)
 
-        self.assertEqual(self.encoder.pending, [('bar', 1, 2, 3)])
+        self.assertEqual(self.encoder.pending, [('bar', 12, 2, 3)])
 
         self.encoder.next()
 
-        self.assertEqual(self.encoder.pending, [('bar', 1, 2, 3)])
+        self.assertEqual(self.encoder.pending, [('bar', 12, 2, 3)])
 
         self.encoder.next()
 
@@ -157,7 +157,7 @@ class WritingTestCase(BaseTestCase):
     def test_interleave(self):
         # dispatch two messages
         self.encoder.send('a' * (128 + 1), 15, 7, 0)
-        self.encoder.send('b' * (128 + 50), 3, 0xfffe, 0)
+        self.encoder.send('b' * (128 + 50), 8, 0xfffe, 0)
 
         self.encoder.next()
 
@@ -166,7 +166,7 @@ class WritingTestCase(BaseTestCase):
             '\x03\x00\x00\x00\x00\x00\x81\x0f\x07\x00\x00\x00')
         self.assertEqual(self.output.read(128), 'a' * 128)
         self.assertEqual(self.output.read(12),
-            '\x04\x00\x00\x00\x00\x00\xb2\x03\xfe\xff\x00\x00')
+            '\x04\x00\x00\x00\x00\x00\xb2\x08\xfe\xff\x00\x00')
         self.assertEqual(self.output.read(128), 'b' * 128)
         self.assertTrue(self.output.at_eof())
         self.output.consume()
@@ -181,25 +181,25 @@ class WritingTestCase(BaseTestCase):
         self.assertTrue(self.output.at_eof())
 
     def test_reappropriate_channel(self):
-        self.encoder.send('a' * 2, 4, 5, 0)
+        self.encoder.send('a' * 2, 8, 5, 0)
 
         self.encoder.next()
 
         self.output.seek(0)
         self.assertEqual(self.output.read(12),
-            '\x03\x00\x00\x00\x00\x00\x02\x04\x05\x00\x00\x00')
+            '\x03\x00\x00\x00\x00\x00\x02\x08\x05\x00\x00\x00')
         self.assertEqual(self.output.read(2), 'a' * 2)
 
         self.assertTrue(self.output.at_eof())
         self.output.consume()
 
-        self.encoder.send('b' * 2, 6, 7, 0)
+        self.encoder.send('b' * 2, 9, 7, 0)
 
         self.encoder.next()
 
         self.output.seek(0)
         self.assertEqual(self.output.read(12),
-            '\x03\x00\x00\x00\x00\x00\x02\x06\x07\x00\x00\x00')
+            '\x03\x00\x00\x00\x00\x00\x02\x09\x07\x00\x00\x00')
         self.assertEqual(self.output.read(2), 'b' * 2)
 
         self.assertTrue(self.output.at_eof())
@@ -212,26 +212,72 @@ class TimestampTestCase(BaseTestCase):
 
     def test_simple(self):
         # data, datatype, timestamp
-        self.encoder.send('', 0, 0, 0)
+        self.encoder.send('', 13, 0, 0)
 
         self.encoder.next()
 
         self.output.seek(0)
         self.assertEqual(self.output.read(12),
-            '\x03\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00')
+            '\x03\x00\x00\x00\x00\x00\x00\r\x00\x00\x00\x00')
 
         self.output.truncate()
-        self.encoder.send('', 0, 0, 15)
+        self.encoder.send('', 7, 0, 15)
 
         self.encoder.next()
 
         self.output.seek(0)
-        self.assertEqual(self.output.read(4), '\x83\x00\x00\x0f')
+        self.assertEqual(self.output.read(4), '\x43\x00\x00\x0f')
         self.output.truncate()
 
-        self.encoder.send('', 3, 0, 15)
+        self.encoder.send('', 8, 0, 15)
         self.encoder.next()
 
         self.output.seek(0)
-        self.assertEqual(self.output.read(8), '\x43\x00\x00\x00\x00\x00\x00\x03')
+        self.assertEqual(self.output.read(8), '\x43\x00\x00\x00\x00\x00\x00\x08')
         self.output.truncate()
+
+
+class CommandTypeTestCase(BaseTestCase):
+    """
+    Tests for encoding command types. These types should only be encoded on
+    channel id of 2.
+
+    @see: L{message.is_command_type}
+    @note: The lack of C{next} calls in the tests. The control messages are
+        immediately encoded.
+    """
+
+    def test_framesize(self):
+        self.assertEqual(self.output.getvalue(), '')
+        self.encoder.send('foo', message.FRAME_SIZE, 0, 10)
+        self.assertEqual(self.output.getvalue(),
+            '\x02\x00\x00\n\x00\x00\x03\x01\x00\x00\x00\x00foo')
+
+    def test_bytes_read(self):
+        self.assertEqual(self.output.getvalue(), '')
+        self.encoder.send('bar', message.BYTES_READ, 0, 8)
+        self.assertEqual(self.output.getvalue(),
+            '\x02\x00\x00\x08\x00\x00\x03\x03\x00\x00\x00\x00bar')
+
+    def test_control(self):
+        self.assertEqual(self.output.getvalue(), '')
+        self.encoder.send('spam', message.CONTROL, 0, 432)
+        self.assertEqual(self.output.getvalue(),
+            '\x02\x00\x01\xb0\x00\x00\x04\x04\x00\x00\x00\x00spam')
+
+    def test_dsbw(self):
+        self.assertEqual(self.output.getvalue(), '')
+        self.encoder.send('eggs', message.DOWNSTREAM_BANDWIDTH, 0, 21)
+        self.assertEqual(self.output.getvalue(),
+            '\x02\x00\x00\x15\x00\x00\x04\x05\x00\x00\x00\x00eggs')
+
+    def test_usbw(self):
+        self.assertEqual(self.output.getvalue(), '')
+        self.encoder.send('eggs', message.DOWNSTREAM_BANDWIDTH, 0, 21)
+        self.assertEqual(self.output.getvalue(),
+            '\x02\x00\x00\x15\x00\x00\x04\x05\x00\x00\x00\x00eggs')
+
+    def test_other(self):
+        self.assertEqual(self.output.getvalue(), '')
+        self.encoder.send('eggs', message.INVOKE, 0, 21)
+        self.assertEqual(self.output.getvalue(), '')
