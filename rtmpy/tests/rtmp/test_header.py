@@ -97,58 +97,16 @@ class HeaderTestCase(unittest.TestCase):
         self.assertFalse(h.relative)
 
 
-class DecodeHeaderByteTestCase(unittest.TestCase):
+class GetHeaderSizeTestCase(unittest.TestCase):
     """
-    Tests for L{header.decodeHeaderByte}
-    """
-
-    def test_types(self):
-        self.assertRaises(TypeError, header.decodeHeaderByte, 'asdfasd')
-
-        try:
-            header.decodeHeaderByte(123)
-        except TypeError, e:
-            self.fail('Unexpected TypeError raised')
-
-    def test_return(self):
-        self.assertEquals(header.decodeHeaderByte(0), (12, 0))
-        self.assertEquals(header.decodeHeaderByte(192), (1, 0))
-        self.assertEquals(header.decodeHeaderByte(255), (1, 63))
-
-
-class EncodeHeaderByteTestCase(unittest.TestCase):
-    """
-    Tests for L{header.encodeHeaderByte}
-    """
-
-    def test_values(self):
-        for x in header.HEADER_SIZES:
-            try:
-                header.encodeHeaderByte(x, 0)
-            except header.HeaderError:
-                self.fail('Raised header.HeaderError on %d' % (x,))
-
-        self.assertFalse(16 in header.HEADER_SIZES)
-        self.assertRaises(header.HeaderError, header.encodeHeaderByte, 16, 0)
-        self.assertRaises(header.HeaderError, header.encodeHeaderByte, 1, -1)
-        self.assertRaises(header.HeaderError, header.encodeHeaderByte, 1, 0x40)
-
-    def test_return(self):
-        self.assertEquals(header.encodeHeaderByte(12, 0), 0)
-        self.assertEquals(header.encodeHeaderByte(1, 0), 192)
-        self.assertEquals(header.encodeHeaderByte(1, 63), 255)
-
-
-class GetHeaderSizeIndexTestCase(unittest.TestCase):
-    """
-    Tests for L{header.getHeaderSizeIndex}
+    Tests for L{header.getHeaderSize}
     """
 
     def test_values(self):
         h = MockHeader()
         self.assertEquals(h.channelId, None)
 
-        self.assertRaises(header.HeaderError, header.getHeaderSizeIndex, h)
+        self.assertRaises(header.HeaderError, header.getHeaderSize, h)
 
     def test_return(self):
         h = MockHeader(channelId=3)
@@ -156,59 +114,37 @@ class GetHeaderSizeIndexTestCase(unittest.TestCase):
         self.assertEquals(
             [h.timestamp, h.datatype, h.bodyLength, h.streamId],
             [None, None, None, None])
-        self.assertEquals(header.getHeaderSizeIndex(h), 3)
+        self.assertEquals(header.getHeaderSize(h), 1)
         self.assertEquals(
             [h.timestamp, h.datatype, h.bodyLength, h.streamId],
             [None, None, None, None])
 
         h.timestamp = 23455
-        self.assertEquals(header.getHeaderSizeIndex(h), 2)
+        self.assertEquals(header.getHeaderSize(h), 4)
 
         h.datatype = 12
         h.bodyLength = 1234
 
-        self.assertEquals(header.getHeaderSizeIndex(h), 1)
+        self.assertEquals(header.getHeaderSize(h), 8)
         h.timestamp = None
-        e = self.assertRaises(header.HeaderError, header.getHeaderSizeIndex, h)
+        e = self.assertRaises(header.HeaderError, header.getHeaderSize, h)
 
         h = MockHeader(channelId=23, streamId=234, bodyLength=1232,
             datatype=2, timestamp=234234)
 
-        self.assertEquals(header.getHeaderSizeIndex(h), 0)
+        self.assertEquals(header.getHeaderSize(h), 12)
 
         h.bodyLength = None
-        e = self.assertRaises(header.HeaderError, header.getHeaderSizeIndex, h)
+        e = self.assertRaises(header.HeaderError, header.getHeaderSize, h)
         h.bodyLength = 1232
 
         h.datatype = None
-        e = self.assertRaises(header.HeaderError, header.getHeaderSizeIndex, h)
+        e = self.assertRaises(header.HeaderError, header.getHeaderSize, h)
         h.datatype = 2
 
         h.timestamp = None
-        e = self.assertRaises(header.HeaderError, header.getHeaderSizeIndex, h)
+        e = self.assertRaises(header.HeaderError, header.getHeaderSize, h)
         h.timestamp = 2345123
-
-
-class GetHeaderSizeTestCase(unittest.TestCase):
-    """
-    Tests for L{header.getHeaderSize}
-    """
-
-    def test_return(self):
-        h = MockHeader(channelId=3)
-
-        self.assertEquals(
-            [h.timestamp, h.datatype, h.bodyLength, h.streamId],
-            [None, None, None, None])
-
-        self.assertEquals(header.getHeaderSize(h), 1)
-        h.timestamp = 234234
-        self.assertEquals(header.getHeaderSize(h), 4)
-        h.datatype = 2
-        h.bodyLength = 1231211
-        self.assertEquals(header.getHeaderSize(h), 8)
-        h.streamId = 2134
-        self.assertEquals(header.getHeaderSize(h), 12)
 
 
 class EncodeHeaderTestCase(unittest.TestCase):
@@ -262,6 +198,29 @@ class EncodeHeaderTestCase(unittest.TestCase):
         h.streamId = 45
         self.assertEquals(self._encode(h),
             '"\xff\xff\xff\x00z\n\x03-\x00\x00\x00\x01\x00\x00\x00')
+
+    def test_extended_channelid(self):
+        h = MockHeader(channelId=3)
+
+        self.assertEquals(self._encode(h), '\xc3')
+
+        h.channelId = 63
+        self.assertEquals(self._encode(h), '\xff')
+
+        h.channelId = 64
+        self.assertEquals(self._encode(h), '\xc0\x00')
+
+        h.channelId = 65
+        self.assertEquals(self._encode(h), '\xc0\x01')
+
+        h.channelId = 319
+        self.assertEquals(self._encode(h), '\xc0\xff')
+
+        h.channelId = 320
+        self.assertEquals(self._encode(h), '\xc1\x00\x01')
+
+        h.channelId = 65599
+        self.assertEquals(self._encode(h), '\xc1\xff\xff')
 
 
 class DecodeHeaderTestCase(unittest.TestCase):
@@ -352,6 +311,33 @@ class DecodeHeaderTestCase(unittest.TestCase):
         self.assertEquals(h.datatype, 3)
         self.assertEquals(h.streamId, 45)
 
+    def test_extended_channelid(self):
+        h = self._decode('\xc3')
+        self.assertEqual(h.channelId, 3)
+
+        h = self._decode('\xff')
+        self.assertEqual(h.channelId, 63)
+
+        h = self._decode('\xc0\x00')
+        self.assertEqual(h.channelId, 64)
+
+        h = self._decode('\xc0\xff')
+        self.assertEqual(h.channelId, 319)
+
+        h = self._decode('\xc1\x00\x00')
+        self.assertEqual(h.channelId, 64)
+
+        h = self._decode('\xc1\x01\x00')
+        self.assertEqual(h.channelId, 65)
+
+        h = self._decode('\xc1\xff\x00')
+        self.assertEqual(h.channelId, 319)
+
+        h = self._decode('\xc1\x00\x01')
+        self.assertEqual(h.channelId, 320)
+
+        h = self._decode('\xc1\xff\xff')
+        self.assertEqual(h.channelId, 65599)
 
 class DiffHeadersTestCase(unittest.TestCase):
     """

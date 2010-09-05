@@ -1,4 +1,4 @@
-# Copyright (c) The RTMPy Project.
+# Copyright the RTMPy project.
 # See LICENSE.txt for details.
 
 """
@@ -8,9 +8,17 @@ Utility/helper functions for encoding and decoding RTMP headers.
     #rtmp_packet_structure>}
 """
 
+__all__ = [
+    'Header',
+    'encodeHeader',
+    'decodeHeader',
+    'diffHeaders',
+    'mergeHeaders'
+]
 
 #: The header can come in one of four sizes: 12, 8, 4, or 1 byte(s).
-HEADER_SIZES = [12, 8, 4, 1]
+ENCODE_HEADER_SIZES = {12: 0, 8: 1, 4: 2, 1: 3}
+DECODE_HEADER_SIZES = [12, 8, 4, 1]
 
 
 class HeaderError(Exception):
@@ -66,52 +74,12 @@ class Header(object):
             id(self))
 
 
-def decodeHeaderByte(byte):
+def getHeaderSize(header):
     """
-    Returns a tuple containing the decoded header length (in bytes) and the
-    channel id from the header byte.
-
-    @param byte: The header byte read from the stream.
-    @type byte: C{int}
-    @return: The header length and the channel id.
-    @rtype: C{tuple}
-    """
-    index = byte >> 6
-
-    return HEADER_SIZES[index], byte & 0x3f
-
-
-def encodeHeaderByte(headerLength, channelId):
-    """
-    Returns the encoded byte for a given C{headerLength} and C{channelId}.
-    This is the reverse operation for L{decodeHeaderByte}.
-
-    @param headerLength: The length of the header.
-    @type headerLength: C{int}
-    @param channelId: The channel id for the header.
-    @type channelId: C{int}
-    """
-    try:
-        index = HEADER_SIZES.index(headerLength)
-    except ValueError:
-        raise HeaderError('Unexpected headerLength value (got %d)' % (
-            headerLength,))
-
-    if channelId > 0x3f or channelId < 0:
-        raise HeaderError('Expected channelId between 0x00 and 0x3f '
-            '(got %d)' % (channelId,))
-
-    return (index << 6) | channelId
-
-
-def getHeaderSizeIndex(header):
-    """
-    Calculates the RTMP header size for C{header}. At a minimum, the
-    C{channelId} on C{header} needs to exist otherwise and L{ValueError}
-    will be raised.
+    Returns the expected number of bytes it will take to encode C{header}.
 
     @param header: An L{interfaces.IHeader} object.
-    @return: An index relating to L{HEADER_SIZES}.
+    @return: The number of bytes required to encode C{header}.
     @rtype: C{int}
     """
     if header.channelId is None:
@@ -122,35 +90,49 @@ def getHeaderSizeIndex(header):
             raise HeaderError('Dependant values unmet (got:%r)' % (
                 header,))
 
-        return 0
+        return 12
 
     if [header.bodyLength, header.datatype] != [None, None]:
         if header.timestamp is None:
             raise HeaderError('Dependant values unmet (got:%r)' % (
                 header,))
 
-        return 1
+        return 8
 
     if header.timestamp is not None:
         # XXX : What should happen if header.streamId or header.datatype is
         # set? Whilst not strictly an error, it could be the result of some
         # corruption elsewhere.
-        return 2
+        return 4
 
-    return 3
+    return 1
 
 
-def getHeaderSize(header):
+def encodeChannelId(stream, size, channelId):
     """
-    Returns the expected number of bytes it will take to encode C{header}.
+    Encodes the channel id to the stream.
 
-    @param header: An L{interfaces.IHeader} object.
-    @return: The number of bytes required to encode C{header}.
-    @rtype: C{int}
+    The channel id can be encoded in up to 3 bytes. The first byte is special as
+    it contains the size of the rest of the header as described in
+    L{getHeaderSize}.
+
+    0 >= channelId > 64: channelId
+    64 >= channelId > 320: 0, channelId - 64
+    320 >= channelId > 0xffff + 64: 1, channelId - 64 (written as 2 byte int)
     """
-    index = getHeaderSizeIndex(header)
+    first = (ENCODE_HEADER_SIZES[size] << 6) & 0xff
 
-    return HEADER_SIZES[index]
+    if channelId < 64:
+        stream.write_uchar(first | channelId)
+    elif channelId < 320:
+        stream.write_uchar(first)
+        stream.write_uchar(channelId - 64)
+    else:
+        channelId -= 64
+
+        stream.write_uchar(first + 1)
+        stream.write_uchar(channelId & 0xff)
+        stream.write_uchar(channelId >> 0x08)
 
 
 def encodeHeader(stream, header):
@@ -165,10 +147,7 @@ def encodeHeader(stream, header):
     @raise TypeError: If L{interfaces.IHeader} is not provided by C{header}.
     """
     size = getHeaderSize(header)
-    stream.write_uchar(encodeHeaderByte(size, header.channelId))
-
-    if size == 1:
-        return
+    encodeChannelId(stream, size, header.channelId)
 
     if size >= 4:
         if header.timestamp >= 0xffffff:
@@ -190,6 +169,25 @@ def encodeHeader(stream, header):
             stream.write_ulong(header.timestamp)
 
 
+def decodeChannelId(stream):
+    """
+    Decodes the channel id and the size of the header from the stream.
+
+    @return: C{tuple} containing the size of the header and the channel id.
+    @see: L{encodeHeader} for an explanation of how the channelId is encoded.
+    """
+    channelId = stream.read_uchar()
+    size = DECODE_HEADER_SIZES[channelId >> 6]
+    channelId &= 0x3f
+
+    if channelId > 1:
+        return size, channelId & 0x3f
+    elif channelId == 0:
+        return size, stream.read_uchar() + 64
+    else:
+        return size, stream.read_uchar() + 64 + (stream.read_uchar() << 8)
+
+
 def decodeHeader(stream):
     """
     Reads a header from the incoming stream.
@@ -203,7 +201,7 @@ def decodeHeader(stream):
     @return: The read header from the stream.
     @rtype: L{Header}
     """
-    size, channelId = decodeHeaderByte(stream.read_uchar())
+    size, channelId = decodeChannelId(stream)
     header = Header(channelId)
 
     if size == 1:
