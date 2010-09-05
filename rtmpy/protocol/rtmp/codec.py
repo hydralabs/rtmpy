@@ -243,6 +243,8 @@ class Codec(object):
         L{setFrameSize} instead.
     """
 
+    bytesInterval = 0x131800
+
     def __init__(self, stream=None):
         self.stream = stream or BufferedByteStream()
 
@@ -417,11 +419,18 @@ class Decoder(ChannelDemuxer):
 
     channel_class = ConsumingChannel
 
-    def __init__(self, dispatcher, stream_factory, stream=None):
+    def __init__(self, dispatcher, stream_factory, stream=None, bytesInterval=None):
         ChannelDemuxer.__init__(self, stream=stream)
 
         self.dispatcher = dispatcher
         self.stream_factory = stream_factory
+        self.bytes = 0
+
+        self.setBytesInterval(bytesInterval or self.bytesInterval)
+
+    def setBytesInterval(self, bytesInterval):
+        self.bytesInterval = bytesInterval
+        self._nextInterval = self.bytes + self.bytesInterval
 
     def next(self):
         """
@@ -435,7 +444,14 @@ class Decoder(ChannelDemuxer):
         otherwise C{StopIteration} will be raised if the end of the stream is
         reached.
         """
+        pos = self.stream.tell()
         data, meta = ChannelDemuxer.next(self)
+
+        self.bytes += self.stream.tell() - pos
+
+        if self.bytes >= self._nextInterval:
+            self.dispatcher.bytesInterval(self.bytes)
+            self._nextInterval += self.bytesInterval
 
         if data is None:
             return
