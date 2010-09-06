@@ -54,6 +54,19 @@ class Stream(object):
 
             self.timestamp = timestamp
 
+    def sendMessage(self, msg, whenDone=None):
+        """
+        Sends an RTMP message to the peer. This a low level method and is not
+        part of any public api. If its use is necessary then this is a bug.
+
+        @param msg: The RTMP message to be sent by this stream.
+        @type: L{message.Message}
+        @param whenDone: An optional callback that is fired once the complete
+            encoded RTMP message has been sent to the peer. This is not the same
+            as a U{defer.Deferred} instance. When called it receives no params.
+        """
+        self.protocol.sendMessage(self, msg, whenDone)
+
     def onInvoke(self, name, id_, args, timestamp):
         print 'invoke', args
 

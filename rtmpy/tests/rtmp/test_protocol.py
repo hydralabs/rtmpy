@@ -262,3 +262,21 @@ class StreamTestCase(ProtocolTestCase):
 
         self.stream.setTimestamp(150, False)
         self.assertEqual(self.stream.timestamp, 150)
+
+    def test_send_message(self):
+        """
+        Send a message back to the protocol.
+        """
+        self.executed = False
+
+        def message(stream, message, whenDone):
+            self.assertIdentical(self.stream, stream)
+            self.assertEqual(message, 'foo')
+            self.assertEqual(whenDone, 'bar')
+
+            self.executed = True
+
+        self.patch(self.protocol, 'sendMessage', message)
+
+        self.stream.sendMessage('foo', 'bar')
+        self.assertTrue(self.executed)
