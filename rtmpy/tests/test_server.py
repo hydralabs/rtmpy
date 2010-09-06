@@ -2,7 +2,9 @@
 """
 
 from twisted.trial import unittest
-from twisted.internet import defer, reactor
+from twisted.python import failure
+from twisted.internet import defer, reactor, protocol
+from twisted.test.proto_helpers import StringTransport, StringIOWithoutClosing
 
 from rtmpy import server
 
@@ -252,7 +254,6 @@ class ServerFactoryTestCase(unittest.TestCase):
         self.factory = server.ServerFactory()
         self.protocol = self.factory.buildProtocol(None)
 
-        isinstance(self.protocol, server.ServerProtocol)
         self.protocol.connectionMade()
         self.protocol.handshakeSuccess('')
 
@@ -265,3 +266,46 @@ class ServerFactoryTestCase(unittest.TestCase):
         self.assertIsInstance(s, server.ServerControlStream)
 
         self.assertIdentical(s.protocol, self.protocol)
+
+
+class ConnectingTestCase(unittest.TestCase):
+    """
+    Tests all facets of connecting to an RTMP server.
+    """
+
+    def setUp(self):
+        self.file = StringIOWithoutClosing()
+        self.transport = protocol.FileWrapper(self.file)
+
+        self.factory = server.ServerFactory()
+        self.protocol = self.factory.buildProtocol(None)
+
+        self.protocol.transport = self.transport
+        self.protocol.connectionMade()
+        self.protocol.handshakeSuccess('')
+
+        self.control = self.protocol.getStream(0)
+        isinstance(self.control, server.ServerControlStream)
+
+    def connect(self, packet):
+        return self.control.onInvoke('connect', None, [packet], 0)
+
+    def test_missing_app_key(self):
+        """
+        RTMP connect packets contain {'app': 'name_of_app'}.
+        """
+        d = self.connect({})
+
+        def cb(r):
+            self.fail('Missing app key')
+
+        def eb(fail):
+            fail.trap(server.ConnectFailed)
+
+            isinstance(fail, failure.Failure)
+            self.assertEqual(fail.getErrorMessage(),
+                "Bad connect packet (missing 'app' key)")
+
+        d.addCallback(cb).addErrback(eb)
+
+        return d

@@ -13,7 +13,46 @@ from rtmpy import util
 from rtmpy.protocol import rtmp, handshake, version
 
 
-class ServerControlStream(object):
+class NetConnectionError(Exception):
+    """
+    """
+
+
+class ConnectError(NetConnectionError):
+    """
+    """
+
+
+class ConnectFailed(ConnectError):
+    """
+    """
+
+    code = 'NetConnection.Connect.Failed'
+
+
+class ServerControlStream(rtmp.ControlStream):
+    """
+    """
+
+    def _handleInvokeResponse(self, result, id_):
+        return result
+
+    def onInvoke(self, name, id_, args, timestamp):
+        """
+        """
+        if self.application is None:
+            if name == 'connect':
+                d = self.activeInvokes[id_] = defer.maybeDeferred(
+                    self.protocol.onConnect, args[0])
+
+                d.addBoth(self._handleInvokeResponse, id_)
+
+                return d
+
+        rtmp.ControlStream.onInvoke(self, name, id_, args, timestamp)
+
+
+class OldServerControlStream(object):
     """
     """
 
@@ -318,68 +357,10 @@ class Application(object):
         self.disconnect(client)
 
 
-class ServerProtocol(object):
+class ServerProtocol(rtmp.RTMPProtocol):
     """
     A basic RTMP protocol that will act like a server.
     """
-
-    def buildHandshakeNegotiator(self):
-        """
-        Generate a server handshake negotiator.
-
-        @rtype: L{handshake.ServerNegotiator}
-        """
-        return handshake.ServerNegotiator(self)
-
-    def connectionMade(self):
-        """
-        Called when a connection is made to the RTMP server. Will begin
-        handshake negotiations.
-        """
-        rtmp.BaseProtocol.connectionMade(self)
-
-        self.handshaker.start(version=0)
-        self.client = None
-        self.application = None
-        self.pendingConnection = None
-
-    def handshakeSuccess(self):
-        """
-        Called when the handshake has been successfully negotiated. If there
-        is any data in the negotiator buffer it will be re-inserted into the
-        main RTMP stream (as any data after the handshake must be RTMP).
-        """
-        b = self.handshaker.buffer
-
-        rtmp.BaseProtocol.handshakeSuccess(self)
-
-        s = ServerControlStream(self)
-
-        self.registerStream(0, s)
-
-        self.encoder.registerScheduler(scheduler.LoopingChannelScheduler())
-
-        if len(b) > 0:
-            self.dataReceived(b)
-
-    def connectionLost(self, reason):
-        """
-        The connection to the client has been lost.
-        """
-        rtmp.BaseProtocol.connectionLost(self, reason)
-
-        if self.client and self.application:
-            self.application.disconnect(self.client)
-
-        if self.pendingConnection:
-            self.pendingConnection.errback(reason)
-
-            self.pendingConnection = None
-
-        for x in self.activeStreams:
-            s = self.streams[x]
-
-            s.connectionLost(reason)
 
     def onConnect(self, args):
         """
