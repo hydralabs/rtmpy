@@ -36,7 +36,7 @@ class Stream(object):
         self.protocol = protocol
         self.streamId = streamId
 
-    def onInvoke(self, *args):
+    def onInvoke(self, name, id_, args, timestamp):
         print 'invoke', args
 
     def onNotify(self, *args):
