@@ -132,21 +132,15 @@ class RTMPProtocol(protocol.Protocol):
                 self.application.clientDisconnected(self, reason)
 
             if hasattr(self, 'decoder_task'):
-                if self.decoder_task:
-                    self.decoder_task.pause()
-
                 del self.decoder_task
 
-            if hasattr(self, 'decoder') and self.decoder:
+            if hasattr(self, 'decoder'):
                 del self.decoder
 
             if hasattr(self, 'encoder_task'):
-                if self.encoder_task:
-                    self.encoder_task.pause()
-
                 del self.encoder_task
 
-            if hasattr(self, 'encoder') and self.encoder:
+            if hasattr(self, 'encoder'):
                 del self.encoder
 
     def _stream_dataReceived(self, data):

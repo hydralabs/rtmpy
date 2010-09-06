@@ -126,31 +126,18 @@ class ConnectionLostTestCase(ProtocolTestCase):
     def test_decode_task(self):
         self.protocol.handshakeSuccess('')
         self.protocol._startDecoding()
-        self.executed = False
 
-        def pause(*args, **kwargs):
-            self.executed = True
-
-        self.patch(self.protocol.decoder_task, 'pause', pause)
-
+        self.assertTrue(hasattr(self.protocol, 'decoder_task'))
         self.protocol.connectionLost(error.ConnectionDone())
-
-        self.assertTrue(self.executed)
+        self.assertFalse(hasattr(self.protocol, 'decoder_task'))
 
     def test_encode_task(self):
         self.protocol.handshakeSuccess('')
-        self.executed = False
-
         self.protocol._startEncoding()
 
-        def pause(*args, **kwargs):
-            self.executed = True
-
-        self.patch(self.protocol.encoder_task, 'pause', pause)
-
+        self.assertTrue(hasattr(self.protocol, 'encoder_task'))
         self.protocol.connectionLost(error.ConnectionDone())
-
-        self.assertTrue(self.executed)
+        self.assertFalse(hasattr(self.protocol, 'encoder_task'))
 
     def test_inform_application(self):
         self.protocol.handshakeSuccess('')
@@ -239,4 +226,3 @@ class DataReceivedTestCase(ProtocolTestCase):
         self.assertEqual(decoder.stream.getvalue(), 'woot')
 
         self.protocol.decoder_task.addErrback(lambda x: None)
-
