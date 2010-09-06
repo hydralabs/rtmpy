@@ -92,8 +92,6 @@ class RTMPProtocol(protocol.Protocol):
     HANDSHAKE = 'handshake'
     STREAM = 'stream'
 
-    #: This value is based on tcp dumps from FME <-> FMS 3.5
-    bytesReadInterval = 1251810L
 
     def logAndDisconnect(self, reason, *args, **kwargs):
         """
