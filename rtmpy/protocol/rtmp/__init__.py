@@ -237,7 +237,7 @@ class RTMPProtocol(protocol.Protocol):
 
         if s is None:
             if streamId == 0:
-                s = ControlStream(self)
+                s = self.factory.getControlStream(self, streamId)
             else:
                 s = Stream(self)
 
