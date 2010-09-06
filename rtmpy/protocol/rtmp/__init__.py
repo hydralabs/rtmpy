@@ -133,11 +133,14 @@ class RTMPProtocol(protocol.Protocol):
     @ivar state: The state of the protocol. Can be either C{HANDSHAKE} or
         C{STREAM}.
     @type state: C{str}
+    @ivar objectEncoding: The version to de/encode AMF packets. Set via the
+        connect packet.
     """
 
     HANDSHAKE = 'handshake'
     STREAM = 'stream'
 
+    objectEncoding = pyamf.AMF0
 
     def logAndDisconnect(self, reason, *args, **kwargs):
         """
@@ -293,7 +296,7 @@ class RTMPProtocol(protocol.Protocol):
     def dispatchMessage(self, stream, datatype, timestamp, data):
         m = message.get_type_class(datatype)()
 
-        m.decode(BufferedByteStream(data))
+        m.decode(BufferedByteStream(data), encoding=self.objectEncoding)
 
         m.dispatch(stream, timestamp)
 
@@ -314,7 +317,7 @@ class RTMPProtocol(protocol.Protocol):
         # this will probably need to be rethought as this could block for an
         # unacceptable amount of time. For most messages however it seems to be
         # fast enough and the penalty for setting up a new thread is too high.
-        msg.encode(buf)
+        msg.encode(buf, encoding=self.objectEncoding)
 
         self.encoder.send(buf.getvalue(), msg.RTMP_TYPE, stream.streamId,
             stream.timestamp, whenDone)
