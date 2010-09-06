@@ -489,6 +489,7 @@ class ChannelMuxer(Codec):
 
         self.nextHeaders = {}
         self.timestamps = {}
+        self.callbacks = {}
 
     @apply
     def minChannelId():
@@ -547,6 +548,11 @@ class ChannelMuxer(Codec):
         self.releasedChannels.appendleft(channelId)
         self.channelsInUse -= 1
 
+        cb = self.callbacks.pop(channelId, None)
+
+        if cb:
+            cb()
+
     def isFull(self):
         """
         Need a better name for this
@@ -575,7 +581,7 @@ class ChannelMuxer(Codec):
     def flush(self):
         raise NotImplementedError
 
-    def send(self, data, datatype, streamId, timestamp):
+    def send(self, data, datatype, streamId, timestamp, callback=None):
         if message.is_command_type(datatype):
             # we have to special case command types because a channel be busy
             # with one message at a time
@@ -594,6 +600,10 @@ class ChannelMuxer(Codec):
 
         self.timestamps[streamId] = timestamp
         self.nextHeaders[channel] = h
+
+        if callback:
+            self.callbacks[channel.channelId] = callback
+
         channel.append(data)
 
         if channel.channelId == 2:
@@ -606,6 +616,9 @@ class ChannelMuxer(Codec):
 
             channel.reset()
             self.flush()
+
+            if callback:
+                callback()
 
     def next(self):
         # 61 active channels might be too larger chunk of work for 1 iteration
@@ -638,15 +651,15 @@ class Encoder(ChannelMuxer):
         self.output = output
         self.dispatcher = dispatcher
 
-    def send(self, data, datatype, streamId, timestamp):
+    def send(self, data, datatype, streamId, timestamp, callback=None):
         """
         """
         if self.isFull():
-            self.pending.append((data, datatype, streamId, timestamp))
+            self.pending.append((data, datatype, streamId, timestamp, callback))
 
             return
 
-        ChannelMuxer.send(self, data, datatype, streamId, timestamp)
+        ChannelMuxer.send(self, data, datatype, streamId, timestamp, callback)
 
     def next(self):
         while self.pending and not self.isFull():
