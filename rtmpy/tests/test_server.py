@@ -285,27 +285,29 @@ class ConnectingTestCase(unittest.TestCase):
         self.protocol.handshakeSuccess('')
 
         self.control = self.protocol.getStream(0)
-        isinstance(self.control, server.ServerControlStream)
 
     def connect(self, packet):
-        return self.control.onInvoke('connect', None, [packet], 0)
+        return self.protocol.onConnect(packet)
+
+    def test_invoke(self):
+        """
+        Make sure that invoking connect call self.protocol.onConnect
+        """
+        my_args = {'foo': 'bar'}
+        self.executed = False
+
+        def connect(args):
+            self.executed = True
+            self.assertEqual(args, my_args)
+
+        self.patch(self.protocol, 'onConnect', connect)
+
+        d = self.control.onInvoke('connect', None, [my_args], 0)
+
+        self.assertTrue(self.executed)
 
     def test_missing_app_key(self):
         """
         RTMP connect packets contain {'app': 'name_of_app'}.
         """
-        d = self.connect({})
-
-        def cb(r):
-            self.fail('Missing app key')
-
-        def eb(fail):
-            fail.trap(server.ConnectFailed)
-
-            isinstance(fail, failure.Failure)
-            self.assertEqual(fail.getErrorMessage(),
-                "Bad connect packet (missing 'app' key)")
-
-        d.addCallback(cb).addErrback(eb)
-
-        return d
+        self.assertRaises(server.ConnectFailed, self.connect, {})
