@@ -261,7 +261,7 @@ class FrameSize(Message):
 
     RTMP_TYPE = FRAME_SIZE
 
-    def __init__(self, size=None):
+    def __init__(self, size=None, **kwargs):
         self.size = size
 
     def decode(self, buf):
@@ -300,7 +300,7 @@ class BytesRead(Message):
 
     RTMP_TYPE = BYTES_READ
 
-    def __init__(self, bytes=None):
+    def __init__(self, bytes=None, **kwargs):
         self.bytes = bytes
 
     def decode(self, buf):
@@ -340,7 +340,7 @@ class ControlMessage(Message):
     PING = 6
     PONG = 7
 
-    def __init__(self, type=None, value1=0, value2=None, value3=None):
+    def __init__(self, type=None, value1=0, value2=None, value3=None, **kwargs):
         self.type = type
         self.value1 = value1
         self.value2 = value2
@@ -406,7 +406,7 @@ class DownstreamBandwidth(Message):
 
     RTMP_TYPE = DOWNSTREAM_BANDWIDTH
 
-    def __init__(self, bandwidth=None):
+    def __init__(self, bandwidth=None, **kwargs):
         self.bandwidth = bandwidth
 
     def decode(self, buf):
@@ -446,7 +446,7 @@ class UpstreamBandwidth(Message):
 
     RTMP_TYPE = UPSTREAM_BANDWIDTH
 
-    def __init__(self, bandwidth=None, extra=None):
+    def __init__(self, bandwidth=None, extra=None, **kwargs):
         self.bandwidth = bandwidth
         self.extra = extra
 
@@ -493,9 +493,7 @@ class Notify(Message):
 
     @param name: The method name to call.
     @type name: C{str}
-    @param id: The global identifier (per stream) for the call.
-    @type id: C{int}
-    @param args: A list of elements to represent the method arguments.
+    @param args: A list of method arguments.
     """
 
     RTMP_TYPE = NOTIFY
@@ -556,7 +554,7 @@ class StreamingMessage(Message):
     @type data: C{str}
     """
 
-    def __init__(self, data=None):
+    def __init__(self, data=None, **kwargs):
         self.data = data
 
     def decode(self, buf):
