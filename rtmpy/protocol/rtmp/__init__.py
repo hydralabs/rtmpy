@@ -32,8 +32,9 @@ MAX_STREAMS = 0xffff
 class Stream(object):
     timestamp = 0
 
-    def __init__(self, protocol):
+    def __init__(self, protocol, streamId):
         self.protocol = protocol
+        self.streamId = streamId
 
     def onInvoke(self, *args):
         print 'invoke', args
@@ -227,13 +228,18 @@ class RTMPProtocol(protocol.Protocol):
 
     # IStreamFactory
     def getStream(self, streamId):
+        """
+        Returns the L{Stream} instance related to the C{streamId}.
+
+        An id of C{0} is special as it is considered the control stream.
+        """
         s = self.streams.get(streamId, None)
 
         if s is None:
             if streamId == 0:
                 s = self.factory.getControlStream(self, streamId)
             else:
-                s = Stream(self)
+                s = Stream(self, streamId)
 
             self.streams[streamId] = s
 
@@ -250,6 +256,13 @@ class RTMPProtocol(protocol.Protocol):
         """
         Sends an RTMP message to the peer. Not part of a public api, use
         C{stream.sendMessage} instead.
+
+        @param stream: The stream instance that is sending the message.
+        @type stream: L{Stream}
+        @param msg: The message being sent to the peer.
+        @type msg: L{message.Message}
+        @param whenDone: A callback fired when the message has been written to
+            the RTMP stream. See L{Stream.sendMessage}
         """
         buf = BufferedByteStream()
 
