@@ -126,6 +126,16 @@ class ControlStream(Stream):
         print 'bytes-read', args
 
 
+class EncodingDispatcher(object):
+    """
+    TODO: Figure out if we need this class to listen to the bytesInterval for
+    encoding
+    """
+
+    def bytesInterval(self, bytes):
+        pass
+
+
 class RTMPProtocol(protocol.Protocol):
     """
     Provides basic handshaking and RTMP protocol support.
@@ -269,7 +279,7 @@ class RTMPProtocol(protocol.Protocol):
         self.application = None
 
         self.decoder = codec.Decoder(self, self)
-        self.encoder = codec.Encoder(self)
+        self.encoder = codec.Encoder(self.transport, EncodingDispatcher())
 
         self.decoder_task = None
         self.encoder_task = None
