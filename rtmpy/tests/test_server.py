@@ -242,3 +242,26 @@ class ApplicationUnregisteringTestCase(unittest.TestCase):
         reactor.callLater(0, d.callback, None)
 
         return ret
+
+
+class ServerFactoryTestCase(unittest.TestCase):
+    """
+    """
+
+    def setUp(self):
+        self.factory = server.ServerFactory()
+        self.protocol = self.factory.buildProtocol(None)
+
+        isinstance(self.protocol, server.ServerProtocol)
+        self.protocol.connectionMade()
+        self.protocol.handshakeSuccess('')
+
+    def test_controlstream(self):
+        """
+        L{getControlStream}
+        """
+        s = self.factory.getControlStream(self.protocol, 0)
+
+        self.assertIsInstance(s, server.ServerControlStream)
+
+        self.assertIdentical(s.protocol, self.protocol)

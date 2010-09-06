@@ -492,7 +492,7 @@ class ServerFactory(protocol.ServerFactory):
     RTMP server protocol factory.
     """
 
-    protocol = rtmp.RTMPProtocol
+    protocol = ServerProtocol
     protocolVersion = version.RTMP
 
     upstreamBandwidth = 2500000L
@@ -506,6 +506,17 @@ class ServerFactory(protocol.ServerFactory):
         if applications:
             for name, app in applications.items():
                 self.registerApplication(name, app)
+
+    def getControlStream(self, protocol, streamId):
+        """
+        Creates and returns the stream for controlling server side protocol
+        instances.
+
+        @param protocol: The L{ServerProtocol} instance created by
+            L{buildProtocol}
+        @param streamId: The streamId for this control stream. Always 0.
+        """
+        return ServerControlStream(protocol, streamId)
 
     def getApplication(self, name):
         """
