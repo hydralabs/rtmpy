@@ -499,12 +499,13 @@ class ServerFactory(protocol.ServerFactory):
     downstreamBandwidth = 2500000L
     fmsVer = u'FMS/3,5,1,516'
 
-    def __init__(self, applications={}):
+    def __init__(self, applications=None):
         self.applications = {}
         self._pendingApplications = {}
 
-        for name, app in applications.iteritems():
-            self.registerApplication(name, app)
+        if applications:
+            for name, app in applications.items():
+                self.registerApplication(name, app)
 
     def getApplication(self, name):
         """

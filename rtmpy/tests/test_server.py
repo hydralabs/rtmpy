@@ -33,6 +33,25 @@ class ApplicationRegisteringTestCase(unittest.TestCase):
         self.factory = server.ServerFactory()
         self.app = SimpleApplication()
 
+    def test_create(self):
+        """
+        Test initial args for L{server.ServerFactory}
+        """
+        self.factory = server.ServerFactory({'foo': self.app})
+
+        self.assertEqual(self.factory.applications, {'foo': self.app})
+
+        d = self.app.ret = defer.Deferred()
+
+        self.factory = server.ServerFactory({'foo': self.app})
+
+        self.assertEqual(self.factory.applications, {})
+
+        def cb(res):
+            self.assertEqual(self.factory.applications, {'foo': self.app})
+
+        reactor.callLater(0, d.callback, None)
+
     def test_invalid_pending(self):
         """
         Pending applications cannot be registered twice.
