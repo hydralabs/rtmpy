@@ -19,7 +19,7 @@ class BaseTestCase(unittest.TestCase):
 
     def setUp(self):
         self.output = BufferedByteStream()
-        self.encoder = codec.Encoder(self.output)
+        self.encoder = codec.Encoder(self.output, None)
 
 
 class EncoderTestCase(BaseTestCase):

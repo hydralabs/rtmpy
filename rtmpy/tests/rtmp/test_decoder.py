@@ -38,8 +38,11 @@ class MockFrameReader(object):
     """
 
     @classmethod
-    def __init__(cls, self, stream=None):
+    def __init__(cls, self, stream=None, bytesInterval=None):
         self.stream = stream
+        self.bytesInterval = bytesInterval
+        self.bytes = 0
+        self._nextInterval = bytesInterval
 
     @classmethod
     def next(cls, self):
@@ -323,7 +326,8 @@ class DecoderTestCase(unittest.TestCase):
 
         self.dispatcher = DispatchTester(self)
         self.stream_factory = MockStreamFactory(self)
-        self.decoder = codec.Decoder(self.dispatcher, self.stream_factory, stream=BufferedByteStream())
+        self.decoder = codec.Decoder(self.dispatcher, self.stream_factory,
+            stream=BufferedByteStream(), bytesInterval=codec.BYTES_INTERVAL)
 
         self.expected_streams = None
         self.streams = {}

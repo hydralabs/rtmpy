@@ -24,7 +24,11 @@ __all__ = [
 FRAME_SIZE = 128
 #: Maximum number of channels that can be active per RTMP connection
 MAX_CHANNELS = 0xffff + 64
+#: The minimum channel id that non-command messages can use
 MIN_CHANNEL_ID = 3
+
+#:
+BYTES_INTERVAL = 0x131800
 
 #: A list of encoded headers
 _ENCODED_CONTINUATION_HEADERS = []
@@ -243,13 +247,20 @@ class Codec(object):
         L{setFrameSize} instead.
     """
 
-    bytesInterval = 0x131800
+    bytesInterval = BYTES_INTERVAL
 
-    def __init__(self, stream=None):
+    def __init__(self, stream=None, bytesInterval=None):
         self.stream = stream or BufferedByteStream()
 
         self.channels = {}
         self.frameSize = FRAME_SIZE
+        self.bytes = 0
+
+        self.setBytesInterval(bytesInterval or self.bytesInterval)
+
+    def setBytesInterval(self, bytesInterval):
+        self.bytesInterval = bytesInterval
+        self._nextInterval = self.bytes + self.bytesInterval
 
     def setFrameSize(self, size):
         """
@@ -369,8 +380,8 @@ class ChannelDemuxer(FrameReader):
     @type bucket: channel -> buffered data.
     """
 
-    def __init__(self, stream=None):
-        FrameReader.__init__(self, stream=stream)
+    def __init__(self, stream=None, bytesInterval=None):
+        FrameReader.__init__(self, stream=stream, bytesInterval=bytesInterval)
 
         self.bucket = {}
 
@@ -420,17 +431,10 @@ class Decoder(ChannelDemuxer):
     channel_class = ConsumingChannel
 
     def __init__(self, dispatcher, stream_factory, stream=None, bytesInterval=None):
-        ChannelDemuxer.__init__(self, stream=stream)
+        ChannelDemuxer.__init__(self, stream=stream, bytesInterval=bytesInterval)
 
         self.dispatcher = dispatcher
         self.stream_factory = stream_factory
-        self.bytes = 0
-
-        self.setBytesInterval(bytesInterval or self.bytesInterval)
-
-    def setBytesInterval(self, bytesInterval):
-        self.bytesInterval = bytesInterval
-        self._nextInterval = self.bytes + self.bytesInterval
 
     def next(self):
         """
@@ -627,7 +631,7 @@ class Encoder(ChannelMuxer):
         channel.
     """
 
-    def __init__(self, output, stream=None):
+    def __init__(self, output, dispatcher, stream=None):
         ChannelMuxer.__init__(self, stream=stream)
 
         self.pending = []
@@ -654,8 +658,16 @@ class Encoder(ChannelMuxer):
     def flush(self):
         """
         """
-        self.output.write(self.stream.getvalue())
+        s = self.stream.getvalue()
+
+        self.output.write(s)
         self.stream.consume()
+
+        self.bytes += len(s)
+
+        if self.bytes >= self._nextInterval:
+            self.dispatcher.bytesInterval(self.bytes)
+            self._nextInterval += self.bytesInterval
 
 
 def build_header_continuations():
