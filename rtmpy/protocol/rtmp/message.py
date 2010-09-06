@@ -261,16 +261,16 @@ class FrameSize(Message):
 
     RTMP_TYPE = FRAME_SIZE
 
-    def __init__(self, size=None, **kwargs):
+    def __init__(self, size=None):
         self.size = size
 
-    def decode(self, buf):
+    def decode(self, buf, **kwargs):
         """
         Decode a frame size message.
         """
         self.size = buf.read_ulong()
 
-    def encode(self, buf):
+    def encode(self, buf, **kwargs):
         """
         Encode a frame size message.
         """
@@ -300,16 +300,16 @@ class BytesRead(Message):
 
     RTMP_TYPE = BYTES_READ
 
-    def __init__(self, bytes=None, **kwargs):
+    def __init__(self, bytes=None):
         self.bytes = bytes
 
-    def decode(self, buf):
+    def decode(self, buf, **kwargs):
         """
         Decode a bytes read message.
         """
         self.bytes = buf.read_ulong()
 
-    def encode(self, buf):
+    def encode(self, buf, **kwargs):
         """
         Encode a bytes read message.
         """
@@ -340,13 +340,13 @@ class ControlMessage(Message):
     PING = 6
     PONG = 7
 
-    def __init__(self, type=None, value1=0, value2=None, value3=None, **kwargs):
+    def __init__(self, type=None, value1=0, value2=None, value3=None):
         self.type = type
         self.value1 = value1
         self.value2 = value2
         self.value3 = value3
 
-    def decode(self, buf):
+    def decode(self, buf, **kwargs):
         """
         Decode a control message.
         """
@@ -359,7 +359,7 @@ class ControlMessage(Message):
         except IOError:
             pass
 
-    def encode(self, buf):
+    def encode(self, buf, **kwargs):
         """
         Encode a control message.
         """
@@ -406,16 +406,16 @@ class DownstreamBandwidth(Message):
 
     RTMP_TYPE = DOWNSTREAM_BANDWIDTH
 
-    def __init__(self, bandwidth=None, **kwargs):
+    def __init__(self, bandwidth=None):
         self.bandwidth = bandwidth
 
-    def decode(self, buf):
+    def decode(self, buf, **kwargs):
         """
         Decode a downstream bandwidth message.
         """
         self.bandwidth = buf.read_ulong()
 
-    def encode(self, buf):
+    def encode(self, buf, **kwargs):
         """
         Encode a downstream bandwidth message.
         """
@@ -446,18 +446,18 @@ class UpstreamBandwidth(Message):
 
     RTMP_TYPE = UPSTREAM_BANDWIDTH
 
-    def __init__(self, bandwidth=None, extra=None, **kwargs):
+    def __init__(self, bandwidth=None, extra=None):
         self.bandwidth = bandwidth
         self.extra = extra
 
-    def decode(self, buf):
+    def decode(self, buf, **kwargs):
         """
         Decode an upstream bandwidth message.
         """
         self.bandwidth = buf.read_ulong()
         self.extra = buf.read_uchar()
 
-    def encode(self, buf):
+    def encode(self, buf, **kwargs):
         """
         Encode an upstream bandwidth message.
         """
@@ -498,33 +498,32 @@ class Notify(Message):
 
     RTMP_TYPE = NOTIFY
 
-    def __init__(self, name=None, *args, **kwargs):
+    def __init__(self, name=None, *args):
         self.name = name
         self.argv = list(args)
-        self.encoding = kwargs.pop('encoding', None)
 
-    def decode(self, buf):
+    def decode(self, buf, encoding=None, **kwargs):
         """
         Decode a notification message.
         """
-        if self.encoding is None:
-            raise EncodeError('An decoding value is required')
+        if encoding is None:
+            raise EncodeError('An encoding value is required')
 
-        decoder = pyamf.get_decoder(self.encoding, stream=buf)
+        decoder = pyamf.get_decoder(encoding, stream=buf)
 
         self.name = decoder.next()
         self.argv = [x for x in decoder]
 
-    def encode(self, buf):
+    def encode(self, buf, encoding=None, **kwargs):
         """
         Encode a notification message.
         """
-        if self.encoding is None:
+        if encoding is None:
             raise EncodeError('An encoding value is required')
 
         args = [self.name] + self.argv
 
-        encoder = pyamf.get_encoder(self.encoding, buf)
+        encoder = pyamf.get_encoder(encoding, buf)
 
         for a in args:
             encoder.writeElement(a)
@@ -543,35 +542,34 @@ class Invoke(Message):
 
     RTMP_TYPE = INVOKE
 
-    def __init__(self, name=None, id=None, *args, **kwargs):
+    def __init__(self, name=None, id=None, *args):
         self.name = name
         self.id = id
         self.argv = list(args)
-        self.encoding = kwargs.pop('encoding', None)
 
-    def decode(self, buf):
+    def decode(self, buf, encoding=None, **kwargs):
         """
         Decode a notification message.
         """
-        if self.encoding is None:
-            raise EncodeError('An decoding value is required')
+        if encoding is None:
+            raise EncodeError('An encoding value is required')
 
-        decoder = pyamf.get_decoder(self.encoding, stream=buf)
+        decoder = pyamf.get_decoder(encoding, stream=buf)
 
         self.name = decoder.next()
         self.id = decoder.next()
         self.argv = [x for x in decoder]
 
-    def encode(self, buf):
+    def encode(self, buf, encoding=None, **kwargs):
         """
         Encode a notification message.
         """
-        if self.encoding is None:
+        if encoding is None:
             raise EncodeError('An encoding value is required')
 
         args = [self.name, self.id] + self.argv
 
-        encoder = pyamf.get_encoder(self.encoding, buf)
+        encoder = pyamf.get_encoder(encoding, buf)
 
         for a in args:
             encoder.writeElement(a)
@@ -591,17 +589,17 @@ class StreamingMessage(Message):
     @type data: C{str}
     """
 
-    def __init__(self, data=None, **kwargs):
+    def __init__(self, data=None):
         self.data = data
 
-    def decode(self, buf):
+    def decode(self, buf, **kwargs):
         """
         Decode a streaming message.
         """
         if not buf.at_eof():
             self.data = buf.read()
 
-    def encode(self, buf):
+    def encode(self, buf, **kwargs):
         """
         Encode a streaming message.
         """
