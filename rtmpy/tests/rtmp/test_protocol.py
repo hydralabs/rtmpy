@@ -10,6 +10,7 @@ from twisted.internet import error, defer, task
 from twisted.test.proto_helpers import StringTransportWithDisconnection
 
 from rtmpy.protocol import rtmp
+from rtmpy.protocol.rtmp import message
 
 
 class MockHandshakeNegotiator(object):
@@ -45,6 +46,9 @@ class MockFactory(object):
         self.test.assertIdentical(protocol, self.protocol)
 
         return self.test.handshaker
+
+    def getControlStream(self, protocol, streamId):
+        return rtmp.ControlStream(protocol, streamId)
 
 
 class MockApplication(object):
@@ -310,3 +314,43 @@ class ControlStreamTestCase(ProtocolTestCase):
 
         self.assertIdentical(s.decoder, self.protocol.decoder)
         self.assertIdentical(s.encoder, self.protocol.encoder)
+
+
+class BytesReadTestCase(ProtocolTestCase):
+    """
+    Tests to ensure that the bytes read keep alive packet is dispatched
+    correctly.
+    """
+
+    def setUp(self):
+        ProtocolTestCase.setUp(self)
+
+        self.factory = MockFactory(self, self.protocol)
+        self.protocol.factory = self.factory
+
+        self.protocol.connectionMade()
+        self.protocol.handshakeSuccess('')
+
+        self.decoder = self.protocol.decoder
+
+    def test_send_bytes_read(self):
+        self.messages = []
+
+        def send_message(*args):
+            self.messages.append(args)
+
+        self.patch(self.protocol, 'sendMessage', send_message)
+
+        self.decoder.setBytesInterval(8)
+        self.decoder.send('\x03\x00\x00\x00\x00\x00\x00\x08\x00\x00\x00\x00')
+
+        self.decoder.next()
+
+        self.assertEqual(len(self.messages), 1)
+
+        stream, msg, whenDone = self.messages[0]
+
+        self.assertEqual(stream.streamId, 0)
+        self.assertIsInstance(msg, message.BytesRead)
+        self.assertEqual(msg.bytes, 12)
+        self.assertEqual(whenDone, None)

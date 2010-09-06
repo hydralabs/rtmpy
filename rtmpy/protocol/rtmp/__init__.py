@@ -126,6 +126,42 @@ class ControlStream(Stream):
         print 'bytes-read', args
 
 
+class DecodingDispatcher(object):
+    """
+    A proxy class that listens for events fired from the L{codec.Decoder}
+
+    @param protocol: The L{RTMPProtocol} instance attached to the decoder.
+    """
+
+    def __init__(self, protocol):
+        self.protocol = protocol
+
+    def dispatchMessage(self, stream, datatype, timestamp, data):
+        """
+        Called when the RTMP decoder has read a complete RTMP message.
+
+        @param stream: The L{Stream} to receive this mesage.
+        @param datatype: The RTMP datatype for the message.
+        @param timestamp: The absolute timestamp this message was received.
+        @param data: The raw data for the message.
+        """
+        m = message.get_type_class(datatype)()
+
+        m.decode(BufferedByteStream(data), encoding=self.protocol.objectEncoding)
+
+        m.dispatch(stream, timestamp)
+
+    def bytesInterval(self, bytes):
+        """
+        Called when a specified number of bytes has been read from the stream.
+        The RTMP protocol demands that we send an acknowledge message to the
+        peer. If we don't do this, Flash will stop streaming video/audio.
+        """
+        stream = self.protocol.getStream(0)
+
+        stream.sendMessage(message.BytesRead(self.protocol.decoder.bytes))
+
+
 class EncodingDispatcher(object):
     """
     TODO: Figure out if we need this class to listen to the bytesInterval for
@@ -278,7 +314,7 @@ class RTMPProtocol(protocol.Protocol):
         self.streams = {}
         self.application = None
 
-        self.decoder = codec.Decoder(self, self)
+        self.decoder = codec.Decoder(DecodingDispatcher(self), self)
         self.encoder = codec.Encoder(self.transport, EncodingDispatcher())
 
         self.decoder_task = None
@@ -302,13 +338,6 @@ class RTMPProtocol(protocol.Protocol):
             self.streams[streamId] = s
 
         return s
-
-    def dispatchMessage(self, stream, datatype, timestamp, data):
-        m = message.get_type_class(datatype)()
-
-        m.decode(BufferedByteStream(data), encoding=self.objectEncoding)
-
-        m.dispatch(stream, timestamp)
 
     def sendMessage(self, stream, msg, whenDone=None):
         """
