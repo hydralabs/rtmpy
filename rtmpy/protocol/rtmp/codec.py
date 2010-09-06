@@ -636,6 +636,7 @@ class Encoder(ChannelMuxer):
 
         self.pending = []
         self.output = output
+        self.dispatcher = dispatcher
 
     def send(self, data, datatype, streamId, timestamp):
         """
