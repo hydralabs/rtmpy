@@ -226,3 +226,24 @@ class DataReceivedTestCase(ProtocolTestCase):
         self.assertEqual(decoder.stream.getvalue(), 'woot')
 
         self.protocol.decoder_task.addErrback(lambda x: None)
+
+
+class StreamTestCase(ProtocolTestCase):
+    """
+    Tests for L{rtmp.Stream}
+    """
+
+    def setUp(self):
+        ProtocolTestCase.setUp(self)
+
+        self.protocol.application = None
+
+    def test_create(self):
+        """
+        Ensure basic attribute initialisation and constructor args.
+        """
+        s = rtmp.Stream(self.protocol, 3)
+
+        self.assertIdentical(s.protocol, self.protocol)
+        self.assertEqual(s.streamId, 3)
+        self.assertEqual(s.timestamp, 0)
