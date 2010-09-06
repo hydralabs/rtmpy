@@ -514,24 +514,43 @@ class ServerFactory(protocol.ServerFactory):
 
     def registerApplication(self, name, app):
         """
+        Registers the application to this factory instance. Returns a deferred
+        which will signal the completion of the registration process.
+
+        @param name: The name of the application. This is the name that the
+            player will use when connecting to this server. An example::
+
+            RTMP uri: http://appserver.mydomain.com/webApp; name: webApp.
+        @param app: The L{IApplication} object that will interact with the
+            RTMP clients.
+        @return: A deferred signalling the completion of the registration
+            process.
         """
+        if name in self._pendingApplications or name in self.applications:
+            raise InvalidApplication(
+                '%r is already a registered application' % (name,))
+
         self._pendingApplications[name] = app
 
         d = defer.maybeDeferred(app.startup)
 
-        def eb(f):
-            del self._pendingApplications[name]
+        def cleanup_pending(r):
+            try:
+                del self._pendingApplications[name]
+            except KeyError:
+                raise InvalidApplication('Pending application %r not found '
+                    '(already unregistered?)' % (name,))
 
-            return f
+            return r
 
-        def cb(res):
+        def attach_application(res):
             self.applications[name] = app
             app.factory = self
             app.name = name
 
             return res
 
-        d.addBoth(eb).addCallback(cb)
+        d.addBoth(cleanup_pending).addCallback(attach_application)
 
         return d
 
