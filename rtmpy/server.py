@@ -554,24 +554,35 @@ class ServerFactory(protocol.ServerFactory):
 
         return d
 
-    def unregisterApplication(self, nameOrApp):
+    def unregisterApplication(self, name):
         """
+        Unregisters and removes the named application from this factory. Any
+        subsequent connect attempts to the C{name} will be met with an error.
+
+        @return: A L{defer.Deferred} when the process is complete. The result
+            will be the application instance that was successfully unregistered.
         """
-        name = nameOrApp
+        try:
+            app = self._pendingApplications.pop(name)
 
-        if IApplication.implementedBy(nameOrApp):
-            name = app.name
+            return defer.succeed(app)
+        except KeyError:
+            pass
 
-        app = self.applications[name]
+        try:
+            app = self.applications[name]
+        except KeyError:
+            raise InvalidApplication('Unknown application %r' % (name,))
 
+        # TODO: run through the attached clients and signal the app shutdown.
         d = defer.maybeDeferred(app.shutdown)
 
         def cb(res):
-            del self.applications[name]
+            app = self.applications.pop(name)
             app.factory = None
             app.name = None
 
-            return res
+            return app
 
         d.addBoth(cb)
 

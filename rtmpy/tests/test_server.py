@@ -15,8 +15,13 @@ class SimpleApplication(object):
     factory = None
     name = None
 
+    ret = None
+
     def startup(self):
-        return self.ret_startup
+        return self.ret
+
+    def shutdown(self):
+        return self.ret
 
 
 class ApplicationRegisteringTestCase(unittest.TestCase):
@@ -51,7 +56,7 @@ class ApplicationRegisteringTestCase(unittest.TestCase):
         Registering an application can be paused whilst the app is startup is
         called.
         """
-        d = self.app.ret_startup = defer.Deferred()
+        d = self.app.ret = defer.Deferred()
         ret = self.factory.registerApplication('foo', self.app)
 
         self.assertIsInstance(ret, defer.Deferred)
@@ -96,5 +101,125 @@ class ApplicationRegisteringTestCase(unittest.TestCase):
             self.assertFalse('foo' in self.factory.applications)
 
         ret.addErrback(eb)
+
+        return ret
+
+
+class ApplicationUnregisteringTestCase(unittest.TestCase):
+    """
+    Tests for L{server.ServerFactory.unregisterApplication}
+    """
+
+    def setUp(self):
+        self.factory = server.ServerFactory()
+        self.app = SimpleApplication()
+
+    def test_not_registered(self):
+        """
+        Unregistering an unknown app should error.
+        """
+        self.assertRaises(server.InvalidApplication,
+            self.factory.unregisterApplication, 'foo')
+
+    def test_unregister_pending(self):
+        """
+        Unregistering a pending application should immediately succeed.
+        """
+        # this never gets its callback fired, meaning that after registering
+        # the application, it is considered pending.
+        self.app.ret = defer.Deferred()
+
+        self.factory.registerApplication('foo', self.app)
+
+        self.assertTrue('foo' in self.factory._pendingApplications)
+
+        d = self.factory.unregisterApplication('foo')
+
+        def cb(res):
+            self.assertIdentical(res, self.app)
+
+        d.addCallback(cb)
+
+        return d
+
+    def test_simple_unregister(self):
+        """
+        app.shutdown doesn't need to return a deferred
+        """
+        self.factory.registerApplication('foo', self.app)
+
+        ret = self.factory.unregisterApplication('foo')
+
+        self.assertIsInstance(ret, defer.Deferred)
+
+        def cb(res):
+            self.assertIdentical(res, self.app)
+
+            self.assertEqual(self.app.factory, None)
+            self.assertEqual(self.app.name, None)
+            self.assertFalse('foo' in self.factory._pendingApplications)
+            self.assertFalse('foo' in self.factory.applications)
+
+        ret.addCallback(cb)
+
+        return ret
+
+    def test_deferred(self):
+        """
+        app.shutdown can return a deferred
+        """
+        self.factory.registerApplication('foo', self.app)
+        d = self.app.ret = defer.Deferred()
+
+        ret = self.factory.unregisterApplication('foo')
+
+        self.assertIsInstance(ret, defer.Deferred)
+
+        def cb(res):
+            self.assertIdentical(res, self.app)
+
+            self.assertEqual(self.app.factory, None)
+            self.assertEqual(self.app.name, None)
+            self.assertFalse('foo' in self.factory._pendingApplications)
+            self.assertFalse('foo' in self.factory.applications)
+
+        ret.addCallback(cb)
+
+        reactor.callLater(0, d.callback, None)
+
+        return ret
+
+    def test_deferred_failure(self):
+        """
+        Removing the app from the factory should not fail due to app.shutdown
+        erroring.
+        """
+        self.factory.registerApplication('foo', self.app)
+
+        d = self.app.ret = defer.Deferred()
+
+        def boom(res):
+            self.executed = True
+
+            raise RuntimeError
+
+        d.addCallback(boom)
+
+        ret = self.factory.unregisterApplication('foo')
+
+        self.assertIsInstance(ret, defer.Deferred)
+
+        def cb(res):
+            self.assertIdentical(res, self.app)
+            self.assertTrue(self.executed)
+
+            self.assertEqual(self.app.factory, None)
+            self.assertEqual(self.app.name, None)
+            self.assertFalse('foo' in self.factory._pendingApplications)
+            self.assertFalse('foo' in self.factory.applications)
+
+        ret.addCallback(cb)
+
+        reactor.callLater(0, d.callback, None)
 
         return ret
