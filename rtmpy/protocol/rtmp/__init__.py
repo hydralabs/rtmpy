@@ -253,3 +253,21 @@ class RTMPProtocol(protocol.Protocol):
         m.decode(BufferedByteStream(data))
 
         m.dispatch(stream, timestamp)
+
+    def sendMessage(self, stream, msg, whenDone=None):
+        """
+        Sends an RTMP message to the peer. Not part of a public api, use
+        C{stream.sendMessage} instead.
+        """
+        buf = BufferedByteStream()
+
+        # this will probably need to be rethought as this could block for an
+        # unacceptable amount of time. For most messages however it seems to be
+        # fast enough and the penalty for setting up a new thread is too high.
+        msg.encode(buf)
+
+        self.encoder.send(buf.getvalue(), msg.RTMP_TYPE, stream.streamId,
+            stream.timestamp, whenDone)
+
+        if not self.encoder_task:
+            self._startEncoding()

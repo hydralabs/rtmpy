@@ -259,6 +259,8 @@ class FrameSize(Message):
     @type size: C{int}
     """
 
+    RTMP_TYPE = FRAME_SIZE
+
     def __init__(self, size=None):
         self.size = size
 
@@ -296,6 +298,8 @@ class BytesRead(Message):
     @type bytes: C{int}
     """
 
+    RTMP_TYPE = BYTES_READ
+
     def __init__(self, bytes=None):
         self.bytes = bytes
 
@@ -329,6 +333,8 @@ class ControlMessage(Message):
     """
     A control message. Akin to Red5's Ping event.
     """
+
+    RTMP_TYPE = CONTROL
 
     UNDEFINED = -1
     PING = 6
@@ -398,6 +404,8 @@ class DownstreamBandwidth(Message):
     A downstream bandwidth message.
     """
 
+    RTMP_TYPE = DOWNSTREAM_BANDWIDTH
+
     def __init__(self, bandwidth=None):
         self.bandwidth = bandwidth
 
@@ -435,6 +443,8 @@ class UpstreamBandwidth(Message):
     @type bandwidth: C{int}
     @param extra: Not sure what this is supposed to represent at the moment.
     """
+
+    RTMP_TYPE = UPSTREAM_BANDWIDTH
 
     def __init__(self, bandwidth=None, extra=None):
         self.bandwidth = bandwidth
@@ -488,6 +498,8 @@ class Notify(Message):
     @param args: A list of elements to represent the method arguments.
     """
 
+    RTMP_TYPE = NOTIFY
+
     def __init__(self, name=None, id=None, *args):
         self.name = name
         self.id = id
@@ -526,6 +538,8 @@ class Invoke(Notify):
     """
     Similar to L{Notify} but a reply is expected.
     """
+
+    RTMP_TYPE = INVOKE
 
     def dispatch(self, listener, timestamp):
         """
@@ -571,6 +585,8 @@ class AudioData(StreamingMessage):
     A message containing audio data.
     """
 
+    RTMP_TYPE = AUDIO_DATA
+
     def dispatch(self, listener, timestamp):
         """
         Dispatches the message to the listener.
@@ -583,6 +599,8 @@ class VideoData(StreamingMessage):
     """
     A message containing video data.
     """
+
+    RTMP_TYPE = AUDIO_DATA
 
     def dispatch(self, listener, timestamp):
         """
