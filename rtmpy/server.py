@@ -490,6 +490,15 @@ class ServerProtocol(object):
 class ServerFactory(protocol.ServerFactory):
     """
     RTMP server protocol factory.
+
+    Maintains a collection of applications that RTMP clients connect and
+    interact with.
+
+    @ivar applications: A collection of active applications.
+    @type applications: C{dict} of C{name} -> L{IApplication}
+    @ivar _pendingApplications: A collection of applications that are pending
+        activation.
+    @type _pendingApplications: C{dict} of C{name} -> L{IApplication}
     """
 
     protocol = ServerProtocol
@@ -520,7 +529,8 @@ class ServerFactory(protocol.ServerFactory):
 
     def getApplication(self, name):
         """
-        Returns the application mounted at C{name}, if any.
+        Returns the active L{IApplication} instance related to C{name}. If
+        there is no active application, C{None} is returned.
         """
         return self.applications.get(name, None)
 
@@ -602,6 +612,9 @@ class ServerFactory(protocol.ServerFactory):
 
     def buildHandshakeNegotiator(self, protocol):
         """
+        Returns a negotiator capable of handling server side handshakes.
+
+        @param protocol: The L{ServerProtocol} requiring handshake negotiations.
         """
         i = handshake.get_implementation(self.protocolVersion)
 
