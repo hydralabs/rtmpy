@@ -498,29 +498,33 @@ class Notify(Message):
 
     RTMP_TYPE = NOTIFY
 
-    def __init__(self, name=None, id=None, *args):
+    def __init__(self, name=None, *args, **kwargs):
         self.name = name
-        self.id = id
         self.argv = list(args)
+        self.encoding = kwargs.pop('encoding', None)
 
-    def decode(self, buf, encoding=0):
+    def decode(self, buf):
         """
         Decode a notification message.
         """
-        decoder = pyamf.get_decoder(encoding, stream=buf)
+        if self.encoding is None:
+            raise EncodeError('An decoding value is required')
+
+        decoder = pyamf.get_decoder(self.encoding, stream=buf)
 
         self.name = decoder.next()
-        self.id = decoder.next()
-
         self.argv = [x for x in decoder]
 
-    def encode(self, buf, encoding=0):
+    def encode(self, buf):
         """
         Encode a notification message.
         """
-        args = [self.name, self.id] + self.argv
+        if self.encoding is None:
+            raise EncodeError('An encoding value is required')
 
-        encoder = pyamf.get_encoder(encoding, buf)
+        args = [self.name] + self.argv
+
+        encoder = pyamf.get_encoder(self.encoding, buf)
 
         for a in args:
             encoder.writeElement(a)
@@ -532,12 +536,45 @@ class Notify(Message):
         return listener.onNotify(self, timestamp)
 
 
-class Invoke(Notify):
+class Invoke(Message):
     """
     Similar to L{Notify} but a reply is expected.
     """
 
     RTMP_TYPE = INVOKE
+
+    def __init__(self, name=None, id=None, *args, **kwargs):
+        self.name = name
+        self.id = id
+        self.argv = list(args)
+        self.encoding = kwargs.pop('encoding', None)
+
+    def decode(self, buf):
+        """
+        Decode a notification message.
+        """
+        if self.encoding is None:
+            raise EncodeError('An decoding value is required')
+
+        decoder = pyamf.get_decoder(self.encoding, stream=buf)
+
+        self.name = decoder.next()
+        self.id = decoder.next()
+        self.argv = [x for x in decoder]
+
+    def encode(self, buf):
+        """
+        Encode a notification message.
+        """
+        if self.encoding is None:
+            raise EncodeError('An encoding value is required')
+
+        args = [self.name, self.id] + self.argv
+
+        encoder = pyamf.get_encoder(self.encoding, buf)
+
+        for a in args:
+            encoder.writeElement(a)
 
     def dispatch(self, listener, timestamp):
         """
