@@ -30,13 +30,30 @@ MAX_STREAMS = 0xffff
 
 
 class Stream(object):
-    timestamp = 0
 
     def __init__(self, protocol, streamId):
         self.protocol = protocol
         self.streamId = streamId
 
         self.timestamp = 0
+
+    def setTimestamp(self, timestamp, relative=True):
+        """
+        Sets the timestamp for this stream. The timestamp is measured in
+        milliseconds since an arbitrary epoch. This could be since the stream
+        started sending or receiving audio/video etc.
+
+        @param relative: Whether the supplied timestamp is relative to the
+            previous.
+        """
+        if relative:
+            self.timestamp += timestamp
+        else:
+            if timestamp < self.timestamp:
+                raise ValueError('Cannot set a negative timestamp')
+
+            self.timestamp = timestamp
+
     def onInvoke(self, name, id_, args, timestamp):
         print 'invoke', args
 

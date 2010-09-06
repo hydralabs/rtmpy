@@ -236,7 +236,7 @@ class StreamTestCase(ProtocolTestCase):
     def setUp(self):
         ProtocolTestCase.setUp(self)
 
-        self.protocol.application = None
+        self.stream = rtmp.Stream(self.protocol, None)
 
     def test_create(self):
         """
@@ -247,3 +247,18 @@ class StreamTestCase(ProtocolTestCase):
         self.assertIdentical(s.protocol, self.protocol)
         self.assertEqual(s.streamId, 3)
         self.assertEqual(s.timestamp, 0)
+
+    def test_set_timestamp(self):
+        """
+        @see: L{rtmp.Stream.setTimestamp}
+        """
+        self.assertEqual(self.stream.timestamp, 0)
+
+        self.stream.setTimestamp(50)
+        self.assertEqual(self.stream.timestamp, 50)
+
+        self.stream.setTimestamp(50)
+        self.assertEqual(self.stream.timestamp, 100)
+
+        self.stream.setTimestamp(150, False)
+        self.assertEqual(self.stream.timestamp, 150)
