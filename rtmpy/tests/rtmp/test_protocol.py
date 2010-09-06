@@ -316,10 +316,9 @@ class ControlStreamTestCase(ProtocolTestCase):
         self.assertIdentical(s.encoder, self.protocol.encoder)
 
 
-class BytesReadTestCase(ProtocolTestCase):
+class BasicResponseTestCase(ProtocolTestCase):
     """
-    Tests to ensure that the bytes read keep alive packet is dispatched
-    correctly.
+    Some RTMP messages are really low level. Test them.
     """
 
     def setUp(self):
@@ -333,7 +332,6 @@ class BytesReadTestCase(ProtocolTestCase):
 
         self.decoder = self.protocol.decoder
 
-    def test_send_bytes_read(self):
         self.messages = []
 
         def send_message(*args):
@@ -341,6 +339,11 @@ class BytesReadTestCase(ProtocolTestCase):
 
         self.patch(self.protocol, 'sendMessage', send_message)
 
+    def test_send_bytes_read(self):
+        """
+        Tests to ensure that the bytes read keep alive packet is dispatched
+        correctly.
+        """
         self.decoder.setBytesInterval(8)
         self.decoder.send('\x03\x00\x00\x00\x00\x00\x00\x08\x00\x00\x00\x00')
 
@@ -354,3 +357,18 @@ class BytesReadTestCase(ProtocolTestCase):
         self.assertIsInstance(msg, message.BytesRead)
         self.assertEqual(msg.bytes, 12)
         self.assertEqual(whenDone, None)
+
+    def test_frame_size(self):
+        """
+        When a L{message.FrameSize} message is received, ensure that the decoder
+        is updated correctly.
+        """
+        self.decoder.send('\x03\x00\x00\x00\x00\x00\x04\x01\x00\x00\x00\x00'
+            '\x00\x00\x00\x32')
+
+        self.assertNotEqual(self.decoder.frameSize, 50)
+
+        [x for x in self.decoder]
+
+        self.assertEqual(self.decoder.frameSize, 50)
+        self.assertEqual(self.messages, [])
