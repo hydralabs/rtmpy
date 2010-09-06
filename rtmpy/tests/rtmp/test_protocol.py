@@ -280,3 +280,33 @@ class StreamTestCase(ProtocolTestCase):
 
         self.stream.sendMessage('foo', 'bar')
         self.assertTrue(self.executed)
+
+
+class ControlStreamTestCase(ProtocolTestCase):
+    """
+    Tests for L{rtmp.ControlStream}
+    """
+
+    def setUp(self):
+        ProtocolTestCase.setUp(self)
+
+        self.factory = MockFactory(self, self.protocol)
+        self.protocol.factory = self.factory
+
+        self.protocol.connectionMade()
+        self.protocol.handshakeSuccess('')
+
+        self.stream = rtmp.ControlStream(self.protocol, None)
+
+    def test_create(self):
+        """
+        Ensure basic attribute initialisation and constructor args.
+        """
+        s = rtmp.ControlStream(self.protocol, 3)
+
+        self.assertIdentical(s.protocol, self.protocol)
+        self.assertEqual(s.streamId, 3)
+        self.assertEqual(s.timestamp, 0)
+
+        self.assertIdentical(s.decoder, self.protocol.decoder)
+        self.assertIdentical(s.encoder, self.protocol.encoder)

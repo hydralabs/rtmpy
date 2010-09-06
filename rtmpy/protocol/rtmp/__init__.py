@@ -96,6 +96,20 @@ class Stream(object):
 
 
 class ControlStream(Stream):
+    """
+    A privileged stream that can send and receive control messages as well as
+    having greater integration with the underlying protocol
+
+    @ivar decoder: L{codec.Decoder} instance owned by the protocol.
+    @ivar encoder: L{codec.Encoder} instance owned by the protocol.
+    """
+
+    def __init__(self, protocol, streamId):
+        Stream.__init__(self, protocol, streamId)
+
+        self.decoder = self.protocol.decoder
+        self.encoder = self.protocol.encoder
+
     def onFrameSize(self, size, timestamp):
         self.protocol.setFrameSize(size)
 
