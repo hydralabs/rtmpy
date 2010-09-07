@@ -63,9 +63,10 @@ class ServerControlStream(rtmp.ControlStream):
         return d
 
     def getInvokableTarget(self, name):
-        if self.application is None:
-            if name == 'connect':
-                return self.onConnect
+        if name == 'connect':
+            return self.onConnect
+
+        return rtmp.ControlStream.getInvokableTarget(self, name)
 
 
 class IApplication(Interface):

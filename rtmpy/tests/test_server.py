@@ -378,7 +378,7 @@ class ConnectingTestCase(unittest.TestCase):
 
         self.patch(self.protocol, 'onConnect', connect)
 
-        d = self.control.onInvoke('connect', 0, [None, my_args], 0)
+        d = self.control.onInvoke('connect', 0, [my_args], 0)
 
         return d
 

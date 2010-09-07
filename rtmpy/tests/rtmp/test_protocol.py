@@ -541,7 +541,7 @@ class InvokingTestCase(ProtocolTestCase):
 
         self.assertEqual(self.stream.getInvokableTarget('foo'), func)
 
-        d = self.stream.onInvoke('foo', 1, [None], 0)
+        d = self.stream.onInvoke('foo', 1, [], 0)
         self.assertIsInstance(d, defer.Deferred)
 
         def check_messages(res):
@@ -606,7 +606,8 @@ class InvokingTestCase(ProtocolTestCase):
         """
         Pass args to the target
         """
-        def func(b, c):
+        def func(a, b, c):
+            self.assertEqual(a, 'foo')
             self.assertEqual(b, 'bar')
             self.assertEqual(c, 'baz')
 

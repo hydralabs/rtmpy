@@ -166,13 +166,8 @@ class Stream(object):
             d.errback()
             func = None
 
-        try:
-            if args[0] is not None:
-                log.msg('Invoke %r has first arg of %r' % (name, args[0]))
-
+        if len(args) == 1 and args[0] is None:
             args = args[1:]
-        except IndexError:
-            pass
 
         if func is None:
             d.errback(exc.CallFailed('Unknown method %r' % (name,)))
@@ -255,6 +250,13 @@ class ControlStream(Stream):
     def onBytesRead(self, bytes, timestamp):
         """
         """
+
+    def getInvokableTarget(self, name):
+        if name == 'createStream':
+            return self.createStream
+
+    def createStream(self):
+        return len(self.protocol.streams)
 
 
 class DecodingDispatcher(object):
