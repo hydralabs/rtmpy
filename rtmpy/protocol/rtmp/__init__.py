@@ -87,6 +87,46 @@ class Stream(object):
         self.protocol.sendMessage(self, msg, whenDone)
 
     def _handleInvokeResponse(self, result, id_):
+        """
+        Called to handle the response to an invoked method
+        """
+        if id_ == 0:
+            return result
+
+        d = self.activeInvokes.pop(id_, None)
+
+        if d is None:
+            self.sendMessage(message.Invoke('_error', id_, [None, {}]))
+
+            raise RuntimeError('Missing activeInvoke for id %r' % (id_,))
+
+        isinstance(d, defer.Deferred)
+
+        def write_error(fail):
+            isinstance(fail, failure.Failure)
+
+            code = getattr(fail.type, 'code', 'NetConnection.Call.Failed')
+
+            msg = message.Invoke('_error', id_, None, {
+                'level': 'status',
+                'code': code,
+                'description': fail.getErrorMessage()
+            })
+
+            self.sendMessage(msg)
+
+            return fail
+
+        def write_result(result):
+            # need to figure out how to set the first param
+            msg = message.Invoke('_result', id_, None, result)
+
+            self.sendMessage(msg)
+
+            return result
+
+        d.addCallbacks(write_result, write_error)
+
         return result
 
     def onInvoke(self, name, id_, args, timestamp):
@@ -109,7 +149,7 @@ class Stream(object):
             else:
                 log.msg('Unhandled name for invoke response %r' % (name,))
 
-            return
+            return d
 
         # a request from the peer to call a local method
         try:
@@ -118,7 +158,7 @@ class Stream(object):
             d = defer.fail()
         else:
             if func is None:
-                d = defer.fail(ConnectFailed('Unknown method %r' % (name,)))
+                d = defer.fail(exc.CallFailed('Unknown method %r' % (name,)))
 
         if func:
             d = defer.maybeDeferred(func, *args)

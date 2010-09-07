@@ -11,6 +11,7 @@ from twisted.test.proto_helpers import StringTransportWithDisconnection
 
 from rtmpy.protocol import rtmp
 from rtmpy.protocol.rtmp import message
+from rtmpy import exc
 
 
 class MockHandshakeNegotiator(object):
@@ -391,7 +392,24 @@ class InvokingTestCase(ProtocolTestCase):
     def setUp(self):
         ProtocolTestCase.setUp(self)
 
+        self.factory = MockFactory(self, self.protocol)
+        self.protocol.factory = self.factory
+
+        self.protocol.connectionMade()
+        self.protocol.handshakeSuccess('')
+
+        self.decoder = self.protocol.decoder
+
+        self.messages = []
+
+        def send_message(*args):
+            self.messages.append(args)
+
+        self.patch(self.protocol, 'sendMessage', send_message)
+
+        self.targets = {}
         self.stream = InvokableStream(self.protocol, 3)
+        self.stream.targets = self.targets
 
     def test_init(self):
         """
@@ -414,6 +432,7 @@ class InvokingTestCase(ProtocolTestCase):
 
     def test_missing_target(self):
         """
+        Invoke a method that does not exist with no response expected.
         """
         self.assertEqual(self.stream.getInvokableTarget('foo'), None)
 
@@ -425,10 +444,86 @@ class InvokingTestCase(ProtocolTestCase):
             self.fail('errback should be called')
 
         def eb(fail):
-            fail.trap(rtmp.ConnectFailed)
+            fail.trap(exc.CallFailed)
 
             self.assertEqual(fail.getErrorMessage(), "Unknown method 'foo'")
 
-        d.addCallbacks(cb, eb)
+        def check_messages(res):
+            self.assertEqual(self.messages, [])
+
+        d.addCallbacks(cb, eb).addCallback(check_messages)
+
+        return d
+
+    def test_missing_target_response(self):
+        """
+        Invoke a method that does not exist with a response expected.
+        """
+        self.assertEqual(self.stream.getInvokableTarget('foo'), None)
+
+        d = self.stream.onInvoke('foo', 1, [], 0)
+
+        self.assertIsInstance(d, defer.Deferred)
+
+        def cb(res):
+            self.fail('errback should be called')
+
+        def eb(fail):
+            fail.trap(exc.CallFailed)
+
+            self.assertEqual(fail.getErrorMessage(), "Unknown method 'foo'")
+
+        def check_messages(res):
+            msg = self.messages.pop(0)
+
+            self.assertEqual(self.messages, [])
+
+            self.assertIdentical(msg[0], self.stream)
+            self.assertEqual(msg[2], None)
+
+            i = msg[1]
+
+            self.assertIsInstance(i, message.Invoke)
+            self.assertEqual(i.id, 1)
+            self.assertEqual(i.name, '_error')
+            self.assertEqual(i.argv, [None, {
+                'code': 'NetConnection.Call.Failed',
+                'description': "Unknown method 'foo'",
+                'level': 'status'}])
+
+        d.addCallbacks(cb, eb).addCallback(check_messages)
+
+        return d
+
+    def test_success_response(self):
+        """
+        Test a successful invocation with a response.
+        """
+        def func():
+            return 'bar'
+
+        self.targets['foo'] = func
+
+        self.assertEqual(self.stream.getInvokableTarget('foo'), func)
+
+        d = self.stream.onInvoke('foo', 1, [], 0)
+        self.assertIsInstance(d, defer.Deferred)
+
+        def check_messages(res):
+            msg = self.messages.pop(0)
+
+            self.assertEqual(self.messages, [])
+
+            self.assertIdentical(msg[0], self.stream)
+            self.assertEqual(msg[2], None)
+
+            i = msg[1]
+
+            self.assertIsInstance(i, message.Invoke)
+            self.assertEqual(i.id, 1)
+            self.assertEqual(i.name, '_result')
+            self.assertEqual(i.argv, [None, 'bar'])
+
+        d.addCallback(check_messages)
 
         return d
