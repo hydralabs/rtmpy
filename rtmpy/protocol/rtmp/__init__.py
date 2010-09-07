@@ -24,27 +24,22 @@ from pyamf.util import BufferedByteStream
 
 from rtmpy.protocol import handshake, version
 from rtmpy.protocol.rtmp import message, codec
+from rtmpy import exc
 
 
 #: Maximum number of streams that can be active per RTMP stream
 MAX_STREAMS = 0xffff
 
 
-class NetConnectionError(Exception):
+class RemoteCallFailed(failure.Failure):
     """
     """
 
 
-class ConnectError(NetConnectionError):
-    """
     """
 
-
-class ConnectFailed(ConnectError):
-    """
     """
 
-    code = 'NetConnection.Connect.Failed'
 class Stream(object):
 
     def __init__(self, protocol, streamId):
