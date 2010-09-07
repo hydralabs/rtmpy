@@ -637,3 +637,41 @@ class InvokingTestCase(ProtocolTestCase):
         self.assertIsInstance(d, defer.Deferred)
 
         return wait_ok
+
+    def test_missing_active(self):
+        my_deferred = defer.Deferred()
+
+        def func():
+            reactor.callLater(0, my_deferred.callback, None)
+
+            return my_deferred
+
+        self.targets['foo'] = func
+
+        self.assertEqual(self.stream.getInvokableTarget('foo'), func)
+
+        d = self.stream.onInvoke('foo', 1, [], 0)
+        self.stream.activeInvokes = {}
+        self.assertIsInstance(d, defer.Deferred)
+
+        def eb(fail):
+            fail.trap(RuntimeError)
+
+        def check_messages(res):
+            msg = self.messages.pop(0)
+
+            self.assertEqual(self.messages, [])
+
+            self.assertIdentical(msg[0], self.stream)
+            self.assertEqual(msg[2], None)
+
+            i = msg[1]
+
+            self.assertIsInstance(i, message.Invoke)
+            self.assertEqual(i.id, 1)
+            self.assertEqual(i.name, '_error')
+            self.assertEqual(i.argv, [None, {}])
+
+        my_deferred.addErrback(eb).addCallback(check_messages)
+
+        return d

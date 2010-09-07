@@ -96,7 +96,7 @@ class Stream(object):
         d = self.activeInvokes.pop(id_, None)
 
         if d is None:
-            self.sendMessage(message.Invoke('_error', id_, [None, {}]))
+            self.sendMessage(message.Invoke('_error', id_, None, {}))
 
             raise RuntimeError('Missing activeInvoke for id %r' % (id_,))
 
@@ -147,16 +147,18 @@ class Stream(object):
 
             return d
 
+        d = defer.Deferred()
+
         # a request from the peer to call a local method
         try:
             func = self.getInvokableTarget(name)
         except:
-            d = defer.fail()
-        else:
-            if func is None:
-                d = defer.fail(exc.CallFailed('Unknown method %r' % (name,)))
+            d.errback()
+            func = None
 
-        if func:
+        if func is None:
+            d.errback(exc.CallFailed('Unknown method %r' % (name,)))
+        else:
             d = defer.maybeDeferred(func, *args)
 
         if id_ > 0:
