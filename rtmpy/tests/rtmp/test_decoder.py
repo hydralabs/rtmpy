@@ -173,18 +173,17 @@ class FrameReaderTestCase(unittest.TestCase):
         size = self.reader.frameSize
 
         full = header.Header(3, datatype=2, bodyLength=500, streamId=1, timestamp=10)
-        relative = header.Header(3)
 
         header.encodeHeader(self.stream, full)
         self.stream.write('a' * size)
 
-        header.encodeHeader(self.stream, relative)
+        header.encodeHeader(self.stream, full, full)
         self.stream.write('b' * size)
 
-        header.encodeHeader(self.stream, relative)
+        header.encodeHeader(self.stream, full, full)
         self.stream.write('c' * size)
 
-        header.encodeHeader(self.stream, relative)
+        header.encodeHeader(self.stream, full, full)
         self.stream.write('d' * (size - 12))
 
         self.stream.seek(0)
@@ -234,11 +233,12 @@ class FrameReaderTestCase(unittest.TestCase):
             bodyLength=256, streamId=4)
 
         # only change the bodyLength and timestamp
-        relative_header = header.Header(52, timestamp=45)
+        relative_header = header.Header(52, datatype=2, streamId=4,
+            bodyLength=256, timestamp=45)
 
         header.encodeHeader(self.stream, full_header)
         self.stream.write('a' * self.reader.frameSize)
-        header.encodeHeader(self.stream, relative_header)
+        header.encodeHeader(self.stream, relative_header, full_header)
         self.stream.write('b' * self.reader.frameSize)
 
         self.stream.seek(0)

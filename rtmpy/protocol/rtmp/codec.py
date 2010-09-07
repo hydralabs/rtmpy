@@ -115,21 +115,12 @@ class BaseChannel(object):
         @return: The previous header, if there is one.
         @rtype: L{header.Header} or C{None}
         """
-        old_header = self.header
-
-        if old_header is None:
-            if new.relative is True:
-                raise header.HeaderError(
-                    'Tried to set a relative header as absolute')
-
-        if not new.relative:
-            h = self.header = new
+        if self.header is None:
+            self.header = new
         else:
-            h = self.header = header.mergeHeaders(self.header, new)
+            self.header.merge(new)
 
-        self._bodyRemaining = h.bodyLength - self.bytes
-
-        return old_header
+        self._bodyRemaining = self.header.bodyLength - self.bytes
 
     def _adjustFrameRemaining(self, l):
         """
@@ -564,19 +555,18 @@ class ChannelMuxer(Codec):
         """
         h = self.nextHeaders.pop(channel, None)
 
-        if h is None:
+        if h is not None:
+            old_header = channel.setHeader(h)
+        else:
             if channel.channelId < 64:
                 self.stream.write(
                     _ENCODED_CONTINUATION_HEADERS[channel.channelId])
-            else:
-                header.encodeHeader(self.stream, h)
-        else:
-            old_header = channel.setHeader(h)
 
-            if old_header:
-                h = header.diffHeaders(old_header, h)
+                return
 
-            header.encodeHeader(self.stream, h)
+            old_header = channel.header
+
+        header.encodeHeader(self.stream, h, old_header)
 
     def flush(self):
         raise NotImplementedError
@@ -693,7 +683,7 @@ def build_header_continuations():
     for i in xrange(0, 64):
         h = header.Header(i)
 
-        header.encodeHeader(s, h)
+        header.encodeHeader(s, h, h)
 
         _ENCODED_CONTINUATION_HEADERS.append(s.getvalue())
         s.consume()
