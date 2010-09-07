@@ -240,8 +240,8 @@ class Application(object):
         return a C{bool} (or a L{defer.Deferred} returning a C{bool}) which
         determines the result of the connection request.
 
-        If C{True} is returned then the connection is accepted. If anything else
-        is returned then the connection is rejected
+        If C{False} is returned (or an exception raised) then the connection is
+        rejected.
 
         @param client: The client requesting the connection.
         @type client: An instance of L{client_class}.
@@ -249,7 +249,6 @@ class Application(object):
             request.
         @type kwargs: C{dict}
         """
-        return True
 
     def onPublish(self, client, stream):
         """
