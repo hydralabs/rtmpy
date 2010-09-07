@@ -6,7 +6,7 @@ from twisted.python import failure
 from twisted.internet import defer, reactor, protocol
 from twisted.test.proto_helpers import StringTransport, StringIOWithoutClosing
 
-from rtmpy import server
+from rtmpy import server, exc
 
 
 class SimpleApplication(object):
@@ -60,7 +60,7 @@ class ApplicationRegisteringTestCase(unittest.TestCase):
         """
         self.factory._pendingApplications['foo'] = None
 
-        self.assertRaises(server.InvalidApplication,
+        self.assertRaises(exc.InvalidApplication,
             self.factory.registerApplication, 'foo', None)
 
     def test_invalid_active(self):
@@ -69,7 +69,7 @@ class ApplicationRegisteringTestCase(unittest.TestCase):
         """
         self.factory.applications['foo'] = None
 
-        self.assertRaises(server.InvalidApplication,
+        self.assertRaises(exc.InvalidApplication,
             self.factory.registerApplication, 'foo', None)
 
     def test_deferred_startup(self):
@@ -139,7 +139,7 @@ class ApplicationUnregisteringTestCase(unittest.TestCase):
         """
         Unregistering an unknown app should error.
         """
-        self.assertRaises(server.InvalidApplication,
+        self.assertRaises(exc.InvalidApplication,
             self.factory.unregisterApplication, 'foo')
 
     def test_unregister_pending(self):
@@ -280,6 +280,8 @@ class ConnectingTestCase(unittest.TestCase):
         self.factory = server.ServerFactory()
         self.protocol = self.factory.buildProtocol(None)
 
+        self.protocol.factory = self.factory
+
         self.protocol.transport = self.transport
         self.protocol.connectionMade()
         self.protocol.handshakeSuccess('')
@@ -302,12 +304,12 @@ class ConnectingTestCase(unittest.TestCase):
 
         self.patch(self.protocol, 'onConnect', connect)
 
-        d = self.control.onInvoke('connect', None, [my_args], 0)
+        d = self.control.onInvoke('connect', 0, [my_args], 0)
 
-        self.assertTrue(self.executed)
+        return d
 
     def test_missing_app_key(self):
         """
         RTMP connect packets contain {'app': 'name_of_app'}.
         """
-        self.assertRaises(server.ConnectFailed, self.connect, {})
+        self.assertRaises(exc.ConnectFailed, self.connect, {})
