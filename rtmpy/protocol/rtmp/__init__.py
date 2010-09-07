@@ -90,6 +90,9 @@ class Stream(object):
         """
         self.protocol.sendMessage(self, msg, whenDone)
 
+    def _handleInvokeResponse(self, result, id_):
+        return result
+
     def onInvoke(self, name, id_, args, timestamp):
         """
         Called when an invoke message has been received from the peer. This
