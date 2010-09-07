@@ -9,142 +9,63 @@ from zope.interface import Interface, Attribute, implements
 from twisted.internet import protocol, defer, reactor
 import pyamf
 
-from rtmpy import util
+from rtmpy import util, exc
+from rtmpy.protocol.rtmp import message
 from rtmpy.protocol import rtmp, handshake, version
-
-
-class NetConnectionError(Exception):
-    """
-    """
-
-
-class ConnectError(NetConnectionError):
-    """
-    """
-
-
-class ConnectFailed(ConnectError):
-    """
-    """
-
-    code = 'NetConnection.Connect.Failed'
 
 
 class ServerControlStream(rtmp.ControlStream):
     """
     """
 
-    def _handleInvokeResponse(self, result, id_):
-        return result
+    def __init__(self, protocol, streamId):
+        rtmp.ControlStream.__init__(self, protocol, streamId)
 
-    def onInvoke(self, name, id_, args, timestamp):
+        self.application = self.protocol.application
+
+    def _onConnectCB(self, res):
         """
+        Called when the connect packet has been accepted by the application.
         """
+        f = self.protocol.factory
+
+        self.sendMessage(
+            message.DownstreamBandwidth(f.downstreamBandwidth))
+        self.sendMessage(
+            message.DownstreamBandwidth(f.upstreamBandwidth))
+        self.sendMessage(
+            message.ControlMessage(0, 0))
+
+        self.sendStatus({'fmsVer': f.fmsVer, 'capabilities': 31},
+            code='NetConnection.Connect.Success',
+            description='Connection succeeded.',
+            objectEncoding=self.protocol.objectEncoding)
+
+        return res
+
+    def _onConnectEB(self, fail):
+        """
+        Called when an error occurred when asking the application to validate
+        the connection request.
+        """
+        self.sendStatus(
+            level='error',
+            code='NetConnection.Connect.Failed',
+            description='Internal Server Error')
+
+        return fail
+
+    def onConnect(self, *args):
+        d = defer.maybeDeferred(self.protocol.onConnect, *args)
+
+        d.addErrback(self._onConnectEB).addCallback(self._onConnectCB)
+
+        return d
+
+    def getInvokableTarget(self, name):
         if self.application is None:
             if name == 'connect':
-                d = self.activeInvokes[id_] = defer.maybeDeferred(
-                    self.protocol.onConnect, args[0])
-
-                d.addBoth(self._handleInvokeResponse, id_)
-
-                return d
-
-        rtmp.ControlStream.onInvoke(self, name, id_, args, timestamp)
-
-
-class OldServerControlStream(object):
-    """
-    """
-
-    def _fatal(self, f):
-        """
-        If we ever get here then a pathological error occurred and the only
-        thing left to do is to log the error and kill the connection.
-
-        Only to be used as part of a deferred call/errback chain.
-        """
-        self.protocol.logAndDisconnect(f)
-
-    def onInvoke(self, invoke):
-        """
-        """
-        d = None
-
-        def cb(res):
-            if not isinstance(res, (tuple, list)):
-                res = (None, res)
-
-            s = res[1]
-
-            if isinstance(s, status.Status):
-                if s.level == 'error':
-                    return event.Invoke('_error', invoke.id, *res)
-
-            return event.Invoke('_result', invoke.id, *res)
-
-        if invoke.name == u'connect':
-            def eb(f):
-                # TODO: log the error
-                print f
-                return status.error(
-                    code='NetConnection.Connect.Failed',
-                    description='Internal Server Error'
-                )
-
-            def check_error(res):
-                if not isinstance(res, event.Invoke):
-                    return res
-
-                if res.name == '_error':
-                    self.writeEvent(res, channelId=2)
-                    self.writeEvent(event.Invoke('close', 0, None), channelId=2)
-
-                    return
-
-                return res
-
-            d = defer.maybeDeferred(self.protocol.onConnect, *invoke.argv)
-            d.addErrback(eb).addCallback(cb).addCallback(check_error)
-        elif invoke.name == u'createStream':
-            d = defer.maybeDeferred(self.protocol.createStream)
-
-            d.addCallback(cb)
-        elif invoke.name == u'deleteStream':
-            d = defer.maybeDeferred(self.protocol.removeStream, *invoke.argv[1:])
-
-            d.addCallback(cb).addCallback(lambda _: None)
-        else:
-            def eb(f):
-                # TODO: log the error
-                print f
-                return status.error(
-                    code='NetConnection.Call.Failed',
-                    description='Internal Server Error'
-                )
-
-            kls = self.protocol.client.__class__
-
-            if not hasattr(kls, invoke.name):
-                return status.error(
-                    code='NetConnection.Call.Failed',
-                    description="Unknown method '%s'" % (invoke.name,)
-                )
-
-            method = getattr(self.protocol.client, invoke.name)
-
-            d = defer.maybeDeferred(method, *invoke.argv[1:])
-
-            d.addErrback(eb).addCallback(cb)
-
-        return d.addErrback(self._fatal)
-
-    def onDownstreamBandwidth(self, bandwidth):
-        """
-        """
-        self.protocol.onDownstreamBandwidth(bandwidth)
-
-    def onFrameSize(self, size):
-        self.protocol.decoder.setFrameSize(size)
+                return self.onConnect
 
 
 class IApplication(Interface):
@@ -317,8 +238,8 @@ class Application(object):
         return a C{bool} (or a L{defer.Deferred} returning a C{bool}) which
         determines the result of the connection request.
 
-        If C{True} is returned then the connection is accepted. If C{False} is
-        returned then the connection is rejected
+        If C{True} is returned then the connection is accepted. If anything else
+        is returned then the connection is rejected
 
         @param client: The client requesting the connection.
         @type client: An instance of L{client_class}.
@@ -327,18 +248,6 @@ class Application(object):
         @type kwargs: C{dict}
         """
         return True
-
-    def getStream(self, name):
-        """
-        """
-        try:
-            return self.streams[name]
-        except KeyError:
-            s = self.streams[name] = stream.SubscriberStream()
-            s.application = self
-            s.name = name
-
-        return self.streams[name]
 
     def onPublish(self, client, stream):
         """
@@ -369,68 +278,25 @@ class ServerProtocol(rtmp.RTMPProtocol):
         if self.application:
             # This protocol has already successfully completed a connection
             # request.
-
-            # TODO, kill the connection
-            return status.status(
-                code='NetConnection.Connect.Closed',
-                description='Already connected.'
-            )
+            raise exc.ConnectFailed('Already connected.')
 
         try:
             appName = args['app']
         except KeyError:
-            return status.status(
-                code='NetConnection.Connect.Failed',
-                description='Bad connect packet (missing `app` key)'
-            )
+            raise exc.ConnectFailed("Bad connect packet (missing 'app' key)")
 
         self.application = self.factory.getApplication(appName)
 
         if self.application is None:
-            return status.error(
-                code='NetConnection.Connect.InvalidApp',
-                description='Unknown application \'%s\'' % (appName,)
-            )
+            raise exc.InvalidApplication('Unknown application %r' % (appName,))
 
         self.client = self.application.buildClient(self)
-        self.pendingConnection = defer.Deferred()
 
         def cb(res):
-            if res is False:
-                self.pendingConnection = None
-
-                return status.error(
-                    code='NetConnection.Connect.Rejected',
-                    description='Authorization is required'
-                )
+            if res is not True:
+                raise exc.ConnectRejected('Authorization is required')
 
             self.application.acceptConnection(self.client)
-
-            s = self.getStream(0)
-
-            s.writeEvent(event.DownstreamBandwidth(self.factory.downstreamBandwidth), channelId=2)
-            s.writeEvent(event.UpstreamBandwidth(self.factory.upstreamBandwidth, 2), channelId=2)
-
-            # clear the stream
-            d = s.writeEvent(event.ControlEvent(0, 0), channelId=2)
-
-            def sendStatus(res):
-                x = {'fmsVer': self.factory.fmsVer, 'capabilities': 31}
-
-                def y(res):
-                    self.client.registerApplication(self.application)
-
-                    return res
-
-                self.pendingConnection.addCallback(y)
-
-                self.pendingConnection.callback((x, status.status(
-                    code=u'NetConnection.Connect.Success',
-                    description=u'Connection succeeded.',
-                    objectEncoding=0
-                )))
-
-                self.pendingConnection = None
 
             d.addCallback(sendStatus)
 
@@ -530,7 +396,7 @@ class ServerFactory(protocol.ServerFactory):
             process.
         """
         if name in self._pendingApplications or name in self.applications:
-            raise InvalidApplication(
+            raise exc.InvalidApplication(
                 '%r is already a registered application' % (name,))
 
         self._pendingApplications[name] = app
@@ -541,7 +407,7 @@ class ServerFactory(protocol.ServerFactory):
             try:
                 del self._pendingApplications[name]
             except KeyError:
-                raise InvalidApplication('Pending application %r not found '
+                raise exc.InvalidApplication('Pending application %r not found '
                     '(already unregistered?)' % (name,))
 
             return r
@@ -575,7 +441,7 @@ class ServerFactory(protocol.ServerFactory):
         try:
             app = self.applications[name]
         except KeyError:
-            raise InvalidApplication('Unknown application %r' % (name,))
+            raise exc.InvalidApplication('Unknown application %r' % (name,))
 
         # TODO: run through the attached clients and signal the app shutdown.
         d = defer.maybeDeferred(app.shutdown)
