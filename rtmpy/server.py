@@ -23,26 +23,28 @@ class ServerControlStream(rtmp.ControlStream):
 
         self.application = self.protocol.application
 
-    def onConnect(self, *args):
+    def onConnect(self, args):
         def cb(res):
             """
             Called when the connect packet has been accepted by the application.
             """
+            oE = args.pop('objectEncoding', self.protocol.objectEncoding)
+
+            self.protocol.objectEncoding = oE
             f = self.protocol.factory
 
             self.sendMessage(
                 message.DownstreamBandwidth(f.downstreamBandwidth))
             self.sendMessage(
-                message.DownstreamBandwidth(f.upstreamBandwidth))
+                message.UpstreamBandwidth(f.upstreamBandwidth, 2))
             self.sendMessage(
                 message.ControlMessage(0, 0))
 
-            self.sendStatus('NetConnection.Connect.Success',
-                {'fmsVer': f.fmsVer, 'capabilities': 31},
-                description='Connection succeeded.',
-                objectEncoding=self.protocol.objectEncoding)
-
-            return res
+            return {
+                'code': 'NetConnection.Connect.Success',
+                'description': 'Connection succeeded.',
+                'objectEncoding': self.protocol.objectEncoding
+            }
 
         def eb(fail):
             """
@@ -56,7 +58,7 @@ class ServerControlStream(rtmp.ControlStream):
 
             return fail
 
-        d = defer.maybeDeferred(self.protocol.onConnect, *args)
+        d = defer.maybeDeferred(self.protocol.onConnect, *(args,))
 
         d.addErrback(eb).addCallback(cb)
 
@@ -134,7 +136,7 @@ class Client(object):
             return d
 
         s = self.protocol.getStream(0)
-        x = s.writeEvent(event.Invoke(name, 0, *args), channelId=3)
+        x = s.sendMessage(message.Invoke(name, 0, *args), channelId=3)
 
         x.addCallback(lambda _: d.callback(pyamf.Undefined))
 
@@ -198,7 +200,7 @@ class Application(object):
         Called when the application is closed.
         """
 
-    def acceptConnection(self, client):
+    def connectionAccepted(self, client):
         """
         Called when this application has accepted the client connection.
         """
@@ -293,15 +295,10 @@ class ServerProtocol(rtmp.RTMPProtocol):
         self.client = self.application.buildClient(self)
 
         def cb(res):
-            if res is not True:
+            if res is False:
                 raise exc.ConnectRejected('Authorization is required')
 
-            self.application.acceptConnection(self.client)
-
-            d.addCallback(sendStatus)
-
-            # TODO: A timeout for the pendingConnection
-            return self.pendingConnection
+            self.application.connectionAccepted(self.client)
 
         def eb(f):
             print 'failed app.onConnect', f
@@ -314,24 +311,7 @@ class ServerProtocol(rtmp.RTMPProtocol):
 
         d.addCallback(cb)
 
-        if d.called:
-            return d
-
-        return self.pendingConnection
-
-    def createStream(self):
-        """
-        """
-        streamId = self.getNextAvailableStreamId()
-
-        self.registerStream(streamId, stream.Stream(self))
-
-        return streamId
-
-    def onDownstreamBandwidth(self, bandwidth):
-        self.client.upstreamBandwidth = bandwidth
-
-        self.client.checkBandwidth()
+        return d
 
 
 class ServerFactory(protocol.ServerFactory):
