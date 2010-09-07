@@ -264,13 +264,13 @@ class FrameSize(Message):
     def __init__(self, size=None):
         self.size = size
 
-    def decode(self, buf, **kwargs):
+    def decode(self, buf):
         """
         Decode a frame size message.
         """
         self.size = buf.read_ulong()
 
-    def encode(self, buf, **kwargs):
+    def encode(self, buf):
         """
         Encode a frame size message.
         """
@@ -303,13 +303,13 @@ class BytesRead(Message):
     def __init__(self, bytes=None):
         self.bytes = bytes
 
-    def decode(self, buf, **kwargs):
+    def decode(self, buf):
         """
         Decode a bytes read message.
         """
         self.bytes = buf.read_ulong()
 
-    def encode(self, buf, **kwargs):
+    def encode(self, buf):
         """
         Encode a bytes read message.
         """
@@ -346,7 +346,7 @@ class ControlMessage(Message):
         self.value2 = value2
         self.value3 = value3
 
-    def decode(self, buf, **kwargs):
+    def decode(self, buf):
         """
         Decode a control message.
         """
@@ -359,7 +359,7 @@ class ControlMessage(Message):
         except IOError:
             pass
 
-    def encode(self, buf, **kwargs):
+    def encode(self, buf):
         """
         Encode a control message.
         """
@@ -409,13 +409,13 @@ class DownstreamBandwidth(Message):
     def __init__(self, bandwidth=None):
         self.bandwidth = bandwidth
 
-    def decode(self, buf, **kwargs):
+    def decode(self, buf):
         """
         Decode a downstream bandwidth message.
         """
         self.bandwidth = buf.read_ulong()
 
-    def encode(self, buf, **kwargs):
+    def encode(self, buf):
         """
         Encode a downstream bandwidth message.
         """
@@ -450,14 +450,14 @@ class UpstreamBandwidth(Message):
         self.bandwidth = bandwidth
         self.extra = extra
 
-    def decode(self, buf, **kwargs):
+    def decode(self, buf):
         """
         Decode an upstream bandwidth message.
         """
         self.bandwidth = buf.read_ulong()
         self.extra = buf.read_uchar()
 
-    def encode(self, buf, **kwargs):
+    def encode(self, buf):
         """
         Encode an upstream bandwidth message.
         """
@@ -502,19 +502,19 @@ class Notify(Message):
         self.name = name
         self.argv = list(args)
 
-    def decode(self, buf, encoding=None, **kwargs):
+    def decode(self, buf):
         """
         Decode a notification message.
         """
         if encoding is None:
             raise EncodeError('An encoding value is required')
 
-        decoder = pyamf.get_decoder(encoding, stream=buf)
+        decoder = pyamf.get_decoder(pyamf.AMF0, stream=buf)
 
         self.name = decoder.next()
         self.argv = [x for x in decoder]
 
-    def encode(self, buf, encoding=None, **kwargs):
+    def encode(self, buf):
         """
         Encode a notification message.
         """
@@ -523,7 +523,7 @@ class Notify(Message):
 
         args = [self.name] + self.argv
 
-        encoder = pyamf.get_encoder(encoding, buf)
+        encoder = pyamf.get_encoder(pyamf.AMF0, buf)
 
         for a in args:
             encoder.writeElement(a)
@@ -542,34 +542,30 @@ class Invoke(Message):
 
     RTMP_TYPE = INVOKE
 
+    encoding = pyamf.AMF0
+
     def __init__(self, name=None, id=None, *args):
         self.name = name
         self.id = id
         self.argv = list(args)
 
-    def decode(self, buf, encoding=None, **kwargs):
+    def decode(self, buf):
         """
         Decode a notification message.
         """
-        if encoding is None:
-            raise EncodeError('An encoding value is required')
-
-        decoder = pyamf.get_decoder(encoding, stream=buf)
+        decoder = pyamf.get_decoder(self.encoding, stream=buf)
 
         self.name = decoder.next()
         self.id = decoder.next()
         self.argv = [x for x in decoder]
 
-    def encode(self, buf, encoding=None, **kwargs):
+    def encode(self, buf):
         """
         Encode a notification message.
         """
-        if encoding is None:
-            raise EncodeError('An encoding value is required')
-
         args = [self.name, self.id] + self.argv
 
-        encoder = pyamf.get_encoder(encoding, buf)
+        encoder = pyamf.get_encoder(self.encoding, buf)
 
         for a in args:
             encoder.writeElement(a)
@@ -579,6 +575,24 @@ class Invoke(Message):
         Dispatches the message to the listener.
         """
         listener.onInvoke(self.name, self.id, self.argv, timestamp)
+
+
+class FlexMessage(Invoke):
+    """
+    The name is crap .. but basically its an Invoke but using amf3 to do the
+    encoding/decoding.
+    """
+
+    RTMP_TYPE = FLEX_MESSAGE
+
+    encoding = pyamf.AMF3
+
+    def decode(self, buf):
+        if buf.peek(1) == '\x00':
+            buf.seek(1, 1)
+            self.encoding = pyamf.AMF0
+
+        return Invoke.decode(self, buf)
 
 
 class StreamingMessage(Message):
@@ -592,14 +606,14 @@ class StreamingMessage(Message):
     def __init__(self, data=None):
         self.data = data
 
-    def decode(self, buf, **kwargs):
+    def decode(self, buf):
         """
         Decode a streaming message.
         """
         if not buf.at_eof():
             self.data = buf.read()
 
-    def encode(self, buf, **kwargs):
+    def encode(self, buf):
         """
         Encode a streaming message.
         """
@@ -652,6 +666,7 @@ TYPE_MAP = {
     UPSTREAM_BANDWIDTH: UpstreamBandwidth,
     NOTIFY: Notify,
     INVOKE: Invoke,
+    FLEX_MESSAGE: FlexMessage,
     AUDIO_DATA: AudioData,
     VIDEO_DATA: VideoData,
     # TODO: Shared object etc.

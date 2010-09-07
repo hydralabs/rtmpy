@@ -270,7 +270,7 @@ class DecodingDispatcher(object):
         """
         m = message.get_type_class(datatype)()
 
-        m.decode(BufferedByteStream(data), encoding=self.protocol.objectEncoding)
+        m.decode(BufferedByteStream(data))
 
         m.dispatch(stream, timestamp)
 
@@ -479,7 +479,7 @@ class RTMPProtocol(protocol.Protocol):
         # this will probably need to be rethought as this could block for an
         # unacceptable amount of time. For most messages however it seems to be
         # fast enough and the penalty for setting up a new thread is too high.
-        msg.encode(buf, encoding=self.objectEncoding)
+        msg.encode(buf)
 
         self.encoder.send(buf.getvalue(), msg.RTMP_TYPE, stream.streamId,
             stream.timestamp, whenDone)
