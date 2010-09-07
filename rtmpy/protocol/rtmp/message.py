@@ -506,9 +506,6 @@ class Notify(Message):
         """
         Decode a notification message.
         """
-        if encoding is None:
-            raise EncodeError('An encoding value is required')
-
         decoder = pyamf.get_decoder(pyamf.AMF0, stream=buf)
 
         self.name = decoder.next()
@@ -518,9 +515,6 @@ class Notify(Message):
         """
         Encode a notification message.
         """
-        if encoding is None:
-            raise EncodeError('An encoding value is required')
-
         args = [self.name] + self.argv
 
         encoder = pyamf.get_encoder(pyamf.AMF0, buf)

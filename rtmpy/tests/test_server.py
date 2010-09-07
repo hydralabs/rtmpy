@@ -19,6 +19,7 @@ class SimpleApplication(object):
     name = None
 
     ret = None
+    reject = False
 
     def startup(self):
         return self.ret
@@ -30,7 +31,7 @@ class SimpleApplication(object):
         pass
 
     def onConnect(self, client, **kwargs):
-        pass
+        return not self.reject
 
     def connectionAccepted(self, client):
         pass
@@ -388,14 +389,13 @@ class ConnectingTestCase(unittest.TestCase):
         d = self.connect({})
 
         def cb(res):
-            self.fail('errback should be fired')
+            self.assertEqual(res, {
+                'code': 'NetConnection.Connect.Failed',
+                'description': "Bad connect packet (missing 'app' key)",
+                'level': 'error'
+            })
 
-        def eb(fail):
-            fail.trap(exc.ConnectFailed)
-
-            self.assertErrorStatus(description="Bad connect packet (missing 'app' key)")
-
-        d.addCallbacks(cb, eb)
+        d.addCallback(cb)
 
         return d
 
@@ -404,21 +404,21 @@ class ConnectingTestCase(unittest.TestCase):
         If something random goes wrong, make sure the status is correctly set.
         """
         def bork(*args):
-            raise EnvironmentError
+            raise EnvironmentError('woot')
 
         self.patch(self.protocol, 'onConnect', bork)
 
         d = self.connect({})
 
         def cb(res):
-            self.fail('errback should be fired')
+            self.assertEqual(res, {
+                'code': 'NetConnection.Connect.Failed',
+                'description': 'woot',
+                'level': 'error'
+            })
 
-        def eb(fail):
-            fail.trap(EnvironmentError)
 
-            self.assertErrorStatus()
-
-        d.addCallbacks(cb, eb)
+        d.addCallback(cb)
 
         return d
 
@@ -428,16 +428,13 @@ class ConnectingTestCase(unittest.TestCase):
         d = self.connect({'app': 'what'})
 
         def cb(res):
-            self.fail('errback should be fired')
+            self.assertEqual(res, {
+                'code': 'NetConnection.Connect.InvalidApp',
+                'description': "Unknown application 'what'",
+                'level': 'error'
+            })
 
-        def eb(fail):
-            fail.trap(exc.InvalidApplication)
-
-            self.assertErrorStatus(
-                code='NetConnection.Connect.InvalidApp',
-                description="Unknown application 'what'")
-
-        d.addCallbacks(cb, eb)
+        d.addCallback(cb)
 
         return d
 
@@ -470,7 +467,7 @@ class ConnectingTestCase(unittest.TestCase):
             self.assertEqual(whenDone, None)
 
             self.assertMessage(msg, message.UPSTREAM_BANDWIDTH,
-                bandwidth=2500000L)
+                bandwidth=2500000L, extra=2)
 
             stream, msg, whenDone = self.messages.pop(0)
 
@@ -481,6 +478,27 @@ class ConnectingTestCase(unittest.TestCase):
                 type=0, value1=0, value2=None, value3=None)
 
             self.assertEqual(self.messages, [])
+
+        d.addCallback(check_status)
+
+        return d
+
+    def test_reject(self):
+        a = self.factory.applications['what'] = SimpleApplication()
+        a.reject = True
+
+        d = self.connect({'app': 'what'})
+
+
+        def check_status(res):
+            self.assertEqual(res, {
+                'code': 'NetConnection.Connect.Rejected',
+                'level': 'error',
+                'description': 'Authorization is required'
+            })
+
+            self.assertEqual(self.messages, [])
+
 
         d.addCallback(check_status)
 

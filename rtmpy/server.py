@@ -48,19 +48,17 @@ class ServerControlStream(rtmp.ControlStream):
 
         def eb(fail):
             """
-            Called when an error occurred when asking the application to validate
-            the connection request.
+            Called when an error occurred when asking the application to
+            validate the connection request.
             """
-            code = getattr(fail.type, 'code', 'NetConnection.Connect.Failed')
+            code = getattr(fail.value, 'code', 'NetConnection.Connect.Failed')
             description = fail.getErrorMessage() or 'Internal Server Error'
 
-            self.sendStatus(code, level='error', description=description)
-
-            return fail
+            return dict(code=code, description=description, level='error')
 
         d = defer.maybeDeferred(self.protocol.onConnect, *(args,))
 
-        d.addErrback(eb).addCallback(cb)
+        d.addCallback(cb).addErrback(eb)
 
         return d
 
@@ -298,13 +296,6 @@ class ServerProtocol(rtmp.RTMPProtocol):
                 raise exc.ConnectRejected('Authorization is required')
 
             self.application.connectionAccepted(self.client)
-
-        def eb(f):
-            print 'failed app.onConnect', f
-            return status.status(
-                code='NetConnection.Connect.Failed',
-                description='Internal Server Error'
-            )
 
         d = defer.maybeDeferred(self.application.onConnect, self.client, **args)
 

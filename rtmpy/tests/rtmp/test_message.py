@@ -243,24 +243,10 @@ class NotifyTestCase(BaseTestCase):
         self.assertEquals(e.__dict__, {'name': 'foo',
             'argv': [{'baz': 'gak', 'spam': 'eggs'}, 'yar']})
 
-    def test_amf0(self):
-        e = message.Notify()
-
-        e.encode(self.buffer, encoding=pyamf.AMF0)
-
-        self.assertEquals(self.buffer.getvalue(), '\x05')
-
-    def test_amf3(self):
-        e = message.Notify()
-
-        e.encode(self.buffer, encoding=pyamf.AMF3)
-
-        self.assertEquals(self.buffer.getvalue(), '\x01')
-
     def test_encode(self):
         e = message.Notify('_result', 2, {'foo': 'bar', 'baz': 'gak'})
 
-        e.encode(self.buffer, encoding=pyamf.AMF0)
+        e.encode(self.buffer)
 
         self.assertEqual(self.buffer.getvalue(), '\x02\x00\x07_result\x00@\x00'
             '\x00\x00\x00\x00\x00\x00\x03\x00\x03foo\x02\x00\x03bar\x00\x03baz'
@@ -270,7 +256,7 @@ class NotifyTestCase(BaseTestCase):
         e = message.Notify()
 
         self.buffer.append('\x05\x03\x00\x00\t')
-        e.decode(self.buffer, encoding=pyamf.AMF0)
+        e.decode(self.buffer)
 
         self.assertEquals(e.name, None)
         self.assertEquals(e.argv, [{}])
@@ -282,7 +268,7 @@ class NotifyTestCase(BaseTestCase):
         self.buffer.append('\x02\x00\x07_result\x03\x00\x03foo\x02\x00\x03bar'
             '\x00\x03baz\x02\x00\x03gak\x00\x00\t')
 
-        e.decode(self.buffer, encoding=pyamf.AMF0)
+        e.decode(self.buffer)
 
         self.assertEquals(e.name, '_result')
         self.assertEquals(e.argv, [{'foo': 'bar', 'baz': 'gak'}])
@@ -307,24 +293,10 @@ class InvokeTestCase(BaseTestCase):
         self.assertEquals(e.__dict__, {'name': 'foo', 'id': 'bar',
             'argv': [{'baz': 'gak', 'spam': 'eggs'}, 'yar']})
 
-    def test_amf0(self):
-        e = message.Invoke()
-
-        e.encode(self.buffer, encoding=pyamf.AMF0)
-
-        self.assertEquals(self.buffer.getvalue(), '\x05\x05')
-
-    def test_amf3(self):
-        e = message.Invoke()
-
-        e.encode(self.buffer, encoding=pyamf.AMF3)
-
-        self.assertEquals(self.buffer.getvalue(), '\x01\x01')
-
     def test_encode(self):
         e = message.Invoke('_result', 2, {'foo': 'bar', 'baz': 'gak'})
 
-        e.encode(self.buffer, encoding=pyamf.AMF0)
+        e.encode(self.buffer)
 
         self.assertEqual(self.buffer.getvalue(), '\x02\x00\x07_result\x00@\x00'
             '\x00\x00\x00\x00\x00\x00\x03\x00\x03foo\x02\x00\x03bar\x00\x03baz'
@@ -334,7 +306,7 @@ class InvokeTestCase(BaseTestCase):
         e = message.Invoke()
 
         self.buffer.append('\x05\x05\x03\x00\x00\t')
-        e.decode(self.buffer, encoding=pyamf.AMF0)
+        e.decode(self.buffer)
 
         self.assertEquals(e.name, None)
         self.assertEquals(e.id, None)
@@ -348,7 +320,7 @@ class InvokeTestCase(BaseTestCase):
             '\x00\x03\x00\x03foo\x02\x00\x03bar\x00\x03baz\x02\x00\x03gak\x00'
             '\x00\t')
 
-        e.decode(self.buffer, encoding=pyamf.AMF0)
+        e.decode(self.buffer)
 
         self.assertEquals(e.name, '_result')
         self.assertEquals(e.id, 2)
