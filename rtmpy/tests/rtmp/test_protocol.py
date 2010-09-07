@@ -390,6 +390,24 @@ class BasicResponseTestCase(ProtocolTestCase):
         self.assertEqual(msg.name, 'onStatus')
         self.assertEqual(msg.argv, ['foo', {'code': 'blarg', 'level': 'status', 'one': 1, 'two': 'two'}])
 
+    def test_send_status_no_args(self):
+        """
+        If not supplied, the resulting L{message.Invoke} should result in
+        C{argv=[None, {'code': ...}
+        """
+        self.control.sendStatus('spam')
+
+        stream, msg, whenDone = self.messages.pop(0)
+
+        self.assertEqual(self.messages, [])
+        self.assertIdentical(stream, self.control)
+        self.assertEqual(whenDone, None)
+
+        self.assertIsInstance(msg, message.Invoke)
+        self.assertEqual(msg.id, 0)
+        self.assertEqual(msg.name, 'onStatus')
+        self.assertEqual(msg.argv, [None, {'code': 'spam', 'level': 'status'}])
+
 
 class InvokableStream(rtmp.Stream):
     """

@@ -59,10 +59,12 @@ class Stream(object):
         kwargs.setdefault('level', 'status')
         kwargs['code'] = code
 
+        if not args:
+            args = (None,)
+
         msg = message.Invoke('onStatus', 0, *list(args) + [kwargs])
 
         self.sendMessage(msg)
-
 
     def setTimestamp(self, timestamp, relative=True):
         """
