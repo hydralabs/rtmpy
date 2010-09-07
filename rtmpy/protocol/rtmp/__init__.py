@@ -100,15 +100,11 @@ class Stream(object):
 
             raise RuntimeError('Missing activeInvoke for id %r' % (id_,))
 
-        isinstance(d, defer.Deferred)
-
         def write_error(fail):
-            isinstance(fail, failure.Failure)
-
             code = getattr(fail.type, 'code', 'NetConnection.Call.Failed')
 
             msg = message.Invoke('_error', id_, None, {
-                'level': 'status',
+                'level': 'error',
                 'code': code,
                 'description': fail.getErrorMessage()
             })

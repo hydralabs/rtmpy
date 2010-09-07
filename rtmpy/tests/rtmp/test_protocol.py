@@ -6,7 +6,7 @@ Tests for L{rtmpy.protocol.rtmp}
 """
 
 from twisted.trial import unittest
-from twisted.internet import error, defer, task
+from twisted.internet import error, defer, task, reactor
 from twisted.test.proto_helpers import StringTransportWithDisconnection
 
 from rtmpy.protocol import rtmp
@@ -489,7 +489,7 @@ class InvokingTestCase(ProtocolTestCase):
             self.assertEqual(i.argv, [None, {
                 'code': 'NetConnection.Call.Failed',
                 'description': "Unknown method 'foo'",
-                'level': 'status'}])
+                'level': 'error'}])
 
         d.addCallbacks(cb, eb).addCallback(check_messages)
 
@@ -527,3 +527,113 @@ class InvokingTestCase(ProtocolTestCase):
         d.addCallback(check_messages)
 
         return d
+
+    def test_failure_response(self):
+        """
+        Test a successful invocation but that raises an error.
+        """
+        def func():
+            raise RuntimeError('spam and eggs please')
+
+        self.targets['foo'] = func
+
+        self.assertEqual(self.stream.getInvokableTarget('foo'), func)
+
+        d = self.stream.onInvoke('foo', 1, [], 0)
+        self.assertIsInstance(d, defer.Deferred)
+
+        def eb(fail):
+            fail.trap(RuntimeError)
+
+        def check_messages(res):
+            msg = self.messages.pop(0)
+
+            self.assertEqual(self.messages, [])
+
+            self.assertIdentical(msg[0], self.stream)
+            self.assertEqual(msg[2], None)
+
+            i = msg[1]
+
+            self.assertIsInstance(i, message.Invoke)
+            self.assertEqual(i.id, 1)
+            self.assertEqual(i.name, '_error')
+            self.assertEqual(i.argv, [None, {
+                'code': 'NetConnection.Call.Failed',
+                'description': 'spam and eggs please',
+                'level': 'error'}])
+
+        d.addErrback(eb).addCallback(check_messages)
+
+        return d
+
+    def test_args(self):
+        """
+        Pass args to the target
+        """
+        def func(a, b, c):
+            self.assertEqual(a, 'foo')
+            self.assertEqual(b, 'bar')
+            self.assertEqual(c, 'baz')
+
+        self.targets['foo'] = func
+
+        self.assertEqual(self.stream.getInvokableTarget('foo'), func)
+
+        d = self.stream.onInvoke('foo', 1, ['foo', 'bar', 'baz'], 0)
+        self.assertIsInstance(d, defer.Deferred)
+
+        def check_messages(res):
+            self.assertNotEqual(self.messages, [])
+
+        d.addCallback(check_messages)
+
+        return d
+
+    def test_deferred(self):
+        """
+        Await the response of a deferred
+        """
+        wait_ok = defer.Deferred()
+        my_deferred = defer.Deferred()
+
+        def check_messages(res):
+            msg = self.messages.pop(0)
+
+            self.assertEqual(self.messages, [])
+
+            self.assertIdentical(msg[0], self.stream)
+            self.assertEqual(msg[2], None)
+
+            i = msg[1]
+
+            self.assertIsInstance(i, message.Invoke)
+            self.assertEqual(i.id, 1)
+            self.assertEqual(i.name, '_result')
+            self.assertEqual(i.argv, [None, 'foo'])
+
+        def wrap_ok(res):
+            try:
+                check_messages(res)
+            except:
+                wait_ok.errback()
+            else:
+                wait_ok.callback(res)
+
+        def func():
+            def join():
+                my_deferred.callback('foo')
+                reactor.callLater(0, my_deferred.addCallback, wrap_ok)
+
+            reactor.callLater(0, join)
+
+            return my_deferred
+
+        self.targets['foo'] = func
+
+        self.assertEqual(self.stream.getInvokableTarget('foo'), func)
+
+        d = self.stream.onInvoke('foo', 1, [], 0)
+        self.assertIsInstance(d, defer.Deferred)
+
+        return wait_ok
