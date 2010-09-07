@@ -177,19 +177,29 @@ class ControlStream(Stream):
         self.encoder = self.protocol.encoder
 
     def onFrameSize(self, size, timestamp):
-        self.protocol.setFrameSize(size)
+        """
+        Called when the peer sets its RTMP frame size
 
-    def onDownstreamBandwidth(self, *args):
-        print 'dsbw', args
+        @param size: The new size of any RTMP frames sent from the peer.
+        @param timestamp: Time this message was received.
+        """
+        self.decoder.setFrameSize(size)
 
-    def onUpstreamBandwidth(self, *args):
-        print 'usbw', args
+    def onDownstreamBandwidth(self, bandwidth, timestamp):
+        """
+        """
 
-    def onControlMessage(self, *args):
-        print 'cm', args
+    def onUpstreamBandwidth(self, bandwidth, extra, timestamp):
+        """
+        """
 
-    def onBytesRead(self, *args):
-        print 'bytes-read', args
+    def onControlMessage(self, msg, timestamp):
+        """
+        """
+
+    def onBytesRead(self, bytes, timestamp):
+        """
+        """
 
 
 class DecodingDispatcher(object):
