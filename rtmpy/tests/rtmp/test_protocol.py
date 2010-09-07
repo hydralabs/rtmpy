@@ -340,6 +340,8 @@ class BasicResponseTestCase(ProtocolTestCase):
 
         self.patch(self.protocol, 'sendMessage', send_message)
 
+        self.control = self.protocol.getStream(0)
+
     def test_send_bytes_read(self):
         """
         Tests to ensure that the bytes read keep alive packet is dispatched
@@ -373,6 +375,20 @@ class BasicResponseTestCase(ProtocolTestCase):
 
         self.assertEqual(self.decoder.frameSize, 50)
         self.assertEqual(self.messages, [])
+
+    def test_sendStatus(self):
+        self.control.sendStatus('blarg', 'foo', one=1, two='two')
+
+        stream, msg, whenDone = self.messages.pop(0)
+
+        self.assertEqual(self.messages, [])
+        self.assertIdentical(stream, self.control)
+        self.assertEqual(whenDone, None)
+
+        self.assertIsInstance(msg, message.Invoke)
+        self.assertEqual(msg.id, 0)
+        self.assertEqual(msg.name, 'onStatus')
+        self.assertEqual(msg.argv, ['foo', {'code': 'blarg', 'level': 'status', 'one': 1, 'two': 'two'}])
 
 
 class InvokableStream(rtmp.Stream):

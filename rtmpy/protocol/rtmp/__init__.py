@@ -36,10 +36,6 @@ class RemoteCallFailed(failure.Failure):
     """
 
 
-    """
-
-    """
-
 class Stream(object):
 
     def __init__(self, protocol, streamId):
@@ -55,6 +51,18 @@ class Stream(object):
         self.timestamp = 0
         self.lastInvokeId = -1
         self.activeInvokes = {}
+
+    def sendStatus(self, code, *args, **kwargs):
+        """
+        Informs the peer of a change of status.
+        """
+        kwargs.setdefault('level', 'status')
+        kwargs['code'] = code
+
+        msg = message.Invoke('onStatus', 0, *list(args) + [kwargs])
+
+        self.sendMessage(msg)
+
 
     def setTimestamp(self, timestamp, relative=True):
         """
