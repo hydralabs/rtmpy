@@ -23,42 +23,42 @@ class ServerControlStream(rtmp.ControlStream):
 
         self.application = self.protocol.application
 
-    def _onConnectCB(self, res):
-        """
-        Called when the connect packet has been accepted by the application.
-        """
-        f = self.protocol.factory
-
-        self.sendMessage(
-            message.DownstreamBandwidth(f.downstreamBandwidth))
-        self.sendMessage(
-            message.DownstreamBandwidth(f.upstreamBandwidth))
-        self.sendMessage(
-            message.ControlMessage(0, 0))
-
-        self.sendStatus({'fmsVer': f.fmsVer, 'capabilities': 31},
-            code='NetConnection.Connect.Success',
-            description='Connection succeeded.',
-            objectEncoding=self.protocol.objectEncoding)
-
-        return res
-
-    def _onConnectEB(self, fail):
-        """
-        Called when an error occurred when asking the application to validate
-        the connection request.
-        """
-        self.sendStatus(
-            level='error',
-            code='NetConnection.Connect.Failed',
-            description='Internal Server Error')
-
-        return fail
-
     def onConnect(self, *args):
+        def cb(res):
+            """
+            Called when the connect packet has been accepted by the application.
+            """
+            f = self.protocol.factory
+
+            self.sendMessage(
+                message.DownstreamBandwidth(f.downstreamBandwidth))
+            self.sendMessage(
+                message.DownstreamBandwidth(f.upstreamBandwidth))
+            self.sendMessage(
+                message.ControlMessage(0, 0))
+
+            self.sendStatus('NetConnection.Connect.Success',
+                {'fmsVer': f.fmsVer, 'capabilities': 31},
+                description='Connection succeeded.',
+                objectEncoding=self.protocol.objectEncoding)
+
+            return res
+
+        def eb(fail):
+            """
+            Called when an error occurred when asking the application to validate
+            the connection request.
+            """
+            self.sendStatus(
+                level='error',
+                code='NetConnection.Connect.Failed',
+                description='Internal Server Error')
+
+            return fail
+
         d = defer.maybeDeferred(self.protocol.onConnect, *args)
 
-        d.addErrback(self._onConnectEB).addCallback(self._onConnectCB)
+        d.addErrback(eb).addCallback(cb)
 
         return d
 
