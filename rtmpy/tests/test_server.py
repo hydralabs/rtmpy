@@ -296,7 +296,7 @@ class ConnectingTestCase(unittest.TestCase):
 
         self.control = self.protocol.getStream(0)
 
-    def assertErrorStatus(self, code=None, description=None):
+    def assertStatus(self, code=None, description=None, level='status'):
         """
         Ensures that a status message has been sent.
         """
@@ -314,9 +314,25 @@ class ConnectingTestCase(unittest.TestCase):
 
         self.assertEqual(_, None)
 
-        self.assertEqual(args['code'], code or 'NetConnection.Connect.Failed')
-        self.assertEqual(args['description'], description or 'Internal Server Error')
-        self.assertEqual(args['level'], 'error')
+        if code is not None:
+            self.assertEqual(args['code'], code)
+
+        if description is not None:
+            self.assertEqual(args['description'], description)
+
+        self.assertEqual(args['level'], level)
+
+    def assertErrorStatus(self, code=None, description=None):
+        """
+        Ensures that a status message has been sent.
+        """
+        if code is None:
+            code = 'NetConnection.Connect.Failed'
+
+        if description is None:
+            description = 'Internal Server Error'
+
+        self.assertStatus(code, description, 'error')
 
     def connect(self, packet):
         return self.control.onConnect(packet)
@@ -401,3 +417,8 @@ class ConnectingTestCase(unittest.TestCase):
         d.addCallbacks(cb, eb)
 
         return d
+
+    def test_success(self):
+        """
+        Ensure a successful connection
+        """
