@@ -166,6 +166,14 @@ class Stream(object):
             d.errback()
             func = None
 
+        try:
+            if args[0] is not None:
+                log.msg('Invoke %r has first arg of %r' % (name, args[0]))
+
+            args = args[1:]
+        except IndexError:
+            pass
+
         if func is None:
             d.errback(exc.CallFailed('Unknown method %r' % (name,)))
         else:
