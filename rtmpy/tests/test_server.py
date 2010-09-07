@@ -7,6 +7,7 @@ from twisted.internet import defer, reactor, protocol
 from twisted.test.proto_helpers import StringTransport, StringIOWithoutClosing
 
 from rtmpy import server, exc
+from rtmpy.protocol.rtmp import message
 
 
 class SimpleApplication(object):
@@ -286,10 +287,43 @@ class ConnectingTestCase(unittest.TestCase):
         self.protocol.connectionMade()
         self.protocol.handshakeSuccess('')
 
+        self.messages = []
+
+        def send_message(*args):
+            self.messages.append(args)
+
+        self.patch(self.protocol, 'sendMessage', send_message)
+
         self.control = self.protocol.getStream(0)
 
+    def assertErrorStatus(self, code=None, description=None):
+        """
+        Ensures that a status message has been sent.
+        """
+        stream, msg, whenDone = self.messages.pop(0)
+
+        self.assertEqual(self.messages, [])
+
+        self.assertIdentical(stream, self.control)
+        self.assertEqual(whenDone, None)
+
+        self.assertIsInstance(msg, message.Invoke)
+        self.assertEqual(msg.name, 'onStatus')
+
+        _, args = msg.argv
+
+        self.assertEqual(_, None)
+
+        self.assertEqual(args['code'], code or 'NetConnection.Connect.Failed')
+        self.assertEqual(args['description'], description or 'Internal Server Error')
+        self.assertEqual(args['level'], 'error')
+
     def connect(self, packet):
-        return self.protocol.onConnect(packet)
+        return self.control.onConnect(packet)
+
+    def test_invokable_target(self):
+        self.assertEqual(self.control.getInvokableTarget('connect'),
+            self.control.onConnect)
 
     def test_invoke(self):
         """
@@ -312,4 +346,58 @@ class ConnectingTestCase(unittest.TestCase):
         """
         RTMP connect packets contain {'app': 'name_of_app'}.
         """
-        self.assertRaises(exc.ConnectFailed, self.connect, {})
+        d = self.connect({})
+
+        def cb(res):
+            self.fail('errback should be fired')
+
+        def eb(fail):
+            fail.trap(exc.ConnectFailed)
+
+            self.assertErrorStatus(description="Bad connect packet (missing 'app' key)")
+
+        d.addCallbacks(cb, eb)
+
+        return d
+
+    def test_random_failure(self):
+        """
+        If something random goes wrong, make sure the status is correctly set.
+        """
+        def bork(*args):
+            raise EnvironmentError
+
+        self.patch(self.protocol, 'onConnect', bork)
+
+        d = self.connect({})
+
+        def cb(res):
+            self.fail('errback should be fired')
+
+        def eb(fail):
+            fail.trap(EnvironmentError)
+
+            self.assertErrorStatus()
+
+        d.addCallbacks(cb, eb)
+
+        return d
+
+    def test_unknown_application(self):
+        self.assertEqual(self.factory.getApplication('what'), None)
+
+        d = self.connect({'app': 'what'})
+
+        def cb(res):
+            self.fail('errback should be fired')
+
+        def eb(fail):
+            fail.trap(exc.InvalidApplication)
+
+            self.assertErrorStatus(
+                code='NetConnection.Connect.InvalidApp',
+                description="Unknown application 'what'")
+
+        d.addCallbacks(cb, eb)
+
+        return d

@@ -49,10 +49,10 @@ class ServerControlStream(rtmp.ControlStream):
             Called when an error occurred when asking the application to validate
             the connection request.
             """
-            self.sendStatus(
-                level='error',
-                code='NetConnection.Connect.Failed',
-                description='Internal Server Error')
+            code = getattr(fail.type, 'code', 'NetConnection.Connect.Failed')
+            description = fail.getErrorMessage() or 'Internal Server Error'
+
+            self.sendStatus(code, level='error', description=description)
 
             return fail
 
