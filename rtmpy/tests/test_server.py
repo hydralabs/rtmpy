@@ -26,6 +26,15 @@ class SimpleApplication(object):
     def shutdown(self):
         return self.ret
 
+    def buildClient(self, stream):
+        pass
+
+    def onConnect(self, client, **kwargs):
+        pass
+
+    def connectionAccepted(self, client):
+        pass
+
 
 class ApplicationRegisteringTestCase(unittest.TestCase):
     """
@@ -334,6 +343,20 @@ class ConnectingTestCase(unittest.TestCase):
 
         self.assertStatus(code, description, 'error')
 
+    def assertMessage(self, msg, type_, **state):
+        """
+        Ensure that the msg is of a particular type and state
+        """
+        self.assertEqual(msg.RTMP_TYPE, type_)
+
+        d = msg.__dict__
+
+        for k, v in state.copy().iteritems():
+            self.assertEqual(v, d[k])
+            del state[k]
+
+        self.assertEqual(state, {})
+
     def connect(self, packet):
         return self.control.onConnect(packet)
 
@@ -422,3 +445,43 @@ class ConnectingTestCase(unittest.TestCase):
         """
         Ensure a successful connection
         """
+        self.factory.applications['what'] = SimpleApplication()
+
+        d = self.connect({'app': 'what'})
+
+        def check_status(res):
+            self.assertEqual(res, {
+                'code': 'NetConnection.Connect.Success',
+                'objectEncoding': 0,
+                'description': 'Connection succeeded.'
+            })
+
+            stream, msg, whenDone = self.messages.pop(0)
+
+            self.assertIdentical(stream, self.control)
+            self.assertEqual(whenDone, None)
+
+            self.assertMessage(msg, message.DOWNSTREAM_BANDWIDTH,
+                bandwidth=2500000L)
+
+            stream, msg, whenDone = self.messages.pop(0)
+
+            self.assertIdentical(stream, self.control)
+            self.assertEqual(whenDone, None)
+
+            self.assertMessage(msg, message.UPSTREAM_BANDWIDTH,
+                bandwidth=2500000L)
+
+            stream, msg, whenDone = self.messages.pop(0)
+
+            self.assertIdentical(stream, self.control)
+            self.assertEqual(whenDone, None)
+
+            self.assertMessage(msg, message.CONTROL,
+                type=0, value1=0, value2=None, value3=None)
+
+            self.assertEqual(self.messages, [])
+
+        d.addCallback(check_status)
+
+        return d
