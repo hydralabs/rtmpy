@@ -18,7 +18,8 @@ into fixed size body chunks.
 """
 
 from twisted.python import log, failure
-from twisted.internet import protocol, task
+from twisted.internet import protocol, task, defer
+import pyamf
 from pyamf.util import BufferedByteStream
 
 from rtmpy.protocol import handshake, version
