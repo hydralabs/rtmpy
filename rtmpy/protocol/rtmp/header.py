@@ -100,9 +100,6 @@ def getHeaderSize(header):
         return 8
 
     if header.timestamp is not None:
-        # XXX : What should happen if header.streamId or header.datatype is
-        # set? Whilst not strictly an error, it could be the result of some
-        # corruption elsewhere.
         return 4
 
     return 1
