@@ -372,3 +372,63 @@ class BasicResponseTestCase(ProtocolTestCase):
 
         self.assertEqual(self.decoder.frameSize, 50)
         self.assertEqual(self.messages, [])
+
+
+class InvokableStream(rtmp.Stream):
+    """
+    """
+
+    targets = {}
+
+    def getInvokableTarget(self, name):
+        return self.targets.get(name, None)
+
+
+class InvokingTestCase(ProtocolTestCase):
+    """
+    """
+
+    def setUp(self):
+        ProtocolTestCase.setUp(self)
+
+        self.stream = InvokableStream(self.protocol, 3)
+
+    def test_init(self):
+        """
+        Stream creation defaults.
+        """
+        self.assertEqual(self.stream.activeInvokes, {})
+        self.assertEqual(self.stream.lastInvokeId, -1)
+
+    def test_reset(self):
+        """
+        Stream reset defaults.
+        """
+        self.stream.activeInvokes = 'woo'
+        self.stream.lastInvokeId = 'blarg'
+
+        self.stream.reset()
+
+        self.assertEqual(self.stream.activeInvokes, {})
+        self.assertEqual(self.stream.lastInvokeId, -1)
+
+    def test_missing_target(self):
+        """
+        """
+        self.assertEqual(self.stream.getInvokableTarget('foo'), None)
+
+        d = self.stream.onInvoke('foo', 0, [], 0)
+
+        self.assertIsInstance(d, defer.Deferred)
+
+        def cb(res):
+            self.fail('errback should be called')
+
+        def eb(fail):
+            fail.trap(rtmp.ConnectFailed)
+
+            self.assertEqual(fail.getErrorMessage(), "Unknown method 'foo'")
+
+        d.addCallbacks(cb, eb)
+
+        return d

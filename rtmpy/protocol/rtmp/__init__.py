@@ -29,6 +29,21 @@ from rtmpy.protocol.rtmp import message, codec
 MAX_STREAMS = 0xffff
 
 
+class NetConnectionError(Exception):
+    """
+    """
+
+
+class ConnectError(NetConnectionError):
+    """
+    """
+
+
+class ConnectFailed(ConnectError):
+    """
+    """
+
+    code = 'NetConnection.Connect.Failed'
 class Stream(object):
 
     def __init__(self, protocol, streamId):
@@ -36,6 +51,14 @@ class Stream(object):
         self.streamId = streamId
 
         self.timestamp = 0
+        self.lastInvokeId = -1
+        self.activeInvokes = {}
+
+    def reset(self):
+        # TODO: check active invokes and errback
+        self.timestamp = 0
+        self.lastInvokeId = -1
+        self.activeInvokes = {}
 
     def setTimestamp(self, timestamp, relative=True):
         """
@@ -68,7 +91,50 @@ class Stream(object):
         self.protocol.sendMessage(self, msg, whenDone)
 
     def onInvoke(self, name, id_, args, timestamp):
-        print 'invoke', args
+        """
+        Called when an invoke message has been received from the peer. This
+        could be a request or a response depending on whether id_ is 'in use'.
+
+        @return: A deferred containing the result of the invoke call. This is
+            not strictly necessary but useful for testing purposes.
+        @retype: L{defer.Deferred}
+        """
+        d = self.activeInvokes.pop(id_, None)
+
+        if d:
+            # handle the response
+            if name == '_error':
+                d.errback(RemoteCallFailed(args))
+            elif name == '_result':
+                d.callback(*args)
+            else:
+                log.msg('Unhandled name for invoke response %r' % (name,))
+
+            return
+
+        # a request from the peer to call a local method
+        try:
+            func = self.getInvokableTarget(name)
+        except:
+            d = defer.fail()
+        else:
+            if func is None:
+                d = defer.fail(ConnectFailed('Unknown method %r' % (name,)))
+
+        if func:
+            d = defer.maybeDeferred(func, *args)
+
+        if id_ > 0:
+            self.activeInvokes[id_] = d
+
+        d.addBoth(self._handleInvokeResponse, id_)
+
+        return d
+
+    def getInvokableTarget(self, name):
+        """
+        """
+        raise NotImplementedError
 
     def onNotify(self, *args):
         print 'notify', args
