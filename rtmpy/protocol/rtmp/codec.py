@@ -30,9 +30,6 @@ MIN_CHANNEL_ID = 3
 #:
 BYTES_INTERVAL = 0x131800
 
-#: A list of encoded headers
-_ENCODED_CONTINUATION_HEADERS = []
-
 
 class BaseError(Exception):
     """
@@ -555,18 +552,10 @@ class ChannelMuxer(Codec):
         """
         h = self.nextHeaders.pop(channel, None)
 
-        if h is not None:
-            old_header = channel.setHeader(h)
-        else:
-            if channel.channelId < 64:
-                self.stream.write(
-                    _ENCODED_CONTINUATION_HEADERS[channel.channelId])
+        if h:
+            h = channel.setHeader(h)
 
-                return
-
-            old_header = channel.header
-
-        header.encodeHeader(self.stream, h, old_header)
+        header.encodeHeader(self.stream, channel.header, h)
 
     def flush(self):
         raise NotImplementedError
@@ -672,21 +661,3 @@ class Encoder(ChannelMuxer):
         if self.bytes >= self._nextInterval:
             self.dispatcher.bytesInterval(self.bytes)
             self._nextInterval += self.bytesInterval
-
-
-def build_header_continuations():
-    global _ENCODED_CONTINUATION_HEADERS
-
-    s = BufferedByteStream()
-
-    # only generate the first 64 as it is likely that is all we will ever need
-    for i in xrange(0, 64):
-        h = header.Header(i)
-
-        header.encodeHeader(s, h, h)
-
-        _ENCODED_CONTINUATION_HEADERS.append(s.getvalue())
-        s.consume()
-
-
-build_header_continuations()

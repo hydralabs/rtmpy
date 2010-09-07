@@ -247,14 +247,14 @@ class TimestampTestCase(BaseTestCase):
         self.encoder.next()
 
         self.output.seek(0)
-        self.assertEqual(self.output.read(4), '\x43\x00\x00\x0f')
+        self.assertEqual(self.output.read(), '\x43\x00\x00\x0f\x00\x00\x00\x07')
         self.output.truncate()
 
-        self.encoder.send('', 8, 0, 15)
+        self.encoder.send('', 7, 0, 15)
         self.encoder.next()
 
         self.output.seek(0)
-        self.assertEqual(self.output.read(8), '\x43\x00\x00\x00\x00\x00\x00\x08')
+        self.assertEqual(self.output.read(), '\x83\x00\x00\x00')
         self.output.truncate()
 
 

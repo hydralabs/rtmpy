@@ -18,6 +18,9 @@ __all__ = [
 ENCODE_HEADER_SIZES = {12: 0, 8: 1, 4: 2, 1: 3}
 DECODE_HEADER_SIZES = [12, 8, 4, 1]
 
+#: A list of encoded headers
+_ENCODED_CONTINUATION_HEADERS = []
+
 
 class HeaderError(Exception):
     """
@@ -152,6 +155,11 @@ def encodeHeader(stream, header, previous=None):
     else:
         size = header.diff(previous)
 
+    if size == 1 and header.channelId < 64:
+        stream.write(_ENCODED_CONTINUATION_HEADERS[header.channelId])
+
+        return
+
     encodeChannelId(stream, size, header.channelId)
 
     if size >= 4:
@@ -229,3 +237,21 @@ def decodeHeader(stream):
         header.timestamp = stream.read_ulong()
 
     return header
+
+
+def build_header_continuations():
+    global _ENCODED_CONTINUATION_HEADERS
+
+    from pyamf.util import BufferedByteStream
+
+    s = BufferedByteStream()
+
+    # only generate the first 64 as it is likely that is all we will ever need
+    for i in xrange(0, 64):
+        encodeChannelId(s, 1, i)
+
+        _ENCODED_CONTINUATION_HEADERS.append(s.getvalue())
+        s.consume()
+
+
+build_header_continuations()
