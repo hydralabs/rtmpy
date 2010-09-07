@@ -6,6 +6,7 @@
 
    community/index.rst
    architecture/index.rst
+   tutorials/index.rst
    whatsnew/index.rst
 
    install.rst

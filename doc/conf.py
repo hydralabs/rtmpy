@@ -72,7 +72,7 @@ today_fmt = '%B %d, %Y'
 
 # List of patterns, relative to source directory, that match files and
 # directories to ignore when looking for source files.
-exclude_patterns = ['build', 'tutorials/examples']
+exclude_patterns = ['build']
 
 # The reST default role (used for this markup: `text`) to use for all documents.
 #default_role = None
@@ -89,7 +89,7 @@ exclude_patterns = ['build', 'tutorials/examples']
 #show_authors = False
 
 # The name of the Pygments (syntax highlighting) style to use.
-pygments_style = 'sphinx'
+#pygments_style = 'sphinx'
 
 # A list of ignored prefixes for module index sorting.
 #modindex_common_prefix = []
@@ -149,6 +149,7 @@ html_static_path = ['html/static']
 # template names.
 html_additional_pages = {
     'index': 'defindex.html',
+    'tutorials/index': 'tutorials.html',
 }
 
 # If false, no module index is generated.

@@ -1,0 +1,21 @@
+{% extends "page.html" %}
+{% set title = _('Tutorials') %}
+{% block body %}
+
+  <h1>{{ title|e }}</h1>
+
+  <p>{{ project|e }} tutorials are documents that cover a single, specific topic,
+  and attempt to cover it fairly completely. Modelled on Python's
+  HOWTO collection, this collection is an effort to foster
+  documentation that's more detailed than the API documentation.</p>
+
+  <h2>General</h2>
+
+  <table class="contentstable" align="center">
+    <td width="50%">
+      <p><a class="biglink" href="{{ pathto("tutorials/general/helloworld/index") }}">Hello World</a><br/>
+         <span class="linkdescr">The classic example</span></p>
+    </td>
+  </table>
+
+{% endblock %}
