@@ -411,6 +411,7 @@ class BasicResponseTestCase(ProtocolTestCase):
 
 class InvokableStream(rtmp.Stream):
     """
+    Be able to control the targets easily.
     """
 
     targets = {}
