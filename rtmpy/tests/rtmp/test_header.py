@@ -67,93 +67,97 @@ class HeaderTestCase(unittest.TestCase):
             'at 0x%x>' % (id(h),))
 
 
-class EncodeHeaderTestCase(unittest.TestCase):
+class EncodeTestCase(unittest.TestCase):
     """
-    Tests for L{header.encodeHeader}
+    Tests for L{header.encode}
     """
 
     def setUp(self):
         self.stream = util.BufferedByteStream()
 
-    def _encode(self, h, diff=None):
+        self.reset()
+
+    def reset(self):
+        self.old = header.Header(2, 3, 4, 5, 6)
+        self.new = header.Header(2, 3, 4, 5, 6)
+
+    def assertEncoded(self, bytes):
         self.stream.seek(0, 2)
         self.stream.truncate()
-        header.encodeHeader(self.stream, h, diff)
+        header.encode(self.stream, self.new, self.old)
 
-        return self.stream.getvalue()
+        self.assertEqual(self.stream.getvalue(), bytes)
 
-    def test_encode(self):
-        h = header.Header(3)
+    def test_size1(self):
+        self.assertEncoded('\xc2')
 
-        self.assertEquals(
-            [h.timestamp, h.datatype, h.bodyLength, h.streamId],
-            [None, None, None, None])
+        self.old.channelId = self.new.channelId = 21
+        self.assertEncoded('\xd5')
 
-        self.assertEquals(self._encode(h, h), '\xc3')
+    def test_size4(self):
+        self.new.timestamp = 10
 
-        h.channelId = 21
-        self.assertEquals(self._encode(h, h), '\xd5')
+        self.assertEncoded('\x82\x00\x00\n')
 
-        other = header.Header(21)
-        h.timestamp = 234234
-        self.assertEquals(self._encode(h, other), '\x95\x03\x92\xfa')
+    def test_size8(self):
+        self.new.bodyLength = 150
+        self.assertEncoded('B\x00\x00\x03\x00\x00\x96\x04')
 
-        h.datatype = 3
-        h.bodyLength = 31242
-        self.assertEquals(self._encode(h, other), 'U\x03\x92\xfa\x00z\n\x03')
+        self.reset()
 
-        h.streamId = 45
-        self.assertEquals(self._encode(h),
-            '\x15\x03\x92\xfa\x00z\n\x03-\x00\x00\x00')
+        self.new.datatype = 7
+        self.assertEncoded('B\x00\x00\x03\x00\x00\x05\x07')
+
+        # combo
+        self.reset()
+        self.new.bodyLength = 150
+        self.new.datatype = 7
+        self.assertEncoded('B\x00\x00\x03\x00\x00\x96\x07')
+
+    def test_size12(self):
+        self.new.streamId = 15
+        self.assertEncoded('\x02\x00\x00\x03\x00\x00\x05\x04\x0f\x00\x00\x00')
 
     def test_extended_timestamp(self):
-        h = header.Header(34, timestamp=0x1000000, datatype=0, streamId=0, bodyLength=0)
+        self.new.timestamp = 0x1000000
 
-        self.assertEquals(self._encode(h),
-            '\x22\xff\xff\xff\x00\x00\x00\x00\x00\x00\x00\x00\x01\x00\x00\x00')
-
-        h.datatype = 3
-        h.bodyLength = 31242
-        self.assertEquals(self._encode(h),
-            '\x22\xff\xff\xff\x00z\n\x03\x00\x00\x00\x00\x01\x00\x00\x00')
-
-        h.streamId = 45
-        self.assertEquals(self._encode(h),
-            '"\xff\xff\xff\x00z\n\x03-\x00\x00\x00\x01\x00\x00\x00')
+        self.assertEncoded('\x82\xff\xff\xff\x01\x00\x00\x00')
 
     def test_extended_channelid(self):
-        h = header.Header(channelId=3)
+        self.old = self.new
+        h = self.new
 
-        self.assertEquals(self._encode(h, h), '\xc3')
+        h.channelId = 3
+        self.assertEncoded('\xc3')
 
         h.channelId = 63
-        self.assertEquals(self._encode(h, h), '\xff')
+        self.assertEncoded('\xff')
 
         h.channelId = 64
-        self.assertEquals(self._encode(h, h), '\xc0\x00')
+        self.assertEncoded('\xc0\x00')
 
         h.channelId = 65
-        self.assertEquals(self._encode(h, h), '\xc0\x01')
+        self.assertEncoded('\xc0\x01')
 
         h.channelId = 319
-        self.assertEquals(self._encode(h, h), '\xc0\xff')
+        self.assertEncoded('\xc0\xff')
 
         h.channelId = 320
-        self.assertEquals(self._encode(h, h), '\xc1\x00\x01')
+        self.assertEncoded('\xc1\x00\x01')
 
         h.channelId = 65599
-        self.assertEquals(self._encode(h, h), '\xc1\xff\xff')
+        self.assertEncoded('\xc1\xff\xff')
 
 
-class DecodeHeaderTestCase(unittest.TestCase):
+class DecodeTestCase(unittest.TestCase):
     """
-    Tests for L{header.decodeHeader}
+    Tests for L{header.decode}
     """
 
     def _decode(self, s):
         stream = util.BufferedByteStream(s)
 
-        return header.decodeHeader(stream)
+        return header.decode(stream)
 
     def test_decodeSize1(self):
         h = self._decode('\xc3')
@@ -253,53 +257,15 @@ class DecodeHeaderTestCase(unittest.TestCase):
         h = self._decode('\xc1\xff\xff')
         self.assertEqual(h.channelId, 65599)
 
-class DiffHeadersTestCase(unittest.TestCase):
+
+class MergeTestCase(unittest.TestCase):
     """
-    Tests for L{header.diffHeaders}
-    """
-
-    def setUp(self):
-        self.h = header.Header(3, timestamp=1000, bodyLength=2000,
-            datatype=3, streamId=243)
-
-    def diff(self, **kwargs):
-        import copy
-
-        h = copy.copy(self.h)
-
-        for k, v in kwargs.items():
-            setattr(h, k, v)
-
-        return self.h.diff(h)
-
-    def test_sameChannel(self):
-        self.assertRaises(header.HeaderError, self.h.diff, header.Header(4))
-
-    def test_nodiff(self):
-        self.assertEqual(self.h.diff(self.h), 1)
-
-    def test_timestamp(self):
-        self.assertEqual(4, self.diff(timestamp=234234))
-
-    def test_datatype(self):
-        self.assertEqual(8, self.diff(datatype=23))
-
-    def test_bodyLength(self):
-        self.assertEqual(4, self.diff(bodyLength=5))
-
-    def test_streamId(self):
-        self.assertEqual(12, self.diff(streamId=12))
-
-
-class MergeHeadersTestCase(unittest.TestCase):
-    """
-    Tests for L{header.mergeHeaders}
+    Tests for L{header.merge}
     """
 
     def setUp(self):
         self.absolute = header.Header(3, timestamp=1000,
             bodyLength=2000, datatype=3, streamId=243)
-        self.empty = header.Header(3)
 
     def merge(self, **kwargs):
         """
@@ -312,36 +278,39 @@ class MergeHeadersTestCase(unittest.TestCase):
         for k, v in kwargs.items():
             setattr(h, k, v)
 
-        self.absolute.merge(h)
+        return header.merge(self.absolute, h)
+
+    def test_different_channels(self):
+        self.assertRaises(header.HeaderError, self.merge, channelId=4)
 
     def test_timestamp(self):
-        self.merge(timestamp=None)
+        h = self.merge(timestamp=None)
 
-        self.assertEqual(self.absolute.timestamp, 1000)
+        self.assertEqual(h.timestamp, 1000)
 
-        self.merge(timestamp=999)
-        self.assertEqual(self.absolute.timestamp, 999)
+        h = self.merge(timestamp=999)
+        self.assertEqual(h.timestamp, 999)
 
     def test_datatype(self):
-        self.merge(datatype=None)
+        h = self.merge(datatype=None)
 
-        self.assertEqual(self.absolute.datatype, 3)
+        self.assertEqual(h.datatype, 3)
 
-        self.merge(datatype=4)
-        self.assertEqual(self.absolute.datatype, 4)
+        h = self.merge(datatype=4)
+        self.assertEqual(h.datatype, 4)
 
     def test_bodyLength(self):
-        self.merge(bodyLength=None)
+        h = self.merge(bodyLength=None)
 
-        self.assertEqual(self.absolute.bodyLength, 2000)
+        self.assertEqual(h.bodyLength, 2000)
 
-        self.merge(bodyLength=1500)
-        self.assertEqual(self.absolute.bodyLength, 1500)
+        h = self.merge(bodyLength=1500)
+        self.assertEqual(h.bodyLength, 1500)
 
     def test_streamId(self):
-        self.merge(streamId=None)
+        h = self.merge(streamId=None)
 
-        self.assertEqual(self.absolute.streamId, 243)
+        self.assertEqual(h.streamId, 243)
 
-        self.merge(streamId=15)
-        self.assertEqual(self.absolute.streamId, 15)
+        h = self.merge(streamId=15)
+        self.assertEqual(h.streamId, 15)

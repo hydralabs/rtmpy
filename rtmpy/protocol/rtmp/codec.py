@@ -112,12 +112,16 @@ class BaseChannel(object):
         @return: The previous header, if there is one.
         @rtype: L{header.Header} or C{None}
         """
+        old = self.header
+
         if self.header is None:
             self.header = new
         else:
-            self.header.merge(new)
+            self.header = header.merge(self.header, new)
 
         self._bodyRemaining = self.header.bodyLength - self.bytes
+
+        return old
 
     def _adjustFrameRemaining(self, l):
         """
@@ -303,7 +307,7 @@ class FrameReader(Codec):
 
         @rtype: L{header.Header}
         """
-        return header.decodeHeader(self.stream)
+        return header.decode(self.stream)
 
     def send(self, data):
         """
@@ -554,16 +558,18 @@ class ChannelMuxer(Codec):
 
         if h:
             h = channel.setHeader(h)
+        else:
+            h = channel.header
 
-        header.encodeHeader(self.stream, channel.header, h)
+        header.encode(self.stream, channel.header, h)
 
     def flush(self):
         raise NotImplementedError
 
     def send(self, data, datatype, streamId, timestamp, callback=None):
         if message.is_command_type(datatype):
-            # we have to special case command types because a channel be busy
-            # with one message at a time
+            # we have to special case command types because a channel only be
+            # busy with one message at a time
             channel = self.getChannel(2)
         else:
             channel = self.aquireChannel()

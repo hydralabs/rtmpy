@@ -122,7 +122,7 @@ class FrameReaderTestCase(unittest.TestCase):
         full = header.Header(3, datatype=2, bodyLength=2, streamId=1, timestamp=10)
         relative = header.Header(3)
 
-        header.encodeHeader(self.stream, full)
+        header.encode(self.stream, full)
         self.stream.write('a' * 2)
 
         self.stream.seek(0)
@@ -174,16 +174,16 @@ class FrameReaderTestCase(unittest.TestCase):
 
         full = header.Header(3, datatype=2, bodyLength=500, streamId=1, timestamp=10)
 
-        header.encodeHeader(self.stream, full)
+        header.encode(self.stream, full)
         self.stream.write('a' * size)
 
-        header.encodeHeader(self.stream, full, full)
+        header.encode(self.stream, full, full)
         self.stream.write('b' * size)
 
-        header.encodeHeader(self.stream, full, full)
+        header.encode(self.stream, full, full)
         self.stream.write('c' * size)
 
-        header.encodeHeader(self.stream, full, full)
+        header.encode(self.stream, full, full)
         self.stream.write('d' * (size - 12))
 
         self.stream.seek(0)
@@ -217,7 +217,7 @@ class FrameReaderTestCase(unittest.TestCase):
         self.assertIdentical(iter(self.reader), self.reader)
 
         h = header.Header(2, bodyLength=0, datatype=0, timestamp=0, streamId=0)
-        header.encodeHeader(self.stream, h)
+        header.encode(self.stream, h)
 
         self.stream.seek(0)
 
@@ -236,9 +236,9 @@ class FrameReaderTestCase(unittest.TestCase):
         relative_header = header.Header(52, datatype=2, streamId=4,
             bodyLength=256, timestamp=45)
 
-        header.encodeHeader(self.stream, full_header)
+        header.encode(self.stream, full_header)
         self.stream.write('a' * self.reader.frameSize)
-        header.encodeHeader(self.stream, relative_header, full_header)
+        header.encode(self.stream, relative_header, full_header)
         self.stream.write('b' * self.reader.frameSize)
 
         self.stream.seek(0)
