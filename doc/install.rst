@@ -159,4 +159,4 @@ folder.
 .. _Trial:	http://twistedmatrix.com/trac/wiki/TwistedTrial
 .. _Sphinx:     http://sphinx.pocoo.org
 .. _website:    http://rtmpy.org
-.. _Installing Python Modules: http://docs.python.org/inst/inst.html
+.. _Installing Python Modules: http://docs.python.org/install/index.html

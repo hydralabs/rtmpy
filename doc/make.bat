@@ -1,6 +1,6 @@
 @ECHO OFF
 
-REM Command file for Sphinx documentation
+REM Command file for RTMPy documentation
 
 if "%SPHINXBUILD%" == "" (
 	set SPHINXBUILD=sphinx-build

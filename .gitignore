@@ -1,5 +1,7 @@
 RTMPy.egg-info
 *.pyc
+build
+dist
 doc/build
 doc/changelog.rst
 doc/themes

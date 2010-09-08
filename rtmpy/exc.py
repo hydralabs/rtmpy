@@ -1,5 +1,12 @@
+# Copyright (c) The RTMPy Project.
+# See LICENSE.txt for details.
+
 """
+RTMPy exception types.
+
+@since: 0.1
 """
+
 
 class NetConnectionError(Exception):
     """
