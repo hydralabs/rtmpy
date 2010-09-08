@@ -8,8 +8,8 @@ Tests for L{rtmpy.dispatcher}
 from twisted.trial import unittest
 from twisted.internet import defer
 
-from rtmpy.tests import util
 from rtmpy import dispatcher
+
 
 class MethodWrapperTestCase(unittest.TestCase):
     def test_create(self):

@@ -107,7 +107,7 @@ def uptime_darwin():
         result = defer.waitForDeferred(d)
         yield result
 
-        buffer = result.getResult()
+        result.getResult()
 
     get_uptime = defer.deferredGenerator(get_uptime)
 

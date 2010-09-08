@@ -6,9 +6,9 @@ Tests for L{rtmpy.util}
 """
 
 import __builtin__
-import sys, time, warnings
+import sys
+import warnings
 
-from twisted.internet import reactor, defer
 from twisted.trial import unittest
 
 from rtmpy import util

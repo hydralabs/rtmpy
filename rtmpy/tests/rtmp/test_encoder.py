@@ -335,8 +335,6 @@ class CallbackTestCase(BaseTestCase):
         self.assertFalse(self.executed)
         self.encoder.send('a' * 1024, message.VIDEO_DATA, 0, 0, self.cb)
 
-        counter = 0
-
         while True:
             try:
                 self.encoder.next()

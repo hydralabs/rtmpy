@@ -193,8 +193,8 @@ def min_bytes_required(old, new):
         return 1
 
     if old.channelId != new.channelId:
-        raise HeaderError('channelId mismatch on diff self=%r, other=%r' % (
-            self, other))
+        raise HeaderError('channelId mismatch on diff old=%r, new=%r' % (
+            old, new))
 
     if old.streamId != new.streamId:
         return 12

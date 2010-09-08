@@ -22,7 +22,6 @@ from twisted.internet import protocol, task, defer
 import pyamf
 from pyamf.util import BufferedByteStream
 
-from rtmpy.protocol import handshake, version
 from rtmpy.protocol.rtmp import message, codec
 from rtmpy import exc
 

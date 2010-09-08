@@ -6,7 +6,6 @@ Tests for L{rtmpy.protocol.rtmp.message}.
 """
 
 import unittest
-import pyamf
 from pyamf.util import BufferedByteStream
 
 from rtmpy.protocol.rtmp import message
@@ -484,7 +483,7 @@ class UpstreamBandwidthTestCase(BaseTestCase):
         self.buffer.truncate(0)
 
         x = message.UpstreamBandwidth(bandwidth=50, extra=12)
-        e = x.encode(self.buffer)
+        x.encode(self.buffer)
 
         self.assertEquals(self.buffer.getvalue(), '\x00\x00\x00\x32\x0C')
 
@@ -560,7 +559,7 @@ class AudioDataTestCase(BaseTestCase):
     def test_dispatch(self):
         x = message.AudioData('foo')
 
-        ret = x.dispatch(self.listener, 54)
+        x.dispatch(self.listener, 54)
 
         self.assertEquals(self.listener.calls, [('audio', ('foo', 54), {})])
 

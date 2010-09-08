@@ -6,7 +6,7 @@ Server implementation.
 """
 
 from zope.interface import Interface, Attribute, implements
-from twisted.internet import protocol, defer, reactor
+from twisted.internet import protocol, defer
 import pyamf
 
 from rtmpy import util, exc

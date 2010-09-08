@@ -6,7 +6,7 @@ Tests for L{rtmpy.protocol.rtmp}
 """
 
 from twisted.trial import unittest
-from twisted.internet import error, defer, task, reactor
+from twisted.internet import error, defer, reactor
 from twisted.test.proto_helpers import StringTransportWithDisconnection
 
 from rtmpy.protocol import rtmp
@@ -274,14 +274,14 @@ class StreamTestCase(ProtocolTestCase):
         """
         self.executed = False
 
-        def message(stream, message, whenDone):
+        def send_message(stream, message, whenDone):
             self.assertIdentical(self.stream, stream)
             self.assertEqual(message, 'foo')
             self.assertEqual(whenDone, 'bar')
 
             self.executed = True
 
-        self.patch(self.protocol, 'sendMessage', message)
+        self.patch(self.protocol, 'sendMessage', send_message)
 
         self.stream.sendMessage('foo', 'bar')
         self.assertTrue(self.executed)

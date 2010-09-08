@@ -8,7 +8,7 @@ Tests for L{rtmpy.rtmp.codec.header}.
 import unittest
 
 from rtmpy.protocol.rtmp import header
-from rtmpy import util, protocol
+from rtmpy import util
 
 
 class HeaderTestCase(unittest.TestCase):

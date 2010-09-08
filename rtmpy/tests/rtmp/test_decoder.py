@@ -120,7 +120,6 @@ class FrameReaderTestCase(unittest.TestCase):
 
     def test_reset(self):
         full = header.Header(3, datatype=2, bodyLength=2, streamId=1, timestamp=10)
-        relative = header.Header(3)
 
         header.encode(self.stream, full)
         self.stream.write('a' * 2)
