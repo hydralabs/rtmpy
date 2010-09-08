@@ -7,7 +7,6 @@ Tests for L{rtmpy.rtmp.codec.header}.
 
 import unittest
 
-from rtmpy.protocol import interfaces
 from rtmpy.protocol.rtmp import header
 from rtmpy import util, protocol
 
