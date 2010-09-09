@@ -1,5 +1,6 @@
 RTMPy.egg-info
 *.pyc
+_trial_temp
 build
 dist
 doc/build
