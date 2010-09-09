@@ -345,22 +345,20 @@ class FrameReader(Codec):
             channel.setHeader(h)
 
             bytes = channel.marshallOneFrame()
-
-            complete = channel.complete
-
-            if complete:
-                channel.reset()
-
-            return bytes, complete, channel.header
         except IOError:
             self.stream.seek(pos, 0)
 
             if self.stream.at_eof():
                 self.stream.consume()
 
-                raise StopIteration
+            raise StopIteration
 
-            raise
+        complete = channel.complete
+
+        if complete:
+            channel.reset()
+
+        return bytes, complete, channel.header
 
     def __iter__(self):
         return self
