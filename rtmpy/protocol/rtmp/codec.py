@@ -157,6 +157,14 @@ class BaseChannel(object):
 
         return ret
 
+    def setFrameSize(self, size):
+        """
+        """
+        if self.frameRemaining >= self.frameSize:
+            self.frameRemaining = size
+
+        self.frameSize = size
+
     def __repr__(self):
         s = []
         attrs = ['channelId', 'frameRemaining', 'bytes']
@@ -261,7 +269,7 @@ class Codec(object):
         self.frameSize = size
 
         for channel in self.channels.values():
-            channel.frameSize = size
+            channel.setFrameSize(size)
 
     def getChannel(self, channelId):
         """
