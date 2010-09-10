@@ -15,13 +15,6 @@ __all__ = [
     'merge'
 ]
 
-#: The header can come in one of four sizes: 12, 8, 4, or 1 byte(s).
-ENCODE_HEADER_SIZES = {12: 0, 8: 1, 4: 2, 1: 3}
-DECODE_HEADER_SIZES = [12, 8, 4, 1]
-
-#: A list of encoded headers
-_ENCODED_CONTINUATION_HEADERS = []
-
 
 class HeaderError(Exception):
     """
@@ -32,14 +25,12 @@ class HeaderError(Exception):
 class Header(object):
     """
     An RTMP Header. Holds contextual information for an RTMP Channel.
-
-    @see: L{interfaces.IHeader}
     """
 
     __slots__ = ('streamId', 'datatype', 'timestamp', 'bodyLength', 'channelId')
 
-    def __init__(self, channelId, timestamp=None, datatype=None,
-                 bodyLength=None, streamId=None):
+    def __init__(self, channelId, timestamp=-1, datatype=-1,
+                 bodyLength=-1, streamId=-1):
         self.channelId = channelId
         self.timestamp = timestamp
         self.datatype = datatype
@@ -51,6 +42,9 @@ class Header(object):
 
         for k in self.__slots__:
             v = getattr(self, k, None)
+
+            if v == -1:
+                v = None
 
             attrs.append('%s=%r' % (k, v))
 
@@ -67,39 +61,57 @@ def encode(stream, header, previous=None):
 
     We expect the stream to already be in network endian mode.
 
+    The channel id can be encoded in up to 3 bytes. The first byte is special as
+    it contains the size of the rest of the header as described in
+    L{getHeaderSize}.
+
+    0 >= channelId > 64: channelId
+    64 >= channelId > 320: 0, channelId - 64
+    320 >= channelId > 0xffff + 64: 1, channelId - 64 (written as 2 byte int)
+
     @param stream: The stream to write the encoded header.
     @type stream: L{util.BufferedByteStream}
     @param header: The L{Header} to encode.
     @param previous: The previous header (if any).
     """
     if previous is None:
-        size = 12
+        size = 0
     else:
         size = min_bytes_required(header, previous)
 
-    if size == 1 and header.channelId < 64:
-        stream.write(_ENCODED_CONTINUATION_HEADERS[header.channelId])
+    channelId = header.channelId
 
+    if channelId < 64:
+        stream.write_uchar(size | channelId)
+    elif channelId < 320:
+        stream.write_uchar(size)
+        stream.write_uchar(channelId - 64)
+    else:
+        channelId -= 64
+
+        stream.write_uchar(size + 1)
+        stream.write_uchar(channelId & 0xff)
+        stream.write_uchar(channelId >> 0x08)
+
+    if size == 0xc0:
         return
 
-    _encodeChannelId(stream, size, header.channelId)
-
-    if size >= 4:
+    if size <= 0x80:
         if header.timestamp >= 0xffffff:
             stream.write_24bit_uint(0xffffff)
         else:
             stream.write_24bit_uint(header.timestamp)
 
-    if size >= 8:
+    if size <= 0x40:
         stream.write_24bit_uint(header.bodyLength)
         stream.write_uchar(header.datatype)
 
-    if size >= 12:
-        stream.endian = 'little'
+    if size == 0:
+        stream.endian = '<'
         stream.write_ulong(header.streamId)
-        stream.endian = 'network'
+        stream.endian = '!'
 
-    if size >= 4:
+    if size >= 0x40:
         if header.timestamp >= 0xffffff:
             stream.write_ulong(header.timestamp)
 
@@ -117,20 +129,29 @@ def decode(stream):
     @return: The read header from the stream.
     @rtype: L{Header}
     """
-    size, channelId = _decodeChannelId(stream)
+    # read the size and channelId
+    channelId = stream.read_uchar()
+    bits = channelId >> 6
+    channelId &= 0x3f
+
+    if channelId == 0:
+        channelId = stream.read_uchar() + 64
+
+    if channelId == 1:
+        channelId = stream.read_uchar() + 64 + (stream.read_uchar() << 8)
+
     header = Header(channelId)
 
-    if size == 1:
+    if bits == 3:
         return header
 
-    if size >= 4:
-        header.timestamp = stream.read_24bit_uint()
+    header.timestamp = stream.read_24bit_uint()
 
-    if size >= 8:
+    if bits < 2:
         header.bodyLength = stream.read_24bit_uint()
         header.datatype = stream.read_uchar()
 
-    if size >= 12:
+    if bits < 1:
         # streamId is little endian
         stream.endian = '<'
         header.streamId = stream.read_ulong()
@@ -156,22 +177,22 @@ def merge(old, new):
 
     merged = Header(new.channelId)
 
-    if new.streamId is not None:
+    if new.streamId != -1:
         merged.streamId = new.streamId
     else:
         merged.streamId = old.streamId
 
-    if new.bodyLength is not None:
+    if new.bodyLength != -1:
         merged.bodyLength = new.bodyLength
     else:
         merged.bodyLength = old.bodyLength
 
-    if new.datatype is not None:
+    if new.datatype != -1:
         merged.datatype = new.datatype
     else:
         merged.datatype = old.datatype
 
-    if new.timestamp is not None:
+    if new.timestamp != -1:
         merged.timestamp = new.timestamp
     else:
         merged.timestamp = old.timestamp
@@ -190,84 +211,19 @@ def min_bytes_required(old, new):
     @type new: L{Header}
     """
     if old is new:
-        return 1
+        return 0xc0
 
     if old.channelId != new.channelId:
         raise HeaderError('channelId mismatch on diff old=%r, new=%r' % (
             old, new))
 
     if old.streamId != new.streamId:
-        return 12
+        return 0 # full header
 
     if old.datatype == new.datatype and old.bodyLength == new.bodyLength:
         if old.timestamp == new.timestamp:
-            return 1
+            return 0xc0
 
-        return 4
+        return 0x80
 
-    return 8
-
-
-def _encodeChannelId(stream, size, channelId):
-    """
-    Encodes the channel id to the stream.
-
-    The channel id can be encoded in up to 3 bytes. The first byte is special as
-    it contains the size of the rest of the header as described in
-    L{getHeaderSize}.
-
-    0 >= channelId > 64: channelId
-    64 >= channelId > 320: 0, channelId - 64
-    320 >= channelId > 0xffff + 64: 1, channelId - 64 (written as 2 byte int)
-    """
-    first = (ENCODE_HEADER_SIZES[size] << 6) & 0xff
-
-    if channelId < 64:
-        stream.write_uchar(first | channelId)
-    elif channelId < 320:
-        stream.write_uchar(first)
-        stream.write_uchar(channelId - 64)
-    else:
-        channelId -= 64
-
-        stream.write_uchar(first + 1)
-        stream.write_uchar(channelId & 0xff)
-        stream.write_uchar(channelId >> 0x08)
-
-
-def _decodeChannelId(stream):
-    """
-    Decodes the channel id and the size of the header from the stream.
-
-    @return: C{tuple} containing the size of the header and the channel id.
-    @see: L{encodeHeader} for an explanation of how the channelId is encoded.
-    """
-    channelId = stream.read_uchar()
-    bits = channelId >> 6
-    channelId &= 0x3f
-
-    if channelId == 0:
-        channelId = stream.read_uchar() + 64
-
-    if channelId == 1:
-        channelId = stream.read_uchar() + 64 + (stream.read_uchar() << 8)
-
-    return DECODE_HEADER_SIZES[bits], channelId
-
-
-def build_header_continuations():
-    global _ENCODED_CONTINUATION_HEADERS
-
-    from pyamf.util import BufferedByteStream
-
-    s = BufferedByteStream()
-
-    # only generate the first 64 as it is likely that is all we will ever need
-    for i in xrange(0, 64):
-        _encodeChannelId(s, 1, i)
-
-        _ENCODED_CONTINUATION_HEADERS.append(s.getvalue())
-        s.consume()
-
-
-build_header_continuations()
+    return 0x40

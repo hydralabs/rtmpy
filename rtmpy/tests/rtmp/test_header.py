@@ -17,14 +17,14 @@ class HeaderTestCase(unittest.TestCase):
     """
 
     def test_init(self):
-        h = header.Header(None)
+        h = header.Header(3)
 
         expected_attrs = {
-            'channelId': None,
-            'timestamp': None,
-            'datatype': None,
-            'bodyLength': None,
-            'streamId': None
+            'channelId': 3,
+            'timestamp': -1,
+            'datatype': -1,
+            'bodyLength': -1,
+            'streamId':-1
         }
 
         for k, v in expected_attrs.items():
@@ -45,11 +45,11 @@ class HeaderTestCase(unittest.TestCase):
             self.assertEqual(getattr(h, k), v)
 
     def test_repr(self):
-        h = header.Header(None)
+        h = header.Header(3)
 
         self.assertEquals(repr(h), '<rtmpy.protocol.rtmp.header.Header '
             'streamId=None datatype=None timestamp=None bodyLength=None '
-            'channelId=None at 0x%x>' % (id(h),))
+            'channelId=3 at 0x%x>' % (id(h),))
 
         d = {
             'channelId': 1,
@@ -162,27 +162,27 @@ class DecodeTestCase(unittest.TestCase):
         h = self._decode('\xc3')
 
         self.assertEquals(h.channelId, 3)
-        self.assertEquals(h.timestamp, None)
-        self.assertEquals(h.bodyLength, None)
-        self.assertEquals(h.datatype, None)
-        self.assertEquals(h.streamId, None)
+        self.assertEquals(h.timestamp, -1)
+        self.assertEquals(h.bodyLength, -1)
+        self.assertEquals(h.datatype, -1)
+        self.assertEquals(h.streamId, -1)
 
         h = self._decode('\xd5')
 
         self.assertEquals(h.channelId, 21)
-        self.assertEquals(h.timestamp, None)
-        self.assertEquals(h.bodyLength, None)
-        self.assertEquals(h.datatype, None)
-        self.assertEquals(h.streamId, None)
+        self.assertEquals(h.timestamp, -1)
+        self.assertEquals(h.bodyLength, -1)
+        self.assertEquals(h.datatype, -1)
+        self.assertEquals(h.streamId, -1)
 
     def test_decodeSize4(self):
         h = self._decode('\x95\x03\x92\xfa')
 
         self.assertEquals(h.channelId, 21)
         self.assertEquals(h.timestamp, 234234)
-        self.assertEquals(h.bodyLength, None)
-        self.assertEquals(h.datatype, None)
-        self.assertEquals(h.streamId, None)
+        self.assertEquals(h.bodyLength, -1)
+        self.assertEquals(h.datatype, -1)
+        self.assertEquals(h.streamId, -1)
 
     def test_decodeSize8(self):
         h = self._decode('U\x03\x92\xfa\x00z\n\x03')
@@ -191,7 +191,7 @@ class DecodeTestCase(unittest.TestCase):
         self.assertEquals(h.timestamp, 234234)
         self.assertEquals(h.bodyLength, 31242)
         self.assertEquals(h.datatype, 3)
-        self.assertEquals(h.streamId, None)
+        self.assertEquals(h.streamId, -1)
 
     def test_decodeSize12(self):
         h = self._decode('\x15\x03\x92\xfa\x00z\n\x03-\x00\x00\x00')
@@ -207,9 +207,9 @@ class DecodeTestCase(unittest.TestCase):
 
         self.assertEquals(h.channelId, 34)
         self.assertEquals(h.timestamp, 0x1000000)
-        self.assertEquals(h.bodyLength, None)
-        self.assertEquals(h.datatype, None)
-        self.assertEquals(h.streamId, None)
+        self.assertEquals(h.bodyLength, -1)
+        self.assertEquals(h.datatype, -1)
+        self.assertEquals(h.streamId, -1)
 
         h = self._decode('b\xff\xff\xff\x00z\n\x03\x01\x00\x00\x00')
 
@@ -217,7 +217,7 @@ class DecodeTestCase(unittest.TestCase):
         self.assertEquals(h.timestamp, 0x1000000)
         self.assertEquals(h.bodyLength, 31242)
         self.assertEquals(h.datatype, 3)
-        self.assertEquals(h.streamId, None)
+        self.assertEquals(h.streamId, -1)
 
         h = self._decode(
             '"\xff\xff\xff\x00z\n\x03-\x00\x00\x00\x01\x00\x00\x00')
@@ -283,7 +283,7 @@ class MergeTestCase(unittest.TestCase):
         self.assertRaises(header.HeaderError, self.merge, channelId=4)
 
     def test_timestamp(self):
-        h = self.merge(timestamp=None)
+        h = self.merge(timestamp=-1)
 
         self.assertEqual(h.timestamp, 1000)
 
@@ -291,7 +291,7 @@ class MergeTestCase(unittest.TestCase):
         self.assertEqual(h.timestamp, 999)
 
     def test_datatype(self):
-        h = self.merge(datatype=None)
+        h = self.merge(datatype=-1)
 
         self.assertEqual(h.datatype, 3)
 
@@ -299,7 +299,7 @@ class MergeTestCase(unittest.TestCase):
         self.assertEqual(h.datatype, 4)
 
     def test_bodyLength(self):
-        h = self.merge(bodyLength=None)
+        h = self.merge(bodyLength=-1)
 
         self.assertEqual(h.bodyLength, 2000)
 
@@ -307,7 +307,7 @@ class MergeTestCase(unittest.TestCase):
         self.assertEqual(h.bodyLength, 1500)
 
     def test_streamId(self):
-        h = self.merge(streamId=None)
+        h = self.merge(streamId=-1)
 
         self.assertEqual(h.streamId, 243)
 
