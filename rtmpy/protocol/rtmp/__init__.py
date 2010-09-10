@@ -185,7 +185,8 @@ class Stream(object):
             args = args[1:]
 
         if func is None:
-            d.errback(exc.CallFailed('Unknown method %r' % (name,)))
+            if not d.called:
+                d.errback(exc.CallFailed('Unknown method %r' % (name,)))
         else:
             d = defer.maybeDeferred(func, *args)
 
