@@ -10,7 +10,7 @@ from twisted.internet import protocol, defer
 import pyamf
 
 from rtmpy import util, exc
-from rtmpy.protocol.rtmp import message
+from rtmpy.protocol.rtmp import message, expose
 from rtmpy.protocol import rtmp, handshake, version
 
 
@@ -23,6 +23,7 @@ class ServerControlStream(rtmp.ControlStream):
 
         self.application = self.protocol.application
 
+    @expose('connect')
     def onConnect(self, args):
         def cb(res):
             """
@@ -61,12 +62,6 @@ class ServerControlStream(rtmp.ControlStream):
         d.addCallback(cb).addErrback(eb)
 
         return d
-
-    def getInvokableTarget(self, name):
-        if name == 'connect':
-            return self.onConnect
-
-        return rtmp.ControlStream.getInvokableTarget(self, name)
 
 
 class IApplication(Interface):
