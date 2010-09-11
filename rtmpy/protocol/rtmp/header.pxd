@@ -15,8 +15,8 @@ cdef class Header:
 @cython.locals(size=cython.int, channelId=cython.int)
 cpdef object encode(cBufferedByteStream stream, Header header, Header previous=?)
 
-@cython.locals(channelId=cython.int, bits=cython.int)
-cpdef object decode(cBufferedByteStream stream)
+@cython.locals(channelId=cython.int, bits=cython.int, header=Header)
+cpdef Header decode(cBufferedByteStream stream)
 
 @cython.locals(merged=Header)
 cpdef Header merge(Header old, Header new)

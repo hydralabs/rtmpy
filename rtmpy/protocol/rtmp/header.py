@@ -111,7 +111,7 @@ def encode(stream, header, previous=None):
         stream.write_ulong(header.streamId)
         stream.endian = '!'
 
-    if size >= 0x40:
+    if size <= 0x80:
         if header.timestamp >= 0xffffff:
             stream.write_ulong(header.timestamp)
 
@@ -121,8 +121,7 @@ def decode(stream):
     Reads a header from the incoming stream.
 
     A header can be of varying lengths and the properties that get updated
-    depend on the length. A header is relative if the length is not 12,
-    this means that channel lengths and timers get updated accordingly.
+    depend on the length.
 
     @param stream: The byte stream to read the header from.
     @type stream: C{pyamf.util.BufferedByteStream}
