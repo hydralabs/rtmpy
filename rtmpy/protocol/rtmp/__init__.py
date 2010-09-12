@@ -486,7 +486,7 @@ class RTMPProtocol(protocol.Protocol):
         self.application = None
 
         self.decoder = codec.Decoder(DecodingDispatcher(self), self)
-        self.encoder = codec.Encoder(self.transport, EncodingDispatcher())
+        self.encoder = codec.Encoder(self.transport)
 
         self.decoder_task = None
         self.encoder_task = None
