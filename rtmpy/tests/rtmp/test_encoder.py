@@ -12,17 +12,6 @@ from pyamf.util import BufferedByteStream
 from rtmpy.protocol.rtmp import codec, message
 
 
-class MockDispatcher(object):
-    """
-    """
-
-    def __init__(self):
-        self.intervals = []
-
-    def bytesInterval(self, bytes):
-        self.intervals.append(bytes)
-
-
 class BaseTestCase(unittest.TestCase):
     """
     Base functionality for other unit tests.
@@ -30,8 +19,7 @@ class BaseTestCase(unittest.TestCase):
 
     def setUp(self):
         self.output = BufferedByteStream()
-        self.dispatcher = MockDispatcher()
-        self.encoder = codec.Encoder(self.output, self.dispatcher)
+        self.encoder = codec.Encoder(self.output)
 
 
 class EncoderTestCase(BaseTestCase):
@@ -61,15 +49,6 @@ class EncoderTestCase(BaseTestCase):
         self.encoder.next()
 
         self.assertEqual(self.encoder.pending, [])
-
-    def test_interval(self):
-        self.assertEqual(self.encoder.bytes, 0)
-        self.encoder.setBytesInterval(8)
-
-        self.encoder.send('bar', 12, 2, 3)
-        self.encoder.next()
-
-        self.assertEqual(self.dispatcher.intervals, [15])
 
 
 class AquireChannelTestCase(BaseTestCase):

@@ -17,6 +17,9 @@ class MockChannel(object):
     Pretend to be a channel
     """
 
+    def setFrameSize(self, size):
+        self.frameSize = size
+
 
 class ChannelMeta(object):
     """
@@ -154,7 +157,7 @@ class FrameReaderTestCase(unittest.TestCase):
         self.stream.seek(1)
 
         self.assertEqual(self.stream.tell(), 1)
-        self.assertRaises(IOError, self.reader.next)
+        self.assertRaises(StopIteration, self.reader.next)
 
         self.assertEqual(self.stream.tell(), 1)
 
@@ -405,8 +408,7 @@ class BytesIntervalTestCase(unittest.TestCase):
     def setUp(self):
         self.dispatcher = DispatchTester(self)
         self.stream_factory = MockStreamFactory(self)
-        self.decoder = codec.Decoder(self.dispatcher, self.stream_factory,
-            stream=BufferedByteStream())
+        self.decoder = codec.Decoder(self.dispatcher, self.stream_factory)
 
     def getStream(self, streamId):
         return MockStream()

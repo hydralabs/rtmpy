@@ -69,7 +69,7 @@ class ProtocolTestCase(unittest.TestCase):
     """
 
     def setUp(self):
-        self.protocol = rtmp.RTMPProtocol()
+        self.protocol = rtmp.BaseNetConnection()
         self.handshaker = MockHandshakeNegotiator(self, self.protocol)
         self.transport = self.protocol.transport = StringTransportWithDisconnection()
         self.transport.protocol = self.protocol
@@ -241,13 +241,13 @@ class StreamTestCase(ProtocolTestCase):
     def setUp(self):
         ProtocolTestCase.setUp(self)
 
-        self.stream = rtmp.Stream(self.protocol, None)
+        self.stream = rtmp.NetStream(self.protocol, None)
 
     def test_create(self):
         """
         Ensure basic attribute initialisation and constructor args.
         """
-        s = rtmp.Stream(self.protocol, 3)
+        s = rtmp.NetStream(self.protocol, 3)
 
         self.assertIdentical(s.protocol, self.protocol)
         self.assertEqual(s.streamId, 3)
@@ -285,36 +285,6 @@ class StreamTestCase(ProtocolTestCase):
 
         self.stream.sendMessage('foo', 'bar')
         self.assertTrue(self.executed)
-
-
-class ControlStreamTestCase(ProtocolTestCase):
-    """
-    Tests for L{rtmp.ControlStream}
-    """
-
-    def setUp(self):
-        ProtocolTestCase.setUp(self)
-
-        self.factory = MockFactory(self, self.protocol)
-        self.protocol.factory = self.factory
-
-        self.protocol.connectionMade()
-        self.protocol.handshakeSuccess('')
-
-        self.stream = rtmp.ControlStream(self.protocol, None)
-
-    def test_create(self):
-        """
-        Ensure basic attribute initialisation and constructor args.
-        """
-        s = rtmp.ControlStream(self.protocol, 3)
-
-        self.assertIdentical(s.protocol, self.protocol)
-        self.assertEqual(s.streamId, 3)
-        self.assertEqual(s.timestamp, 0)
-
-        self.assertIdentical(s.decoder, self.protocol.decoder)
-        self.assertIdentical(s.encoder, self.protocol.encoder)
 
 
 class BasicResponseTestCase(ProtocolTestCase):
@@ -409,7 +379,7 @@ class BasicResponseTestCase(ProtocolTestCase):
         self.assertEqual(msg.argv, [None, {'code': 'spam', 'level': 'status'}])
 
 
-class InvokableStream(rtmp.Stream):
+class InvokableStream(rtmp.NetStream):
     """
     Be able to control the targets easily.
     """

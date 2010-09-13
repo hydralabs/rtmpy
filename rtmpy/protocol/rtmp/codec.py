@@ -374,8 +374,8 @@ class ChannelDemuxer(FrameReader):
     @type bucket: channel -> buffered data.
     """
 
-    def __init__(self, stream=None, bytesInterval=None):
-        FrameReader.__init__(self, stream=stream, bytesInterval=bytesInterval)
+    def __init__(self, stream=None):
+        FrameReader.__init__(self, stream=stream)
 
         self.bucket = {}
 
