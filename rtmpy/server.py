@@ -18,7 +18,7 @@ class IApplication(Interface):
     """
     """
 
-    clients = Attribute("A collection of clients connected to this application.")
+    clients = Attribute("A list of clients connected to this application.")
     name = Attribute("The name of the application instance.")
     factory = Attribute("The Factory instance that this application is"
         "attached to.")
@@ -55,6 +55,52 @@ class IApplication(Interface):
         """
         Disconnects a client from the application. Returns a deferred that is
         called when the disconnection was successful.
+        """
+
+    def buildClient(protocol, **kwargs):
+        """
+        Returns a client object linked to the protocol object.
+        """
+
+    # events
+
+    def onAppStart():
+        """
+        Called when the application has been fully loaded by the server and is
+        ready to start accepting connections.
+        """
+
+    def onAppStop(reason):
+        """
+        @todo - implement this feature
+        """
+
+    def onConnect(client):
+        """
+        Called when the peer connects to an application (NetConnection.connect).
+
+        Return a C{True}/C{False} value to accept/reject the connection request.
+        Alternatively return a L{defer.Deferred} to put the request in a pending
+        state.
+
+        If C{True} is (eventually) returned, L{acceptConnection} is called,
+        otherwise L{rejectConnection}.
+
+        @param client: The client object built by L{buildClient}
+        """
+
+    def onConnectAccept(client):
+        """
+        Called when the peer has been successfully connected to this application.
+
+        @param client: The client object built by L{buildClient}
+        """
+
+    def onConnectReject(client):
+        """
+        Called when the application has rejected the peers connection attempt.
+
+        @param client: The client object built by L{buildClient}
         """
 
     def onPublish(client, stream):
@@ -162,13 +208,14 @@ class ServerProtocol(rtmp.RTMPProtocol):
         if self.application is None:
             raise exc.InvalidApplication('Unknown application %r' % (appName,))
 
-        self.client = self.application.buildClient(self)
+        self.client = self.application.buildClient(self, **args)
 
         def cb(res):
             if res is False:
                 raise exc.ConnectRejected('Authorization is required')
 
             self.application.acceptConnection(self.client)
+            self.application.onConnectAccept(self.client)
 
         d = defer.maybeDeferred(self.application.onConnect, self.client, **args)
 
@@ -182,7 +229,9 @@ class ServerProtocol(rtmp.RTMPProtocol):
         rtmp.RTMPProtocol.onDownstreamBandwidth(self, interval, timestamp)
 
         if not self.connected:
-            self._pendingConnection.callback(None)
+            if hasattr(self, '_pendingConnection'):
+                if not self._pendingConnection.called:
+                    self._pendingConnection.callback(None)
 
 
 class Application(object):
@@ -232,7 +281,7 @@ class Application(object):
     def clientDisconnected(self, client, reason):
         pass
 
-    def buildClient(self, protocol):
+    def buildClient(self, protocol, **kwargs):
         """
         Create an instance of a subclass of L{Client}. Override this method to
         alter how L{Client} instances are created.
@@ -356,6 +405,8 @@ class ServerFactory(protocol.ServerFactory):
             self.applications[name] = app
             app.factory = self
             app.name = name
+
+            app.onAppStart()
 
             return res
 

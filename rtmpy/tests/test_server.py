@@ -21,20 +21,41 @@ class SimpleApplication(object):
     ret = None
     reject = False
 
-    def startup(self):
+    def __init__(self):
+        self.events = []
+
+    def _add_event(self, name, args, kwargs):
+        self.events.append((name, args, kwargs))
+
+    def startup(self, *args, **kwargs):
+        self._add_event('startup', args, kwargs)
+
         return self.ret
 
-    def shutdown(self):
+    def shutdown(self, *args, **kwargs):
+        self._add_event('shutdown', args, kwargs)
+
         return self.ret
 
-    def buildClient(self, stream):
-        pass
+    def buildClient(self, *args, **kwargs):
+        self._add_event('build-client', args, kwargs)
 
-    def onConnect(self, client, **kwargs):
+    def onConnect(self, *args, **kwargs):
+        self._add_event('connect', args, kwargs)
+
         return not self.reject
 
-    def acceptConnection(self, client):
-        pass
+    def onConnectAccept(self, *args, **kwargs):
+        self._add_event('connect-accept', args, kwargs)
+
+    def onConnectReject(self, *args, **kwargs):
+        self._add_event('connect-reject', args, kwargs)
+
+    def acceptConnection(self, *args, **kwargs):
+        self._add_event('accept-connection', args, kwargs)
+
+    def onAppStart(self, *args, **kwargs):
+        self._add_event('app-start', args, kwargs)
 
 
 class ApplicationRegisteringTestCase(unittest.TestCase):
@@ -432,7 +453,7 @@ class ConnectingTestCase(unittest.TestCase):
         """
         Ensure a successful connection
         """
-        self.factory.applications['what'] = SimpleApplication()
+        a = self.factory.applications['what'] = SimpleApplication()
 
         d = self.connect({'app': 'what'})
 
