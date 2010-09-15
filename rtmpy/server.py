@@ -169,6 +169,9 @@ class ServerProtocol(rtmp.RTMPProtocol):
             Called when an error occurred when asking the application to
             validate the connection request.
             """
+            if self.application and self.client:
+                self.application.onConnectReject(self.client)
+
             code = getattr(fail.value, 'code', 'NetConnection.Connect.Failed')
             description = fail.getErrorMessage() or 'Internal Server Error'
 

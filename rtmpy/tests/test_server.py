@@ -17,6 +17,7 @@ class SimpleApplication(object):
 
     factory = None
     name = None
+    client = None
 
     ret = None
     reject = False
@@ -39,6 +40,8 @@ class SimpleApplication(object):
 
     def buildClient(self, *args, **kwargs):
         self._add_event('build-client', args, kwargs)
+
+        return self.client
 
     def onConnect(self, *args, **kwargs):
         self._add_event('connect', args, kwargs)
@@ -489,6 +492,7 @@ class ConnectingTestCase(unittest.TestCase):
     def test_reject(self):
         a = self.factory.applications['what'] = SimpleApplication()
         a.reject = True
+        a.client = object()
 
         d = self.connect({'app': 'what'})
 
@@ -500,6 +504,13 @@ class ConnectingTestCase(unittest.TestCase):
             })
 
             self.assertEqual(self.messages, [])
+
+            name, args, kwargs = a.events.pop()
+
+            self.assertEqual(name, 'connect-reject')
+            self.assertIdentical(args[0], a.client)
+            self.assertEqual(len(args), 1)
+            self.assertEqual(kwargs, {})
 
         d.addCallback(check_status)
 
