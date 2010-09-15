@@ -444,7 +444,6 @@ class ConnectingTestCase(unittest.TestCase):
                 'code': 'NetConnection.Connect.Success',
                 'objectEncoding': 0,
                 'description': 'Connection succeeded.',
-                'data': {'version': u'3,5,1,516'},
                 'level': 'status'
             })
 

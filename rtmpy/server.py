@@ -10,7 +10,7 @@ from twisted.internet import protocol, defer
 import pyamf
 
 from rtmpy import util, exc, versions
-from rtmpy.protocol.rtmp import message, expose
+from rtmpy.protocol.rtmp import message, expose, status
 from rtmpy.protocol import rtmp, handshake, version
 
 
@@ -101,10 +101,8 @@ class ServerProtocol(rtmp.RTMPProtocol):
             f = self.factory
 
             # begin negotiating bandwidth
-            self.sendMessage(
-                message.DownstreamBandwidth(f.downstreamBandwidth))
-            self.sendMessage(
-                message.UpstreamBandwidth(f.upstreamBandwidth, 2))
+            self.sendMessage(message.DownstreamBandwidth(f.downstreamBandwidth))
+            self.sendMessage(message.UpstreamBandwidth(f.upstreamBandwidth, 2))
 
             return res
 
@@ -112,13 +110,9 @@ class ServerProtocol(rtmp.RTMPProtocol):
             self.connected = True
             del self._pendingConnection
 
-            result = {
-                'code': 'NetConnection.Connect.Success',
-                'description': 'Connection succeeded.',
-                'data': {'version': u'3,5,1,516'},
-                'objectEncoding': self.objectEncoding,
-                'level': 'status',
-            }
+            result = status.status('NetConnection.Connect.Success',
+                description='Connection succeeded.',
+                objectEncoding=self.objectEncoding)
 
             return rtmp.ExtraResult(result,
                 # what are these values?
@@ -132,7 +126,7 @@ class ServerProtocol(rtmp.RTMPProtocol):
             code = getattr(fail.value, 'code', 'NetConnection.Connect.Failed')
             description = fail.getErrorMessage() or 'Internal Server Error'
 
-            return dict(code=code, description=description, level='error')
+            return status.error(code, description)
 
         def chain_errback(f):
             self._pendingConnection.errback(f)
