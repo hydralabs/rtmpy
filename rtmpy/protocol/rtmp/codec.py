@@ -89,6 +89,7 @@ class BaseChannel(object):
         self.bytes = 0
         self._bodyRemaining = -1
         self.frameRemaining = self.frameSize
+        self.header = None
 
     def complete(self):
         """
@@ -349,11 +350,12 @@ class FrameReader(Codec):
             raise StopIteration
 
         complete = channel.complete()
+        h = channel.header
 
         if complete:
             channel.reset()
 
-        return bytes, complete, channel.header
+        return bytes, complete, h
 
     def __iter__(self):
         return self
