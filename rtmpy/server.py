@@ -9,59 +9,9 @@ from zope.interface import Interface, Attribute, implements
 from twisted.internet import protocol, defer
 import pyamf
 
-from rtmpy import util, exc
+from rtmpy import util, exc, versions
 from rtmpy.protocol.rtmp import message, expose
 from rtmpy.protocol import rtmp, handshake, version
-
-
-class ServerControlStream(rtmp.ControlStream):
-    """
-    """
-
-    def __init__(self, protocol, streamId):
-        rtmp.ControlStream.__init__(self, protocol, streamId)
-
-        self.application = self.protocol.application
-
-    @expose('connect')
-    def onConnect(self, args):
-        def cb(res):
-            """
-            Called when the connect packet has been accepted by the application.
-            """
-            oE = args.pop('objectEncoding', self.protocol.objectEncoding)
-
-            self.protocol.objectEncoding = oE
-            f = self.protocol.factory
-
-            self.sendMessage(
-                message.DownstreamBandwidth(f.downstreamBandwidth))
-            self.sendMessage(
-                message.UpstreamBandwidth(f.upstreamBandwidth, 2))
-            self.sendMessage(
-                message.ControlMessage(0, 0))
-
-            return {
-                'code': 'NetConnection.Connect.Success',
-                'description': 'Connection succeeded.',
-                'objectEncoding': self.protocol.objectEncoding
-            }
-
-        def eb(fail):
-            """
-            Called when an error occurred when asking the application to
-            validate the connection request.
-            """
-            code = getattr(fail.value, 'code', 'NetConnection.Connect.Failed')
-            description = fail.getErrorMessage() or 'Internal Server Error'
-
-            return dict(code=code, description=description, level='error')
-
-        d = defer.maybeDeferred(self.protocol.onConnect, *(args,))
-
-        d.addCallback(cb).addErrback(eb)
-
-        return d
 
 
 class IApplication(Interface):
@@ -72,6 +22,8 @@ class IApplication(Interface):
     name = Attribute("The name of the application instance.")
     factory = Attribute("The Factory instance that this application is"
         "attached to.")
+    streams = Attribute("A collection of streams that this application is "
+        "currently publishing")
 
     def startup():
         """
@@ -105,71 +57,138 @@ class IApplication(Interface):
         called when the disconnection was successful.
         """
 
+    def onPublish(client, stream):
+        """
+        """
+
 
 class Client(object):
     """
     """
 
-    def __init__(self):
-        self.protocol = None
+    def __init__(self, nc):
+        self.nc = nc
         self.application = None
 
-        self.pendingCalls = []
 
-    def call(self, name, *args):
+class ServerProtocol(rtmp.RTMPProtocol):
+    """
+    Server side RTMP protocol implementation
+    """
+
+    def startStreaming(self):
         """
         """
-        d = defer.Deferred()
+        rtmp.RTMPProtocol.startStreaming(self)
 
-        if args == ():
-            args = (None,)
+        self.connected = False
+        self.application = None
+
+    @expose('connect')
+    def onConnect(self, args):
+        if self.connected:
+            return
+
+        def connection_accepted(res):
+            """
+            Called when the application has accepted the connection
+            (in principle)
+            """
+            oE = args.pop('objectEncoding', self.objectEncoding)
+
+            self.objectEncoding = oE
+
+            f = self.factory
+
+            # begin negotiating bandwidth
+            self.sendMessage(
+                message.DownstreamBandwidth(f.downstreamBandwidth))
+            self.sendMessage(
+                message.UpstreamBandwidth(f.upstreamBandwidth, 2))
+
+            return res
+
+        def return_success(res):
+            self.connected = True
+            del self._pendingConnection
+
+            result = {
+                'code': 'NetConnection.Connect.Success',
+                'description': 'Connection succeeded.',
+                'data': {'version': u'3,5,1,516'},
+                'objectEncoding': self.objectEncoding,
+                'level': 'status',
+            }
+
+            return rtmp.ExtraResult(result,
+                # what are these values?
+                {'mode': 1, 'capabilities': 31, 'fmsVer': 'FMS/3,5,1,516'})
+
+        def eb(fail):
+            """
+            Called when an error occurred when asking the application to
+            validate the connection request.
+            """
+            code = getattr(fail.value, 'code', 'NetConnection.Connect.Failed')
+            description = fail.getErrorMessage() or 'Internal Server Error'
+
+            return dict(code=code, description=description, level='error')
+
+        def chain_errback(f):
+            self._pendingConnection.errback(f)
+
+        self._pendingConnection = defer.Deferred()
+
+        self._pendingConnection.addCallbacks(return_success, eb)
+
+        d = defer.maybeDeferred(self._onConnect, *(args,))
+
+        d.addCallback(connection_accepted)
+        d.addErrback(chain_errback)
+
+        # todo: timeout for connection
+        return self._pendingConnection
+
+    def _onConnect(self, args):
+        """
+        Called when a 'connect' packet is received from the client.
+        """
+        if self.application:
+            # This protocol has already successfully completed a connection
+            # request.
+            raise exc.ConnectFailed('Already connected.')
+
+        try:
+            appName = args['app']
+        except KeyError:
+            raise exc.ConnectFailed("Bad connect packet (missing 'app' key)")
+
+        self.application = self.factory.getApplication(appName)
 
         if self.application is None:
-            self.pendingCalls.append((name, args, d))
+            raise exc.InvalidApplication('Unknown application %r' % (appName,))
 
-            return d
+        self.client = self.application.buildClient(self)
 
-        s = self.protocol.getStream(0)
-        x = s.sendMessage(message.Invoke(name, 0, *args), channelId=3)
+        def cb(res):
+            if res is False:
+                raise exc.ConnectRejected('Authorization is required')
 
-        x.addCallback(lambda _: d.callback(pyamf.Undefined))
+            self.application.acceptConnection(self.client)
 
-        return d
-
-    def registerApplication(self, application):
-        """
-        """
-        self.application = application
-        s = self.protocol.getStream(0)
-
-        for name, args, d in self.pendingCalls:
-            x = s.writeEvent(event.Invoke(name, 0, *args), channelId=3)
-
-            x.chainDeferred(d)
-
-        self.pendingCalls = []
-
-    def disconnect(self):
-        """
-        Disconnects the client. Returns a deferred to signal when this client
-        has disconnected.
-        """
-        def cb(_):
-            self.application.onDisconnect(self)
-            self.protocol.transport.loseConnection()
-            self.protocol = None
-            self.application = None
-
-        s = self.protocol.getStream(0)
-        d = s.sendStatus(code='NetConnection.Connection.Closed',
-            description='Client disconnected.')
+        d = defer.maybeDeferred(self.application.onConnect, self.client, **args)
 
         d.addCallback(cb)
 
         return d
 
-    def checkBandwidth(self):
-        pass
+    def onDownstreamBandwidth(self, interval, timestamp):
+        """
+        """
+        rtmp.RTMPProtocol.onDownstreamBandwidth(self, interval, timestamp)
+
+        if not self.connected:
+            self._pendingConnection.callback(None)
 
 
 class Application(object):
@@ -198,11 +217,11 @@ class Application(object):
         """
         Called when this application has accepted the client connection.
         """
-        clientId = util.generateBytes(9, readable=True)
-        client.id = clientId
+        self.clients[client.id] = client
 
-        self.clients[client] = clientId
-        self.clients[clientId] = client
+    def acceptConnection(self, client):
+        """
+        """
 
     def disconnect(self, client):
         """
@@ -216,6 +235,9 @@ class Application(object):
 
         client.id = None
 
+    def clientDisconnected(self, client, reason):
+        pass
+
     def buildClient(self, protocol):
         """
         Create an instance of a subclass of L{Client}. Override this method to
@@ -223,25 +245,23 @@ class Application(object):
 
         @param protocol: The L{rtmp.ServerProtocol} instance.
         """
-        c = self.client()
-        c.protocol = protocol
+        c = self.client(protocol)
+
+        c.id = util.generateBytes(9, readable=True)
 
         return c
 
-    def onConnect(self, client, **kwargs):
+    def onConnect(self, client, **args):
         """
         Called when a connection request is made to this application. Must
         return a C{bool} (or a L{defer.Deferred} returning a C{bool}) which
         determines the result of the connection request.
 
         If C{False} is returned (or an exception raised) then the connection is
-        rejected.
+        rejected. The default is to accept the connection.
 
         @param client: The client requesting the connection.
         @type client: An instance of L{client_class}.
-        @param kwargs: The arguments supplied as part of the connection
-            request.
-        @type kwargs: C{dict}
         """
 
     def onPublish(self, client, stream):
@@ -261,50 +281,11 @@ class Application(object):
         self.disconnect(client)
 
 
-class ServerProtocol(rtmp.RTMPProtocol):
-    """
-    A basic RTMP protocol that will act like a server.
-    """
-
-    def onConnect(self, args):
-        """
-        Called when a 'connect' packet is received from the client.
-        """
-        if self.application:
-            # This protocol has already successfully completed a connection
-            # request.
-            raise exc.ConnectFailed('Already connected.')
-
-        try:
-            appName = args['app']
-        except KeyError:
-            raise exc.ConnectFailed("Bad connect packet (missing 'app' key)")
-
-        self.application = self.factory.getApplication(appName)
-
-        if self.application is None:
-            raise exc.InvalidApplication('Unknown application %r' % (appName,))
-
-        self.client = self.application.buildClient(self)
-
-        def cb(res):
-            if res is False:
-                raise exc.ConnectRejected('Authorization is required')
-
-            self.application.connectionAccepted(self.client)
-
-        d = defer.maybeDeferred(self.application.onConnect, self.client, **args)
-
-        d.addCallback(cb)
-
-        return d
-
-
 class ServerFactory(protocol.ServerFactory):
     """
     RTMP server protocol factory.
 
-    Maintains a collection of applications that RTMP clients connect and
+    Maintains a collection of applications that RTMP peers connect and
     interact with.
 
     @ivar applications: A collection of active applications.
@@ -319,7 +300,7 @@ class ServerFactory(protocol.ServerFactory):
 
     upstreamBandwidth = 2500000L
     downstreamBandwidth = 2500000L
-    fmsVer = u'FMS/3,5,1,516'
+    fmsVer = versions.FMS_MIN_H264
 
     def __init__(self, applications=None):
         self.applications = {}
@@ -329,16 +310,15 @@ class ServerFactory(protocol.ServerFactory):
             for name, app in applications.items():
                 self.registerApplication(name, app)
 
-    def getControlStream(self, protocol, streamId):
+    def buildHandshakeNegotiator(self, protocol):
         """
-        Creates and returns the stream for controlling server side protocol
-        instances.
+        Returns a negotiator capable of handling server side handshakes.
 
-        @param protocol: The L{ServerProtocol} instance created by
-            L{buildProtocol}
-        @param streamId: The streamId for this control stream. Always 0.
+        @param protocol: The L{ServerProtocol} requiring handshake negotiations.
         """
-        return ServerControlStream(protocol, streamId)
+        i = handshake.get_implementation(self.protocolVersion)
+
+        return i.ServerNegotiator(protocol, protocol.transport)
 
     def getApplication(self, name):
         """
@@ -422,13 +402,3 @@ class ServerFactory(protocol.ServerFactory):
         d.addBoth(cb)
 
         return d
-
-    def buildHandshakeNegotiator(self, protocol):
-        """
-        Returns a negotiator capable of handling server side handshakes.
-
-        @param protocol: The L{ServerProtocol} requiring handshake negotiations.
-        """
-        i = handshake.get_implementation(self.protocolVersion)
-
-        return i.ServerNegotiator(protocol, protocol.transport)
