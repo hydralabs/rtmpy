@@ -33,7 +33,7 @@ class SimpleApplication(object):
     def onConnect(self, client, **kwargs):
         return not self.reject
 
-    def connectionAccepted(self, client):
+    def acceptConnection(self, client):
         pass
 
 
@@ -268,16 +268,6 @@ class ServerFactoryTestCase(unittest.TestCase):
         self.protocol.connectionMade()
         self.protocol.handshakeSuccess('')
 
-    def test_controlstream(self):
-        """
-        L{getControlStream}
-        """
-        s = self.factory.getControlStream(self.protocol, 0)
-
-        self.assertIsInstance(s, server.ServerControlStream)
-
-        self.assertIdentical(s.protocol, self.protocol)
-
 
 class ConnectingTestCase(unittest.TestCase):
     """
@@ -406,7 +396,7 @@ class ConnectingTestCase(unittest.TestCase):
         def bork(*args):
             raise EnvironmentError('woot')
 
-        self.patch(self.protocol, 'onConnect', bork)
+        self.patch(self.protocol, '_onConnect', bork)
 
         d = self.connect({})
 

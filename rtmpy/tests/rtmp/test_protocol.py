@@ -69,7 +69,7 @@ class ProtocolTestCase(unittest.TestCase):
     """
 
     def setUp(self):
-        self.protocol = rtmp.BaseNetConnection()
+        self.protocol = rtmp.RTMPProtocol()
         self.handshaker = MockHandshakeNegotiator(self, self.protocol)
         self.transport = self.protocol.transport = StringTransportWithDisconnection()
         self.transport.protocol = self.protocol
@@ -101,8 +101,7 @@ class StateTest(ProtocolTestCase):
 
         self.assertEqual(self.protocol.state, 'stream')
         self.assertFalse(hasattr(self.protocol, 'handshaker'))
-        self.assertEqual(self.protocol.streams, {})
-        self.assertEquals(self.protocol.application, None)
+        self.assertEqual(self.protocol.streams, {0: self.protocol})
 
 
 class ConnectionLostTestCase(ProtocolTestCase):
@@ -249,7 +248,6 @@ class StreamTestCase(ProtocolTestCase):
         """
         s = rtmp.NetStream(self.protocol, 3)
 
-        self.assertIdentical(s.protocol, self.protocol)
         self.assertEqual(s.streamId, 3)
         self.assertEqual(s.timestamp, 0)
 
@@ -274,7 +272,7 @@ class StreamTestCase(ProtocolTestCase):
         """
         self.executed = False
 
-        def send_message(stream, message, whenDone):
+        def send_message(message, whenDone, stream=None):
             self.assertIdentical(self.stream, stream)
             self.assertEqual(message, 'foo')
             self.assertEqual(whenDone, 'bar')
@@ -305,12 +303,13 @@ class BasicResponseTestCase(ProtocolTestCase):
 
         self.messages = []
 
-        def send_message(*args):
+        def send_message(*args, **kwargs):
+            args = list(args) + [kwargs.get('stream', None)]
             self.messages.append(args)
 
         self.patch(self.protocol, 'sendMessage', send_message)
 
-        self.control = self.protocol.getStream(0)
+        self.stream = self.protocol.streams[self.protocol.createStream()]
 
     def test_send_bytes_read(self):
         """
@@ -324,12 +323,11 @@ class BasicResponseTestCase(ProtocolTestCase):
 
         self.assertEqual(len(self.messages), 1)
 
-        stream, msg, whenDone = self.messages[0]
+        msg, _, = self.messages[0]
 
-        self.assertEqual(stream.streamId, 0)
+        self.assertEqual(_, None)
         self.assertIsInstance(msg, message.BytesRead)
         self.assertEqual(msg.bytes, 12)
-        self.assertEqual(whenDone, None)
 
     def test_frame_size(self):
         """
@@ -347,12 +345,12 @@ class BasicResponseTestCase(ProtocolTestCase):
         self.assertEqual(self.messages, [])
 
     def test_sendStatus(self):
-        self.control.sendStatus('blarg', 'foo', one=1, two='two')
+        self.stream.sendStatus('blarg', 'foo', one=1, two='two')
 
-        stream, msg, whenDone = self.messages.pop(0)
+        msg, whenDone, stream = self.messages.pop(0)
 
         self.assertEqual(self.messages, [])
-        self.assertIdentical(stream, self.control)
+        self.assertIdentical(stream, self.stream)
         self.assertEqual(whenDone, None)
 
         self.assertIsInstance(msg, message.Invoke)
@@ -365,12 +363,12 @@ class BasicResponseTestCase(ProtocolTestCase):
         If not supplied, the resulting L{message.Invoke} should result in
         C{argv=[None, {'code': ...}
         """
-        self.control.sendStatus('spam')
+        self.stream.sendStatus('spam')
 
-        stream, msg, whenDone = self.messages.pop(0)
+        msg, whenDone, stream = self.messages.pop(0)
 
         self.assertEqual(self.messages, [])
-        self.assertIdentical(stream, self.control)
+        self.assertIdentical(stream, self.stream)
         self.assertEqual(whenDone, None)
 
         self.assertIsInstance(msg, message.Invoke)
@@ -407,7 +405,8 @@ class InvokingTestCase(ProtocolTestCase):
 
         self.messages = []
 
-        def send_message(*args):
+        def send_message(*args, **kwargs):
+            args = list(args) + [kwargs.get('stream', None)]
             self.messages.append(args)
 
         self.patch(self.protocol, 'sendMessage', send_message)
@@ -479,19 +478,17 @@ class InvokingTestCase(ProtocolTestCase):
             self.assertEqual(fail.getErrorMessage(), "Unknown method 'foo'")
 
         def check_messages(res):
-            msg = self.messages.pop(0)
+            msg, whenDone, stream = self.messages.pop(0)
 
             self.assertEqual(self.messages, [])
 
-            self.assertIdentical(msg[0], self.stream)
-            self.assertEqual(msg[2], None)
+            self.assertEqual(whenDone, None)
+            self.assertIdentical(stream, self.stream)
 
-            i = msg[1]
-
-            self.assertIsInstance(i, message.Invoke)
-            self.assertEqual(i.id, 1)
-            self.assertEqual(i.name, '_error')
-            self.assertEqual(i.argv, [None, {
+            self.assertIsInstance(msg, message.Invoke)
+            self.assertEqual(msg.id, 1)
+            self.assertEqual(msg.name, '_error')
+            self.assertEqual(msg.argv, [None, {
                 'code': 'NetConnection.Call.Failed',
                 'description': "Unknown method 'foo'",
                 'level': 'error'}])
@@ -515,19 +512,17 @@ class InvokingTestCase(ProtocolTestCase):
         self.assertIsInstance(d, defer.Deferred)
 
         def check_messages(res):
-            msg = self.messages.pop(0)
+            msg, whenDone, stream = self.messages.pop(0)
 
             self.assertEqual(self.messages, [])
 
-            self.assertIdentical(msg[0], self.stream)
-            self.assertEqual(msg[2], None)
+            self.assertEqual(whenDone, None)
+            self.assertIdentical(stream, self.stream)
 
-            i = msg[1]
-
-            self.assertIsInstance(i, message.Invoke)
-            self.assertEqual(i.id, 1)
-            self.assertEqual(i.name, '_result')
-            self.assertEqual(i.argv, [None, 'bar'])
+            self.assertIsInstance(msg, message.Invoke)
+            self.assertEqual(msg.id, 1)
+            self.assertEqual(msg.name, '_result')
+            self.assertEqual(msg.argv, [None, 'bar'])
 
         d.addCallback(check_messages)
 
@@ -551,19 +546,17 @@ class InvokingTestCase(ProtocolTestCase):
             fail.trap(RuntimeError)
 
         def check_messages(res):
-            msg = self.messages.pop(0)
+            msg, whenDone, stream = self.messages.pop(0)
 
             self.assertEqual(self.messages, [])
 
-            self.assertIdentical(msg[0], self.stream)
-            self.assertEqual(msg[2], None)
+            self.assertEqual(whenDone, None)
+            self.assertIdentical(stream, self.stream)
 
-            i = msg[1]
-
-            self.assertIsInstance(i, message.Invoke)
-            self.assertEqual(i.id, 1)
-            self.assertEqual(i.name, '_error')
-            self.assertEqual(i.argv, [None, {
+            self.assertIsInstance(msg, message.Invoke)
+            self.assertEqual(msg.id, 1)
+            self.assertEqual(msg.name, '_error')
+            self.assertEqual(msg.argv, [None, {
                 'code': 'NetConnection.Call.Failed',
                 'description': 'spam and eggs please',
                 'level': 'error'}])
@@ -603,19 +596,17 @@ class InvokingTestCase(ProtocolTestCase):
         my_deferred = defer.Deferred()
 
         def check_messages(res):
-            msg = self.messages.pop(0)
+            msg, whenDone, stream = self.messages.pop(0)
 
             self.assertEqual(self.messages, [])
 
-            self.assertIdentical(msg[0], self.stream)
-            self.assertEqual(msg[2], None)
+            self.assertEqual(whenDone, None)
+            self.assertIdentical(stream, self.stream)
 
-            i = msg[1]
-
-            self.assertIsInstance(i, message.Invoke)
-            self.assertEqual(i.id, 1)
-            self.assertEqual(i.name, '_result')
-            self.assertEqual(i.argv, [None, 'foo'])
+            self.assertIsInstance(msg, message.Invoke)
+            self.assertEqual(msg.id, 1)
+            self.assertEqual(msg.name, '_result')
+            self.assertEqual(msg.argv, [None, 'foo'])
 
         def wrap_ok(res):
             try:
@@ -663,19 +654,17 @@ class InvokingTestCase(ProtocolTestCase):
             fail.trap(RuntimeError)
 
         def check_messages(res):
-            msg = self.messages.pop(0)
+            msg, whenDone, stream = self.messages.pop(0)
 
             self.assertEqual(self.messages, [])
 
-            self.assertIdentical(msg[0], self.stream)
-            self.assertEqual(msg[2], None)
+            self.assertEqual(whenDone, None)
+            self.assertIdentical(stream, self.stream)
 
-            i = msg[1]
-
-            self.assertIsInstance(i, message.Invoke)
-            self.assertEqual(i.id, 1)
-            self.assertEqual(i.name, '_error')
-            self.assertEqual(i.argv, [None, {}])
+            self.assertIsInstance(msg, message.Invoke)
+            self.assertEqual(msg.id, 1)
+            self.assertEqual(msg.name, '_error')
+            self.assertEqual(msg.argv, [None, {}])
 
         my_deferred.addErrback(eb).addCallback(check_messages)
 

@@ -90,7 +90,6 @@ class BaseChannel(object):
         self._bodyRemaining = -1
         self.frameRemaining = self.frameSize
 
-    @property
     def complete(self):
         """
         Whether this channel has completed its content length requirements.
@@ -349,7 +348,7 @@ class FrameReader(Codec):
 
             raise StopIteration
 
-        complete = channel.complete
+        complete = channel.complete()
 
         if complete:
             channel.reset()
@@ -640,7 +639,7 @@ class ChannelMuxer(Codec):
                 self.writeHeader(channel)
                 channel.marshallOneFrame()
 
-                if channel.complete:
+                if channel.complete():
                     break
 
             channel.reset()
@@ -667,7 +666,7 @@ class ChannelMuxer(Codec):
             self.writeHeader(channel)
             channel.marshallOneFrame()
 
-            if channel.complete:
+            if channel.complete():
                 channel.reset()
                 to_release.append(channel.channelId)
 
