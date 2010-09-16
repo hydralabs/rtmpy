@@ -299,6 +299,11 @@ class Application(object):
 
         return c
 
+    def onAppStart(self):
+        """
+        Called when the application is ready to connect clients
+        """
+
     def onConnect(self, client, **args):
         """
         Called when a connection request is made to this application. Must
@@ -310,6 +315,14 @@ class Application(object):
 
         @param client: The client requesting the connection.
         @type client: An instance of L{client_class}.
+        """
+
+    def onConnectAccept(self, client, **kwargs):
+        """
+        """
+
+    def onConnectReject(self, client):
+        """
         """
 
     def onPublish(self, client, stream):
