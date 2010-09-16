@@ -89,7 +89,6 @@ class BaseChannel(object):
         self.bytes = 0
         self._bodyRemaining = -1
         self.frameRemaining = self.frameSize
-        self.header = None
 
     def complete(self):
         """
@@ -226,6 +225,7 @@ class ProducingChannel(BaseChannel):
 
         self.buffer.seek(0)
         self.buffer.truncate()
+        self.header = None
 
     def append(self, data):
         """
