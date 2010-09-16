@@ -481,6 +481,11 @@ class ConnectingTestCase(unittest.TestCase):
             self.assertMessage(msg, message.UPSTREAM_BANDWIDTH,
                 bandwidth=2500000L, extra=2)
 
+            msg, = self.messages.pop(0)
+
+            self.assertMessage(msg, message.CONTROL,
+                type=0, value1=0)
+
             self.assertEqual(self.messages, [])
 
         d.addCallback(check_status)

@@ -160,6 +160,8 @@ class ServerProtocol(rtmp.RTMPProtocol):
                 description='Connection succeeded.',
                 objectEncoding=self.objectEncoding)
 
+            self.sendMessage(message.ControlMessage(0, 0))
+
             return rtmp.ExtraResult(result,
                 # what are these values?
                 {'mode': 1, 'capabilities': 31, 'fmsVer': 'FMS/3,5,1,516'})
