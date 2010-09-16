@@ -251,28 +251,6 @@ class NetStream(BaseStream):
 
         self.nc = nc
 
-    @expose
-    def publish(self, name, *args):
-        """
-        """
-        d = self.nc.publishStream(self, name, *args)
-
-        def send_status(result):
-            self.sendStatus('NetStream.Publish.Start',
-                description='%s is now published.' % (name,),
-                clientid=self.nc.clientid)
-
-            return result
-
-        d.addCallback(send_status)
-        print 'published'
-
-    @expose
-    def closeStream(self):
-        self.sendStatus('NetStream.Unpublish.Success',
-            description='stream1283853804683 is now unpublished.',
-            clientid='CDAwMKFF')
-
     def sendMessage(self, msg, whenDone=None):
         """
         Sends an RTMP message to the peer. This a low level method and is not
@@ -334,12 +312,13 @@ class RTMPProtocol(protocol.Protocol, BaseStream):
         connect packet.
     """
 
+    stream_class = NetStream
+
     HANDSHAKE = 'handshake'
     STREAM = 'stream'
 
     objectEncoding = pyamf.AMF0
     clientId = None
-
 
     def __init__(self):
         BaseStream.__init__(self, 0)
@@ -527,7 +506,7 @@ class RTMPProtocol(protocol.Protocol, BaseStream):
         Creates a new L{NetStream} and associates it with this protocol.
         """
         streamId = self._nextStreamId
-        self.streams[streamId] = NetStream(self, streamId)
+        self.streams[streamId] = self.stream_class(self, streamId)
 
         self._nextStreamId += 1
 
