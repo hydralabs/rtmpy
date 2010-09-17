@@ -117,12 +117,41 @@ class IApplication(Interface):
         """
 
 
+class IPublishingStream(Interface):
+    """
+    The name should be enough :)
+    """
+
+    def videoDataReceived(data, timestamp):
+        """
+        A video packet has been received from the publishing stream.
+
+        @param data: The raw video data.
+        @type data: C{str}
+        @param timestamp: The timestamp at which this data was received.
+        """
+
+    def audioDataReceived(data, timestamp):
+        """
+        An audio packet has been received from the publishing stream.
+
+        @param data: The raw audio data.
+        @type data: C{str}
+        @param timestamp: The timestamp at which this data was received.
+        """
+
+    def onMetaData(data):
+        """
+        The meta data for the a/v stream has been updated.
+        """
+
+
 class Client(object):
     """
     A very basic client object that relates an application to a connected peer.
     Quite what to do with it right now is anyone's guess ..
 
-    @param nc: The L{ServerProtcol} instance.
+    @param nc: The L{ServerProtocol} instance.
     @param id: The application provided unique id for this client.
     """
 
@@ -143,7 +172,7 @@ class NetStream(rtmp.NetStream):
     @param publisher: When published, this is set to the instance that will
         receive the audio/video/meta data events from the peer. See
         L{StreamPublisher} for now.
-    @todo: Formalise an interface for publisher instances.
+    @type publisher: L{IPublishingStream}
     """
 
     def __init__(self, nc, streamId):
@@ -264,6 +293,8 @@ class ServerProtocol(rtmp.RTMPProtocol):
 
     def startStreaming(self):
         """
+        Called when the RTMP handshake has been successfully negotiated and
+        RTMP messages can now be exchanged.
         """
         rtmp.RTMPProtocol.startStreaming(self)
 
@@ -443,8 +474,11 @@ class StreamPublisher(object):
     @ivar stream: The publishing L{NetStream}
     @ivar client: The linked L{Client} object. Not used right now.
     @ivar subscribers: A list of subscribers that are listening to the stream.
-    @todo: Think about different subscribe times.
+    @todo: Think about different subscribe times and how that will affect
+        relative timestamps.
     """
+
+    implements(IPublishingStream)
 
     def __init__(self, stream, client):
         self.stream = stream
@@ -501,6 +535,7 @@ class StreamPublisher(object):
 
 class Application(object):
     """
+    The business logic behind
     """
 
     implements(IApplication)
@@ -521,15 +556,11 @@ class Application(object):
         Called when the application is closed.
         """
 
-    def connectionAccepted(self, client):
+    def acceptConnection(self, client):
         """
         Called when this application has accepted the client connection.
         """
         self.clients[client.id] = client
-
-    def acceptConnection(self, client):
-        """
-        """
 
     def disconnect(self, client):
         """
@@ -539,15 +570,13 @@ class Application(object):
 
         client.id = None
 
-    def clientDisconnected(self, client, reason):
-        pass
-
     def buildClient(self, protocol, **kwargs):
         """
         Create an instance of a subclass of L{Client}. Override this method to
         alter how L{Client} instances are created.
 
         @param protocol: The L{rtmp.ServerProtocol} instance.
+        @param kwargs: A dict of arguments passed with the connect request.
         """
         c = self.client(protocol)
 
@@ -557,6 +586,13 @@ class Application(object):
 
     def publishStream(self, client, stream, name, type_='live'):
         """
+        The C{stream} is requesting to publish an audio/video stream under the
+        name C{name}. Reject the publish request by raising an exception.
+
+        @param client: The L{Client} requesting the publishing the stream.
+        @param stream: The L{NetStream} that will receive the a/v data.
+        @param name: The name of the stream that will be published.
+        @param type_: Ignored for now.
         """
         publisher = self.streams.get(name, None)
 
@@ -571,11 +607,19 @@ class Application(object):
 
     def addSubscriber(self, stream, subscriber):
         """
+        Adds a subscriber to a stream.
+
+        @type stream: L{NetStream}
+        @type subscriber: L{IPublishingStream}
         """
         self.streams[stream.name].addSubscriber(subscriber)
 
     def removeSubscriber(self, stream, subscriber):
         """
+        Removes a subscriber from a stream.
+
+        @type stream: L{NetStream}
+        @type subscriber: L{IPublishingStream}
         """
         self.streams[stream.name].removeSubscriber(subscriber)
 
@@ -599,10 +643,21 @@ class Application(object):
 
     def onConnectAccept(self, client, **kwargs):
         """
+        Called when the peer has successfully been connected to this
+        application.
+
+        @param client: The L{Client} object representing the peer.
+        @param kwargs: A dict of name/value pairs that were sent with the
+            connect request.
         """
 
     def onConnectReject(self, client, reason):
         """
+        Called when a connection request has been rejected.
+
+        @param client: The L{Client} object representing the peer.
+        @param reason: A L{failure.Failure} object representing the reason why
+            the client was rejected.
         """
 
     def onPublish(self, client, stream):
