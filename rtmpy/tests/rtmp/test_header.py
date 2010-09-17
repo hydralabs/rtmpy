@@ -285,7 +285,7 @@ class MergeTestCase(unittest.TestCase):
     def test_timestamp(self):
         h = self.merge(timestamp=-1)
 
-        self.assertEqual(h.timestamp, 1000)
+        self.assertEqual(h.timestamp, 0)
 
         h = self.merge(timestamp=999)
         self.assertEqual(h.timestamp, 999)

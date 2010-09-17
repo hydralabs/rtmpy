@@ -194,7 +194,7 @@ def merge(old, new):
     if new.timestamp != -1:
         merged.timestamp = new.timestamp
     else:
-        merged.timestamp = old.timestamp
+        merged.timestamp = 0
 
     return merged
 
