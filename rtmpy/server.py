@@ -536,11 +536,7 @@ class Application(object):
         """
         Removes the C{client} from this application.
         """
-        try:
-            del self.clients[client]
-            del self.clients[client.id]
-        except KeyError:
-            pass
+        del self.clients[client.id]
 
         client.id = None
 
@@ -606,7 +602,6 @@ class Application(object):
         """
         """
 
-    def onConnectReject(self, client):
     def onConnectReject(self, client, reason):
         """
         """
