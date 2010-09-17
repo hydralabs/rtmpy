@@ -132,10 +132,135 @@ class Client(object):
         self.id = None
 
 
+class NetStream(rtmp.NetStream):
+    """
+    A server side NetStream. Knows nothing of L{IApplication}s but interfaces
+    directly with the L{ServerProtocol} (which does).
+
+    @param state: The state of the NetStream. Right now the only valid values
+        are C{None} and C{'publishing'}.
+    @param name: The name of the published stream. Use this to look up the
+        stream in the application.
+    @param publisher: When published, this is set to the instance that will
+        receive the audio/video/meta data events from the peer. See
+        L{StreamPublisher} for now.
+    @todo: Formalise an interface for publisher instances.
+    """
+
+    def __init__(self, nc, streamId):
+        rtmp.NetStream.__init__(self, nc, streamId)
+
+        self.state = None
+        self.name = None
+        self.publisher = None
+
+    def publishingStarted(self, name):
+        """
+        Called when this NetStream has started publishing data from the
+        connected peer.
+        """
+        self.name = name
+        self.state = 'publishing'
+
+    @expose
+    def publish(self, name, type_='live'):
+        """
+        Called by the peer to start pushing video/audio data.
+
+        @param name: The name of the stream to publish.
+        @param type_: The type of stream to be published.
+        @see: possible values for U{type_<http://www.adobe.com/livedocs/
+            flashmediaserver/3.0/hpdocs/00000349.html>}
+        """
+        d = defer.maybeDeferred(self.nc.publishStream, self, name, type_)
+
+        def send_status(result):
+            self.sendStatus('NetStream.Publish.Start',
+                description='%s is now published.' % (name,),
+                clientid=self.nc.clientId)
+
+            return result
+
+        d.addCallback(send_status)
+
+    @expose
+    def closeStream(self):
+        """
+        Called when the stream is closing.
+        """
+        d = defer.succeed(None)
+
+        if self.state == 'publishing':
+            d = defer.maybeDeferred(self.nc.unpublishStream, self, self.name)
+
+            def send_status(res):
+                self.sendStatus('NetStream.Unpublish.Success',
+                    description='%s is now unpublished.' % (self.name,),
+                    clientid=self.nc.clientId)
+
+                return res
+
+            d.addBoth(send_status)
+
+        def clear_state(res):
+            self.state = None
+
+            return res
+
+        d.addBoth(clear_state)
+
+        return d
+
+    def onVideoData(self, data, timestamp):
+        """
+        Called when a video packet has been received from the peer.
+
+        Pushes the message on to the publisher.
+
+        @param data: The raw video data.
+        @type data: C{str}
+        @param timestamp: The timestamp at which this message was received.
+        """
+        if self.publisher:
+            self.publisher.videoDataReceived(data, timestamp)
+
+    def onAudioData(self, data, timestamp):
+        """
+        Called when an audio packet has been received from the peer.
+
+        Pushes the message on to the publisher.
+
+        @param data: The raw audio data.
+        @type data: C{str}
+        @param timestamp: The timestamp at which this message was received.
+        """
+        if self.publisher:
+            self.publisher.audioDataReceived(data, timestamp)
+
+    @expose('@setDataFrame')
+    def setDataFrame(self, name, meta):
+        """
+        Called by the peer to set the 'data frame'? Not quite sure what this is
+        all about but it contains any meta data updates for the a/v.
+
+        We hand this responsibility to the publisher.
+
+        @param name: This appears to be the name of the event to call. It is
+            always 'onMetaData'.
+        @param meta: The updated meta data for the stream.
+        """
+        func = getattr(self.publisher, name, None)
+
+        if func and name == 'onMetaData':
+            func(meta)
+
+
 class ServerProtocol(rtmp.RTMPProtocol):
     """
     Server side RTMP protocol implementation
     """
+
+    stream_class = NetStream
 
     def startStreaming(self):
         """
@@ -266,6 +391,47 @@ class ServerProtocol(rtmp.RTMPProtocol):
                 if not self._pendingConnection.called:
                     self._pendingConnection.callback(None)
 
+    def publishStream(self, stream, streamName, type_):
+        """
+        Called when a L{NetStream} wants to publish a stream through this
+        C{NetConnection}.
+
+        @param stream: The L{NetStream} instance requesting the publication.
+        @param streamName: The name of the stream to be published.
+        @param type_: Not quite sure of the significance of this yet - valid
+            values appear to be 'live', 'append', 'record'.
+        """
+        if not self.connected:
+            raise exc.ConnectError('Cannot publish stream - not connected')
+
+        d = defer.maybeDeferred(self.application.publishStream,
+            self.client, stream, streamName, type_)
+
+        def cb(publisher):
+            """
+            Called when the application has published the stream.
+
+            @param publisher: L{StreamPublisher}
+            """
+            stream.publisher = publisher
+            stream.publishingStarted(streamName)
+            self.application.onPublish(self.client, stream)
+
+            return publisher
+
+        d.addCallback(cb)
+
+        return d
+
+    def unpublishStream(self, stream, streamName):
+        """
+        The C{stream} is unpublishing itself.
+
+        @param stream: The stream that has unpublished itself.
+        @type stream: L{NetStream}
+        @param streamName: The name of the stream being unpublished. Not used.
+        """
+        return self.application.onUnpublish(self.client, stream)
 
 class Application(object):
     """
@@ -326,6 +492,30 @@ class Application(object):
         c.id = util.generateBytes(9, readable=True)
 
         return c
+
+    def publishStream(self, client, stream, name, type_='live'):
+        """
+        """
+        publisher = self.streams.get(name, None)
+
+        if publisher is None:
+            # brand new publish
+            publisher = self.streams[name] = StreamPublisher(stream, client)
+
+        if client.id != publisher.client.id:
+            raise exc.BadNameError('%s is already used' % (name,))
+
+        return publisher
+
+    def addSubscriber(self, stream, subscriber):
+        """
+        """
+        self.streams[stream.name].addSubscriber(subscriber)
+
+    def removeSubscriber(self, stream, subscriber):
+        """
+        """
+        self.streams[stream.name].removeSubscriber(subscriber)
 
     def onAppStart(self):
         """
