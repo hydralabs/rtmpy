@@ -514,7 +514,7 @@ class ConnectingTestCase(unittest.TestCase):
 
             self.assertEqual(name, 'connect-reject')
             self.assertIdentical(args[0], a.client)
-            self.assertEqual(len(args), 1)
+            self.assertEqual(len(args), 2)
             self.assertEqual(kwargs, {})
 
         d.addCallback(check_status)

@@ -7,6 +7,7 @@ Server implementation.
 
 from zope.interface import Interface, Attribute, implements
 from twisted.internet import protocol, defer
+from twisted.python import failure
 
 from rtmpy import util, exc, versions
 from rtmpy.protocol.rtmp import message, expose, status
@@ -203,13 +204,23 @@ class NetStream(rtmp.NetStream):
         d = defer.maybeDeferred(self.nc.publishStream, self, name, type_)
 
         def send_status(result):
-            self.sendStatus('NetStream.Publish.Start',
-                description='%s is now published.' % (name,),
-                clientid=self.nc.clientId)
+            s = None
 
-            return result
+            if isinstance(result, failure.Failure):
+                code = getattr(result.value, 'code', 'NetConnection.Call.Failed')
+                description = result.getErrorMessage() or 'Internal Server Error'
 
-        d.addCallback(send_status)
+                s = status.error(code, description)
+            else:
+                s = status.status('NetStream.Publish.Start',
+                    description='%s is now published.' % (name,),
+                    clientid=self.nc.clientId)
+
+            self.sendStatus(s)
+
+        d.addBoth(send_status)
+
+        return d
 
     @expose
     def closeStream(self):
