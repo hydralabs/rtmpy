@@ -53,6 +53,20 @@ class RemoteCallFailed(failure.Failure):
 
 def expose(func):
     """
+    A decorator that provides an easy way to expose methods that the peer can
+    'call' via RTMP C{invoke} or C{notify} messages.
+
+    Example usage::
+
+        @expose
+        def someRemoteMethod(self, foo, bar):
+            pass
+
+        @expose('foo-bar')
+        def anotherExposedMethod(self, *args):
+            pass
+
+    If expose is called with no args, the function name is used.
     """
     if hasattr(func, '__call__'):
         _exposed_funcs[func.func_name] = func.func_name
