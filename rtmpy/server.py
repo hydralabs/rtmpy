@@ -147,7 +147,16 @@ class ServerProtocol(rtmp.RTMPProtocol):
 
     @expose('connect')
     def onConnect(self, args):
+        """
+        Connects this protocol instance to an application. The application has
+        the power to reject the connection (see L{Application.rejectConnection})
+
+        Will return a L{defer.Deferred} that will contain the result of the
+        connection request. The return is paused until the peer has sent its
+        bandwidth negotiation packets. See L{onDownstreamBandwidth}.
+        """
         if self.connected:
+            # todo: error and disconnect here.
             return
 
         def connection_accepted(res):
@@ -211,7 +220,7 @@ class ServerProtocol(rtmp.RTMPProtocol):
 
     def _onConnect(self, args):
         """
-        Called when a 'connect' packet is received from the client.
+        The business logic of connecting to the application.
         """
         if self.application:
             # This protocol has already successfully completed a connection
@@ -231,6 +240,10 @@ class ServerProtocol(rtmp.RTMPProtocol):
         self.client = self.application.buildClient(self, **args)
 
         def cb(res):
+            """
+            Called with the result of the connection attempt, either C{True} or
+            C{False}.
+            """
             if res is False:
                 raise exc.ConnectRejected('Authorization is required')
 
