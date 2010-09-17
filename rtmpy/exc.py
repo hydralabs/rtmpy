@@ -50,3 +50,18 @@ class InvalidApplication(NetConnectionError):
     """
 
     code = 'NetConnection.Connect.InvalidApp'
+
+
+class PublishError(Exception):
+    """
+    Base error for all NetStream publishing errors.
+    """
+
+
+class BadNameError(PublishError):
+    """
+    Raised when a peer attempts to publish a stream with the same name as an
+    already published stream.
+    """
+
+    code = 'NetStream.Publish.BadName'
