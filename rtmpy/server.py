@@ -120,11 +120,16 @@ class IApplication(Interface):
 
 class Client(object):
     """
+    A very basic client object that relates an application to a connected peer.
+    Quite what to do with it right now is anyone's guess ..
+
+    @param nc: The L{ServerProtcol} instance.
+    @param id: The application provided unique id for this client.
     """
 
     def __init__(self, nc):
         self.nc = nc
-        self.application = None
+        self.id = None
 
 
 class ServerProtocol(rtmp.RTMPProtocol):
