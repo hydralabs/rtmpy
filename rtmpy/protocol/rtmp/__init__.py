@@ -165,6 +165,34 @@ class BaseStream(object):
 
         return result
 
+    def _callExposedMethod(self, name, *args):
+        """
+        Returns a L{defer.Deferred} that will hold the result of the called
+        method.
+
+        @param name: The name of the method to call
+        @param args: The supplied args from the invoke/notify call.
+        """
+        d = defer.Deferred()
+
+        # a request from the peer to call a local method
+        try:
+            func = self.getInvokableTarget(name)
+        except:
+            d.errback()
+            func = None
+
+        if len(args) >= 1 and args[0] is None:
+            args = args[1:]
+
+        if func is None:
+            if not d.called:
+                d.errback(exc.CallFailed('Unknown method %r' % (name,)))
+        else:
+            d = defer.maybeDeferred(func, *args)
+
+        return d
+
     def onInvoke(self, name, id_, args, timestamp):
         """
         Called when an invoke message has been received from the peer. This
@@ -187,23 +215,7 @@ class BaseStream(object):
 
             return d
 
-        d = defer.Deferred()
-
-        # a request from the peer to call a local method
-        try:
-            func = self.getInvokableTarget(name)
-        except:
-            d.errback()
-            func = None
-
-        if len(args) == 1 and args[0] is None:
-            args = args[1:]
-
-        if func is None:
-            if not d.called:
-                d.errback(exc.CallFailed('Unknown method %r' % (name,)))
-        else:
-            d = defer.maybeDeferred(func, *args)
+        d = self._callExposedMethod(name, *args)
 
         if id_ > 0:
             self.activeInvokes[id_] = d
@@ -221,8 +233,16 @@ class BaseStream(object):
         @param args: A list of arguments for this method.
         @param timestamp: The timestamp at which this notify was called.
         """
+        self._callExposedMethod(name, *args)
+
     def getInvokableTarget(self, name):
         """
+        Returns a callable based on the supplied name, or C{None} if not found.
+
+        This allows fine grained control over what this stream can expose to the
+        peer.
+
+        @param name: The name of the function to be mapped to a callable.
         """
         func_name = _exposed_funcs.get(name, None)
 
