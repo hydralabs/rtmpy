@@ -1,20 +1,20 @@
-# Copyright (c) The RTMPy Project.
+# Copyright the RTMPy Project.
 # See LICENSE.txt for details.
 
 """
 RTMPy exception types.
-
-@since: 0.1
 """
 
 
 class NetConnectionError(Exception):
     """
+    Base error class for all NetConnection errors.
     """
 
 
 class CallFailed(NetConnectionError):
     """
+    Raised when invoked methods from the peer fails for some reason.
     """
 
     code = 'NetConnection.Call.Failed'

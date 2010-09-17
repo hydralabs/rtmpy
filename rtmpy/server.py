@@ -1,4 +1,4 @@
-# Copyright (c) The RTMPy Project.
+# Copyright the RTMPy Project.
 # See LICENSE.txt for details.
 
 """
