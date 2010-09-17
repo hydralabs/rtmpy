@@ -292,28 +292,6 @@ class DeMuxerTestCase(unittest.TestCase):
         self.assertEqual(self.demuxer.next(), ('foobarbaz', meta))
         self.assertEqual(self.demuxer.bucket, {})
 
-    def test_streaming(self):
-        """
-        Ensure that when reading 'streamable' types, no buffering occurs
-        """
-        from rtmpy.protocol.rtmp import message
-
-        self.add_events(
-            ('audio', False, ChannelMeta(datatype=message.AUDIO_DATA, channelId=3)),
-            ('video', False, ChannelMeta(datatype=message.VIDEO_DATA, channelId=54)))
-
-        data, meta = self.demuxer.next()
-
-        self.assertEqual(data, 'audio')
-        self.assertEqual(meta.datatype, message.AUDIO_DATA)
-        self.assertEqual(self.demuxer.bucket, {})
-
-        data, meta = self.demuxer.next()
-
-        self.assertEqual(data, 'video')
-        self.assertEqual(meta.datatype, message.VIDEO_DATA)
-        self.assertEqual(self.demuxer.bucket, {})
-
     def test_iter(self):
         self.assertIdentical(iter(self.demuxer), self.demuxer)
 

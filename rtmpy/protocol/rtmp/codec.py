@@ -395,10 +395,6 @@ class ChannelDemuxer(FrameReader):
         """
         data, complete, meta = FrameReader.next(self)
 
-        if meta.datatype in message.STREAMABLE_TYPES:
-            # don't buffer the data, pass it right on through
-            return data, meta
-
         if complete:
             data = self.bucket.pop(meta.channelId, '') + data
 
