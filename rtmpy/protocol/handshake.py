@@ -434,7 +434,7 @@ def get_implementation(protocol):
     full_mod_path = protocol_mod + '.handshake'
 
     try:
-        mod = __import__(full_mod_path, globals(), locals(), [protocol_mod], -1)
+        mod = __import__(full_mod_path, globals(), locals(), [protocol_mod])
     except ImportError:
         raise HandshakeError('Unknown handshake version %r' % (protocol,))
 
