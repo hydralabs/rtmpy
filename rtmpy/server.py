@@ -16,6 +16,7 @@ from rtmpy.protocol import rtmp, handshake, version
 
 class IApplication(Interface):
     """
+    An application provides business logic for connected clients and streams.
     """
 
     clients = Attribute("A list of clients connected to this application.")
@@ -103,8 +104,17 @@ class IApplication(Interface):
         @param client: The client object built by L{buildClient}
         """
 
+    def onDisconnect(client):
+        """
+        Called when a client has been disconnected from the application.
+        """
+
     def onPublish(client, stream):
         """
+        Called when the stream is publishing a video/audio stream.
+
+        @param client: The client linked to the stream.
+        @param stream: The L{NetStream} making the publish request.
         """
 
 
