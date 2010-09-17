@@ -96,7 +96,7 @@ class IApplication(Interface):
         @param client: The client object built by L{buildClient}
         """
 
-    def onConnectReject(client):
+    def onConnectReject(client, reason):
         """
         Called when the application has rejected the peers connection attempt.
 
@@ -172,7 +172,7 @@ class ServerProtocol(rtmp.RTMPProtocol):
             validate the connection request.
             """
             if self.application and self.client:
-                self.application.onConnectReject(self.client)
+                self.application.onConnectReject(self.client, fail)
 
             code = getattr(fail.value, 'code', 'NetConnection.Connect.Failed')
             description = fail.getErrorMessage() or 'Internal Server Error'
@@ -322,6 +322,7 @@ class Application(object):
         """
 
     def onConnectReject(self, client):
+    def onConnectReject(self, client, reason):
         """
         """
 
