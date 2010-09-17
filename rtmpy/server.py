@@ -433,6 +433,72 @@ class ServerProtocol(rtmp.RTMPProtocol):
         """
         return self.application.onUnpublish(self.client, stream)
 
+
+class StreamPublisher(object):
+    """
+    Linked to a L{NetStream} when it makes a publish request. Manages a list of
+    subscribers to the stream and propagates the events when the stream produces
+    them.
+
+    @ivar stream: The publishing L{NetStream}
+    @ivar client: The linked L{Client} object. Not used right now.
+    @ivar subscribers: A list of subscribers that are listening to the stream.
+    @todo: Think about different subscribe times.
+    """
+
+    def __init__(self, stream, client):
+        self.stream = stream
+        self.client = client
+
+        self.subscribers = []
+
+    def addSubscriber(self, subscriber):
+        """
+        Adds a subscriber to this publisher.
+        """
+        self.subscribers.append(subscriber)
+
+    def removeSubscriber(self, subscriber):
+        """
+        Removes the subscriber from this publisher.
+        """
+        try:
+            self.subscribers.remove(subscriber)
+        except ValueError:
+            pass
+
+    # events called by the stream
+
+    def videoDataReceived(self, data, timestamp):
+        """
+        A video packet has been received from the publishing stream.
+
+        @param data: The raw video data.
+        @type data: C{str}
+        @param timestamp: The timestamp at which this data was received.
+        """
+        for a in self.subscribers:
+            a.videoDataReceived(data, timestamp)
+
+    def audioDataReceived(self, data, timestamp):
+        """
+        An audio packet has been received from the publishing stream.
+
+        @param data: The raw audio data.
+        @type data: C{str}
+        @param timestamp: The timestamp at which this data was received.
+        """
+        for a in self.subscribers:
+            a.audioDataReceived(data, timestamp)
+
+    def onMetaData(self, data):
+        """
+        The meta data for the a/v stream has been updated.
+        """
+        for a in self.subscribers:
+            a.onMetaData(data)
+
+
 class Application(object):
     """
     """
