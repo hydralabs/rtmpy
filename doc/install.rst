@@ -108,6 +108,7 @@ Sphinx
 To build the Sphinx documentation you need:
 
 - Sphinx_ 1.0 or newer
+- `sphinxcontrib.epydoc`_ 0.4 or newer
 - a :doc:`copy <community/download>` of the RTMPy source distribution
 
 Unix users run the command below in the ``rtmpy/doc`` directory to create the
@@ -145,18 +146,19 @@ This will generate the HTML documentation in the ``rtmpy/doc/build/api``
 folder.
 
 
-.. _Python: 	http://www.python.org
-.. _setuptools:	http://peak.telecommunity.com/DevCenter/setuptools
-.. _easy_install: http://peak.telecommunity.com/DevCenter/EasyInstall#installing-easy-install
-.. _ez_setup.py: http://github.com/hydralabs/rtmpy/blob/master/ez_setup.py
-.. _Twisted:	http://twistedmatrix.com
-.. _PyAMF:	http://pyamf.org
+.. _Python: 	    http://www.python.org
+.. _setuptools:	    http://peak.telecommunity.com/DevCenter/setuptools
+.. _easy_install:   http://peak.telecommunity.com/DevCenter/EasyInstall#installing-easy-install
+.. _ez_setup.py:    http://github.com/hydralabs/rtmpy/blob/master/ez_setup.py
+.. _Twisted:	    http://twistedmatrix.com
+.. _PyAMF: 	    http://pyamf.org
 .. _zope.interface: http://pypi.python.org/pypi/zope.interface
-.. _PyWin32:	http://sourceforge.net/projects/pywin32
-.. _Epydoc:	http://epydoc.sourceforge.net
-.. _unittest2:	http://pypi.python.org/pypi/unittest2
-.. _nose:	http://somethingaboutorange.com/mrl/projects/nose
-.. _Trial:	http://twistedmatrix.com/trac/wiki/TwistedTrial
-.. _Sphinx:     http://sphinx.pocoo.org
-.. _website:    http://rtmpy.org
+.. _PyWin32:	    http://sourceforge.net/projects/pywin32
+.. _Epydoc:	    http://epydoc.sourceforge.net
+.. _unittest2:	    http://pypi.python.org/pypi/unittest2
+.. _nose:	    http://somethingaboutorange.com/mrl/projects/nose
+.. _Trial:	    http://twistedmatrix.com/trac/wiki/TwistedTrial
+.. _Sphinx:         http://sphinx.pocoo.org
+.. _website:        http://rtmpy.org
 .. _Installing Python Modules: http://docs.python.org/install/index.html
+.. _sphinxcontrib.epydoc: http://packages.python.org/sphinxcontrib-epydoc
