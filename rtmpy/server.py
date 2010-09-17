@@ -257,7 +257,8 @@ class NetStream(rtmp.NetStream):
 
 class ServerProtocol(rtmp.RTMPProtocol):
     """
-    Server side RTMP protocol implementation
+    Server side RTMP protocol implementation. Handles connection and stream
+    management. Provides a proxy between streams and the associated application.
     """
 
     stream_class = NetStream
