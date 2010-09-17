@@ -194,14 +194,14 @@ class BaseStream(object):
             func = self.getInvokableTarget(name)
         except:
             d.errback()
-            func = None
+
+            return d
 
         if len(args) >= 1 and args[0] is None:
             args = args[1:]
 
         if func is None:
-            if not d.called:
-                d.errback(exc.CallFailed('Unknown method %r' % (name,)))
+            d.errback(exc.CallFailed('Unknown method %r' % (name,)))
         else:
             d = defer.maybeDeferred(func, *args)
 
