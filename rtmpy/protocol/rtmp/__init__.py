@@ -111,15 +111,18 @@ class BaseStream(object):
         """
         Informs the peer of a change of status.
         """
-        kwargs.setdefault('level', 'status')
-        kwargs['code'] = code
+        if isinstance(code, status.Status):
+            kwargs = code.__dict__
+        else:
+            kwargs.setdefault('level', 'status')
+            kwargs['code'] = code
 
         if not args:
             args = (None,)
 
         msg = message.Invoke('onStatus', 0, *list(args) + [kwargs])
 
-        self.sendMessage(msg)
+        self.sendMessage(msg, whenDone=kwargs.get('whenDone', None))
 
     def setTimestamp(self, timestamp, relative=True):
         """
