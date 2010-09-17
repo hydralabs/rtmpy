@@ -22,11 +22,14 @@ class CallFailed(NetConnectionError):
 
 class ConnectError(NetConnectionError):
     """
+    Base error class for all connection related errors.
     """
 
 
 class ConnectFailed(ConnectError):
     """
+    Raised as a basic error for when connection fails and there is no other
+    specific type of error.
     """
 
     code = 'NetConnection.Connect.Failed'
@@ -34,6 +37,7 @@ class ConnectFailed(ConnectError):
 
 class ConnectRejected(ConnectError):
     """
+    Raised when the peers connection attempt is rejected by the application.
     """
 
     code = 'NetConnection.Connect.Rejected'
@@ -41,6 +45,8 @@ class ConnectRejected(ConnectError):
 
 class InvalidApplication(NetConnectionError):
     """
+    Raised when the peer attempts to connect to an invalid or unknown
+    application.
     """
 
     code = 'NetConnection.Connect.InvalidApp'
