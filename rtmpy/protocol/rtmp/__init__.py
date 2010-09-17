@@ -212,6 +212,15 @@ class BaseStream(object):
 
         return d
 
+    def onNotify(self, name, args, timestamp):
+        """
+        Call an exposed method on this peer but without regard to any return
+        value.
+
+        @param name: The name of the method to call
+        @param args: A list of arguments for this method.
+        @param timestamp: The timestamp at which this notify was called.
+        """
     def getInvokableTarget(self, name):
         """
         """

@@ -526,7 +526,7 @@ class Notify(Message):
         """
         Dispatches the message to the listener.
         """
-        return listener.onNotify(self, timestamp)
+        return listener.onNotify(self.name, self.argv, timestamp)
 
 
 class Invoke(Message):

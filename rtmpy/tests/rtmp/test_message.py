@@ -273,10 +273,10 @@ class NotifyTestCase(BaseTestCase):
         self.assertEquals(e.argv, [{'foo': 'bar', 'baz': 'gak'}])
 
     def test_dispatch(self):
-        x = message.Notify()
+        x = message.Notify('foo')
 
         x.dispatch(self.listener, 54)
-        self.assertEquals(self.listener.calls, [('notify', (x, 54), {})])
+        self.assertEquals(self.listener.calls, [('notify', ('foo', [], 54), {})])
 
 
 class InvokeTestCase(BaseTestCase):
