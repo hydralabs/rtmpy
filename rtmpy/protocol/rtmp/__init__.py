@@ -542,13 +542,12 @@ class RTMPProtocol(protocol.Protocol, BaseStream):
         return streamId
 
     @expose
-    def deleteStream(self, streamId, foo):
+    def deleteStream(self, streamId):
         """
         Deletes an existing L{NetStream} associated with this NetConnection.
 
         @todo: What about error handling or if the NetStream is still receiving
             or streaming data?
-        @todo: What is foo?
         """
         if streamId == 0:
             return # can't delete the NetConnection
