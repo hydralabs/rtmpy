@@ -7,7 +7,6 @@ Server implementation.
 
 from zope.interface import Interface, Attribute, implements
 from twisted.internet import protocol, defer
-import pyamf
 
 from rtmpy import util, exc, versions
 from rtmpy.protocol.rtmp import message, expose, status
