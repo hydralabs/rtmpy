@@ -405,7 +405,7 @@ class ChannelDemuxer(FrameReader):
         self.bucket[channelId] = self.bucket.get(channelId, '') + data
 
         # nothing was available
-        return None, None
+        return None, meta
 
 
 class Decoder(ChannelDemuxer):
@@ -460,12 +460,16 @@ class Decoder(ChannelDemuxer):
             self.dispatcher.bytesInterval(self.bytes)
             self._nextInterval += self.bytesInterval
 
-        if data is None:
+        stream = None
+
+        if data or meta.timestamp:
+            stream = self.stream_factory.getStream(meta.streamId)
+
+        if meta.timestamp != 0:
+            stream.timestamp += meta.timestamp
+
+        if not data:
             return
-
-        stream = self.stream_factory.getStream(meta.streamId)
-
-        stream.timestamp += meta.timestamp
 
         self.dispatcher.dispatchMessage(
             stream, meta.datatype, stream.timestamp, data)

@@ -165,12 +165,12 @@ class FrameReaderTestCase(unittest.TestCase):
         """
         Do a sanity check for a simple 4 frame 1 channel rtmp stream.
         """
-        def check_meta(meta):
+        def check_meta(meta, timestamp=10):
             self.assertEqual(meta.channelId, 3)
             self.assertEqual(meta.streamId, 1)
             self.assertEqual(meta.datatype, 2)
             self.assertEqual(meta.bodyLength, 500)
-            self.assertEqual(meta.timestamp, 10)
+            self.assertEqual(meta.timestamp, timestamp)
 
         size = self.reader.frameSize
 
@@ -199,19 +199,19 @@ class FrameReaderTestCase(unittest.TestCase):
 
         self.assertEqual(bytes, 'b' * self.reader.frameSize)
         self.assertFalse(complete)
-        check_meta(meta)
+        check_meta(meta, 0)
 
         bytes, complete, meta = self.reader.next()
 
         self.assertEqual(bytes, 'c' * self.reader.frameSize)
         self.assertFalse(complete)
-        check_meta(meta)
+        check_meta(meta, 0)
 
         bytes, complete, meta = self.reader.next()
 
         self.assertEqual(bytes, 'd' * (size - 12))
         self.assertTrue(complete)
-        check_meta(meta)
+        check_meta(meta, 0)
 
         self.assertRaises(StopIteration, self.reader.next)
 
@@ -283,10 +283,10 @@ class DeMuxerTestCase(unittest.TestCase):
         self.add_events(
             ('foo', False, meta), ('bar', False, meta), ('baz', True, meta))
 
-        self.assertEqual(self.demuxer.next(), (None, None))
+        self.assertEqual(self.demuxer.next(), (None, meta))
         self.assertEqual(self.demuxer.bucket, {1: 'foo'})
 
-        self.assertEqual(self.demuxer.next(), (None, None))
+        self.assertEqual(self.demuxer.next(), (None, meta))
         self.assertEqual(self.demuxer.bucket, {1: 'foobar'})
 
         self.assertEqual(self.demuxer.next(), ('foobarbaz', meta))
@@ -345,7 +345,7 @@ class DecoderTestCase(unittest.TestCase):
         self.assertRaises(AssertionError, self.decoder.next)
 
     def test_do_nothing(self):
-        self.add_events((None, None))
+        self.add_events((None, ChannelMeta(timestamp=0)))
         self.failOnDispatch = True
 
         self.assertEqual(self.decoder.next(), None)
