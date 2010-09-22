@@ -48,9 +48,6 @@ class MockFactory(object):
 
         return self.test.handshaker
 
-    def getControlStream(self, protocol, streamId):
-        return rtmp.ControlStream(protocol, streamId)
-
 
 class MockApplication(object):
     """
@@ -317,7 +314,8 @@ class BasicResponseTestCase(ProtocolTestCase):
         correctly.
         """
         self.decoder.setBytesInterval(8)
-        self.decoder.send('\x03\x00\x00\x00\x00\x00\x00\x08\x00\x00\x00\x00')
+        self.decoder.send('\x03\x00\x00\x00\x00\x00\x04\x01\x00\x00\x00\x00'
+            '\x00\x00\x00\x32')
 
         self.decoder.next()
 
@@ -327,7 +325,7 @@ class BasicResponseTestCase(ProtocolTestCase):
 
         self.assertEqual(_, None)
         self.assertIsInstance(msg, message.BytesRead)
-        self.assertEqual(msg.bytes, 12)
+        self.assertEqual(msg.bytes, 16)
 
     def test_frame_size(self):
         """

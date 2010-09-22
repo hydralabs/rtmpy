@@ -15,6 +15,7 @@ The Encoder/Decoder is not thread safe.
 """
 
 import collections
+import copy
 
 from pyamf.util import BufferedByteStream
 
@@ -82,6 +83,8 @@ class BaseChannel(object):
         self.stream = stream
         self.frameSize = frameSize
         self.bytes = 0
+        self.timestamp = 0
+        self._lastDelta = 0
 
         self.header = None
 
@@ -113,7 +116,15 @@ class BaseChannel(object):
         else:
             self.header = header.merge(self.header, new)
 
+        # receiving a new message and no timestamp has been supplied means
+        # we use the last known
+        if self._bodyRemaining == -1 and new.timestamp == -1:
+            self.setTimestamp(self._lastDelta)
+
         self._bodyRemaining = self.header.bodyLength - self.bytes
+
+        if new.timestamp > 0:
+            self.setTimestamp(new.timestamp, not new.full)
 
         return old
 
@@ -164,6 +175,25 @@ class BaseChannel(object):
             self.frameRemaining = size
 
         self.frameSize = size
+
+    def setTimestamp(self, timestamp, relative=True):
+        """
+        Sets the timestamp for this stream. The timestamp is measured in
+        milliseconds since an arbitrary epoch. This could be since the stream
+        started sending or receiving audio/video etc.
+
+        @param relative: Whether the supplied timestamp is relative to the
+            previous.
+        """
+        if relative:
+            self._lastDelta = timestamp
+            self.timestamp += timestamp
+        else:
+            if timestamp < self.timestamp:
+                raise ValueError('Cannot set a negative timestamp')
+
+            self.timestamp = timestamp
+            self._lastDelta = 0
 
     def __repr__(self):
         s = []
@@ -350,9 +380,11 @@ class FrameReader(Codec):
             raise StopIteration
 
         complete = channel.complete()
-        h = channel.header
+        h = copy.copy(channel.header)
 
         if complete:
+            h.timestamp = channel.timestamp
+
             channel.reset()
 
         return bytes, complete, h
@@ -405,7 +437,7 @@ class ChannelDemuxer(FrameReader):
         self.bucket[channelId] = self.bucket.get(channelId, '') + data
 
         # nothing was available
-        return None, meta
+        return None, None
 
 
 class Decoder(ChannelDemuxer):
@@ -460,19 +492,13 @@ class Decoder(ChannelDemuxer):
             self.dispatcher.bytesInterval(self.bytes)
             self._nextInterval += self.bytesInterval
 
-        stream = None
-
-        if data or meta.timestamp:
-            stream = self.stream_factory.getStream(meta.streamId)
-
-        if meta.timestamp != 0:
-            stream.timestamp += meta.timestamp
-
-        if not data:
+        if data is None:
             return
 
+        stream = self.stream_factory.getStream(meta.streamId)
+
         self.dispatcher.dispatchMessage(
-            stream, meta.datatype, stream.timestamp, data)
+            stream, meta.datatype, meta.timestamp, data)
 
 
 class ChannelMuxer(Codec):

@@ -49,7 +49,7 @@ class HeaderTestCase(unittest.TestCase):
 
         self.assertEquals(repr(h), '<rtmpy.protocol.rtmp.header.Header '
             'streamId=None datatype=None timestamp=None bodyLength=None '
-            'channelId=3 at 0x%x>' % (id(h),))
+            'channelId=3 full=False at 0x%x>' % (id(h),))
 
         d = {
             'channelId': 1,
@@ -63,7 +63,7 @@ class HeaderTestCase(unittest.TestCase):
 
         self.assertEquals(repr(h), '<rtmpy.protocol.rtmp.header.Header '
             'streamId=98 datatype=20 timestamp=50 bodyLength=2000 channelId=1 '
-            'at 0x%x>' % (id(h),))
+            'full=False at 0x%x>' % (id(h),))
 
 
 class EncodeTestCase(unittest.TestCase):
@@ -285,7 +285,7 @@ class MergeTestCase(unittest.TestCase):
     def test_timestamp(self):
         h = self.merge(timestamp=-1)
 
-        self.assertEqual(h.timestamp, 0)
+        self.assertEqual(h.timestamp, 1000)
 
         h = self.merge(timestamp=999)
         self.assertEqual(h.timestamp, 999)

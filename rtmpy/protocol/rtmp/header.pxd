@@ -10,6 +10,7 @@ cdef class Header:
     cdef public int datatype
     cdef public int bodyLength
     cdef public int streamId
+    cdef public bint full
 
 
 @cython.locals(size=cython.int, channelId=cython.int)

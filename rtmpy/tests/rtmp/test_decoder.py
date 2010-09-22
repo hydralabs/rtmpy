@@ -199,19 +199,19 @@ class FrameReaderTestCase(unittest.TestCase):
 
         self.assertEqual(bytes, 'b' * self.reader.frameSize)
         self.assertFalse(complete)
-        check_meta(meta, 0)
+        check_meta(meta, 10)
 
         bytes, complete, meta = self.reader.next()
 
         self.assertEqual(bytes, 'c' * self.reader.frameSize)
         self.assertFalse(complete)
-        check_meta(meta, 0)
+        check_meta(meta, 10)
 
         bytes, complete, meta = self.reader.next()
 
         self.assertEqual(bytes, 'd' * (size - 12))
         self.assertTrue(complete)
-        check_meta(meta, 0)
+        check_meta(meta, 10)
 
         self.assertRaises(StopIteration, self.reader.next)
 
@@ -255,7 +255,7 @@ class FrameReaderTestCase(unittest.TestCase):
 
         self.assertEqual(bytes, 'b' * 128)
         self.assertTrue(complete)
-        self.assertEqual(meta.timestamp, 45)
+        self.assertEqual(meta.timestamp, 100)
 
 
 class DeMuxerTestCase(unittest.TestCase):
@@ -283,10 +283,10 @@ class DeMuxerTestCase(unittest.TestCase):
         self.add_events(
             ('foo', False, meta), ('bar', False, meta), ('baz', True, meta))
 
-        self.assertEqual(self.demuxer.next(), (None, meta))
+        self.assertEqual(self.demuxer.next(), (None, None))
         self.assertEqual(self.demuxer.bucket, {1: 'foo'})
 
-        self.assertEqual(self.demuxer.next(), (None, meta))
+        self.assertEqual(self.demuxer.next(), (None, None))
         self.assertEqual(self.demuxer.bucket, {1: 'foobar'})
 
         self.assertEqual(self.demuxer.next(), ('foobarbaz', meta))
@@ -374,7 +374,8 @@ class DecoderTestCase(unittest.TestCase):
         self.assertEqual(self.decoder.next(), None)
         self.assertEqual(self.decoder.next(), None)
 
-        self.assertEqual(self.streams[2].timestamp, 5)
+        self.assertEqual(t1.timestamp, 2)
+        self.assertEqual(t2.timestamp, 3)
 
 
 class BytesIntervalTestCase(unittest.TestCase):
