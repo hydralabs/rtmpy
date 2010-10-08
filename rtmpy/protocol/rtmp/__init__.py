@@ -385,9 +385,6 @@ class RTMPProtocol(protocol.Protocol, BaseStream):
     objectEncoding = pyamf.AMF0
     clientId = None
 
-    def __init__(self):
-        BaseStream.__init__(self, 0)
-
     def logAndDisconnect(self, reason, *args, **kwargs):
         """
         Called when something fatal has occurred. Logs any errors and closes the
@@ -511,6 +508,9 @@ class RTMPProtocol(protocol.Protocol, BaseStream):
         """
         Handshaking was successful, streaming now commences.
         """
+        # this protocol is the NetConnection
+        BaseStream.__init__(self, 0)
+
         self.decoder = codec.Decoder(DecodingDispatcher(self), self)
         self.encoder = codec.Encoder(self.transport)
 
