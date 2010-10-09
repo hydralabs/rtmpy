@@ -380,7 +380,7 @@ class FrameReader(Codec):
             raise StopIteration
 
         complete = channel.complete()
-        h = copy.copy(channel.header)
+        h = channel.header
 
         if complete:
             h.timestamp = channel.timestamp
