@@ -455,8 +455,8 @@ class ServerProtocol(rtmp.RTMPProtocol):
 
             @param publisher: L{StreamPublisher}
             """
-            stream.publisher = publisher
-            stream.publishingStarted(streamName)
+            stream.publishingStarted(publisher, streamName)
+            publisher.start()
             self.application.onPublish(self.client, stream)
 
             return publisher
@@ -475,6 +475,24 @@ class ServerProtocol(rtmp.RTMPProtocol):
         """
         return self.application.onUnpublish(self.client, stream)
 
+    @expose
+    def releaseStream(self, name):
+        """
+        Called when the stream is released. Not sure about this one.
+        """
+
+    def playStream(self, name, subscriber, *args):
+        """
+        """
+        try:
+            publisher = self.application.getStreamByName(name)
+        except:
+            raise exc.StreamNotFound('Unknown stream %r' % (name,))
+
+        publisher.addSubscriber(subscriber)
+
+        return publisher
+
 
 class StreamPublisher(object):
     """
@@ -485,8 +503,7 @@ class StreamPublisher(object):
     @ivar stream: The publishing L{NetStream}
     @ivar client: The linked L{Client} object. Not used right now.
     @ivar subscribers: A list of subscribers that are listening to the stream.
-    @todo: Think about different subscribe times and how that will affect
-        relative timestamps.
+    @ivar
     """
 
     implements(IPublishingStream)
@@ -495,21 +512,37 @@ class StreamPublisher(object):
         self.stream = stream
         self.client = client
 
-        self.subscribers = []
+        self.subscribers = {}
+        self.meta = {}
+        self.timestamp = 0
+
+    def _updateTimestamp(self, timestamp):
+        """
+        """
+        self.timestamp = timestamp
 
     def addSubscriber(self, subscriber):
         """
         Adds a subscriber to this publisher.
         """
-        self.subscribers.append(subscriber)
+        print 'adding subscriber', self.timestamp
+
+        self.subscribers[subscriber] = {
+            'timestamp': self.timestamp
+        }
+
+        if self.meta:
+            subscriber.onMetaData(self.meta)
 
     def removeSubscriber(self, subscriber):
         """
         Removes the subscriber from this publisher.
         """
+        print 'removing subscriber'
+
         try:
-            self.subscribers.remove(subscriber)
-        except ValueError:
+            del self.subscribers[subscriber]
+        except KeyError:
             pass
 
     # events called by the stream
@@ -522,8 +555,19 @@ class StreamPublisher(object):
         @type data: C{str}
         @param timestamp: The timestamp at which this data was received.
         """
-        for a in self.subscribers:
-            a.videoDataReceived(data, timestamp)
+        self._updateTimestamp(timestamp)
+
+        to_remove = []
+
+        for subscriber, context in self.subscribers.iteritems():
+            try:
+                subscriber.videoDataReceived(data, timestamp - context['timestamp'])
+            except:
+                to_remove.append(subscriber)
+
+        if to_remove:
+            for subscriber in to_remove:
+                self.removeSubscriber(subscriber)
 
     def audioDataReceived(self, data, timestamp):
         """
@@ -533,15 +577,33 @@ class StreamPublisher(object):
         @type data: C{str}
         @param timestamp: The timestamp at which this data was received.
         """
-        for a in self.subscribers:
-            a.audioDataReceived(data, timestamp)
+        self._updateTimestamp(timestamp)
+        to_remove = []
+
+        for subscriber, context in self.subscribers.iteritems():
+            try:
+                subscriber.audioDataReceived(data, timestamp - context['timestamp'])
+            except:
+                to_remove.append(subscriber)
+
+        if to_remove:
+            for subscriber in to_remove:
+                self.removeSubscriber(subscriber)
 
     def onMetaData(self, data):
         """
         The meta data for the a/v stream has been updated.
         """
+        self.meta.update(data)
+
         for a in self.subscribers:
             a.onMetaData(data)
+
+    def start(self):
+        pass
+
+    def stop(self):
+        pass
 
 
 class Application(object):
@@ -566,6 +628,12 @@ class Application(object):
         """
         Called when the application is closed.
         """
+
+    def getStreamByName(self, name):
+        """
+        """
+        return self.streams[name]
+
 
     def acceptConnection(self, client):
         """
