@@ -123,6 +123,19 @@ class IPublishingStream(Interface):
     The name should be enough :)
     """
 
+    def started(self):
+        """
+        Publishing has now started (or resumed).
+        """
+
+    def stopped(self):
+        """
+        Publishing has been stopped/paused.
+
+        @todo: Distinguish between a paused/starved stream and a stream that has
+            gone away.
+        """
+
     def videoDataReceived(data, timestamp):
         """
         A video packet has been received from the publishing stream.
@@ -164,7 +177,8 @@ class Client(object):
 class NetStream(rtmp.NetStream):
     """
     A server side NetStream. Knows nothing of L{IApplication}s but interfaces
-    directly with the L{ServerProtocol} (which does).
+    directly with the L{ServerProtocol} (which does). A NetStream is dumb and
+    defers all logic to the L{NetConnection<ServerProtocol>}.
 
     @param state: The state of the NetStream. Right now the only valid values
         are C{None} and C{'publishing'}.
@@ -183,11 +197,12 @@ class NetStream(rtmp.NetStream):
         self.name = None
         self.publisher = None
 
-    def publishingStarted(self, name):
+    def publishingStarted(self, publisher, name):
         """
         Called when this NetStream has started publishing data from the
         connected peer.
         """
+        self.publisher = publisher
         self.name = name
         self.state = 'publishing'
 
