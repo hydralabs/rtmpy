@@ -107,6 +107,25 @@ class BaseStream(object):
         self.lastInvokeId = -1
         self.activeInvokes = {}
 
+    def call(self, name, *args, **kwargs):
+        whenDone = kwargs.get('whenDone', None)
+
+        if not whenDone:
+            self.sendMessage(message.Notify(name, *args))
+
+            return
+
+        self.lastInvokeId += 1
+        invokeId = self.lastInvokeId
+
+        d = defer.Deferred()
+        m = message.Invoke(name, invokeId, *args)
+        self.activeInvokes[invokeId] = d
+
+        self.sendMessage(m, whenDone=whenDone)
+
+        return d
+
     def sendStatus(self, code, *args, **kwargs):
         """
         Informs the peer of a change of status.
