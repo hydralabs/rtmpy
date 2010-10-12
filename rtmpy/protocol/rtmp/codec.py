@@ -189,8 +189,8 @@ class BaseChannel(object):
             self._lastDelta = timestamp
             self.timestamp += timestamp
         else:
-            if timestamp < self.timestamp:
-                raise ValueError('Cannot set a negative timestamp')
+            #if timestamp < self.timestamp:
+            #    raise ValueError('Cannot set a negative timestamp')
 
             self.timestamp = timestamp
             self._lastDelta = 0
@@ -522,9 +522,13 @@ class ChannelMuxer(Codec):
     def __init__(self, stream=None):
         Codec.__init__(self, stream=stream)
 
+        self.pending = []
+
         self.minChannelId = MIN_CHANNEL_ID
         self.releasedChannels = collections.deque()
+        self.aquiredChannels = []
         self.activeChannels = []
+        self.internalChannels = {}
         self.channelsInUse = 0
 
         self.nextHeaders = {}
@@ -565,7 +569,7 @@ class ChannelMuxer(Codec):
 
         c = self.getChannel(channelId)
 
-        self.activeChannels.append(c)
+        self.aquiredChannels.append(c)
 
         return c
 
@@ -580,7 +584,7 @@ class ChannelMuxer(Codec):
 
         try:
             # FIXME: this is expensive
-            self.activeChannels.remove(c)
+            self.aquiredChannels.remove(c)
         except ValueError:
             raise EncodeError('Attempted to release channel %r but that '
                 'channel is not active' % (channelId,))
@@ -620,6 +624,12 @@ class ChannelMuxer(Codec):
         """
         raise NotImplementedError
 
+    def _encodeOneFrame(self, channel):
+        self.writeHeader(channel)
+        channel.marshallOneFrame()
+
+        return channel.complete()
+
     def send(self, data, datatype, streamId, timestamp, callback=None):
         """
         Queues an RTMP message to be encoded. Call C{next} to do the encoding.
@@ -640,33 +650,30 @@ class ChannelMuxer(Codec):
         """
         if message.is_command_type(datatype):
             # we have to special case command types because a channel only be
-            # busy with one message at a time
+            # busy with one message at a time. Command messages are always
+            # written right away
             channel = self.getChannel(2)
         else:
             channel = self.aquireChannel()
 
-        if channel is None:
-            raise EncodeError('Could not allocate channel')
+        if not channel:
+            self.pending.append(data, datatype, streamId, timestamp, callback)
 
-        lastTimestamp = self.timestamps.get(streamId, 0)
+            return
 
-        h = header.Header(channel.channelId, streamId=streamId,
-            datatype=datatype, bodyLength=len(data),
-            timestamp=timestamp - lastTimestamp)
-
-        self.timestamps[streamId] = timestamp
-        self.nextHeaders[channel] = h
+        h = header.Header(
+            channel.channelId,
+            timestamp - channel.timestamp,
+            datatype,
+            len(data),
+            streamId)
 
         channel.append(data)
+        self.nextHeaders[channel] = h
 
         if channel.channelId == 2:
-            # channel id of 2 is special and gets the highest priority
-            while True:
-                self.writeHeader(channel)
-                channel.marshallOneFrame()
-
-                if channel.complete():
-                    break
+            while not self._encodeOneFrame(channel):
+                pass
 
             channel.reset()
             self.flush()
@@ -676,27 +683,28 @@ class ChannelMuxer(Codec):
 
             return
 
-        if callback:
-            self.callbacks[channel.channelId] = callback
+        self.activeChannels.append(channel)
 
     def next(self):
         """
         Encodes one RTMP frame from all the active channels.
         """
+        while self.pending and not self.isFull():
+            self.send(*self.pending.pop(0))
+
         if not self.activeChannels:
             raise StopIteration
 
         to_release = []
 
         for channel in self.activeChannels:
-            self.writeHeader(channel)
-            channel.marshallOneFrame()
-
-            if channel.complete():
+            if self._encodeOneFrame(channel):
                 channel.reset()
-                to_release.append(channel.channelId)
+                to_release.append(channel)
 
-        [self.releaseChannel(channelId) for channelId in to_release]
+        for channel in to_release:
+            self.releaseChannel(channel.channelId)
+            self.activeChannels.remove(channel)
 
 
 class Encoder(ChannelMuxer):
@@ -713,46 +721,18 @@ class Encoder(ChannelMuxer):
         channel.
     @ivar output: A C{write}able object that will receive the final encoded RTMP
         stream. The instance only needs to implement C{write} and accept 1 param
+        (the data).
     """
 
     def __init__(self, output, stream=None):
         ChannelMuxer.__init__(self, stream=stream)
 
-        self.pending = []
         self.output = output
-
-    def send(self, data, datatype, streamId, timestamp, callback=None):
-        """
-        Queues an RTMP message to be encoded. Call C{next} to do the encoding.
-
-        @param data: The raw data that will be marshalled into RTMP frames and
-            sent to the peer.
-        @type data: C{str}
-        @param datatype: The type of data. See C{message} for a list of known
-            RTMP types.
-        @type datatype: C{int}
-        @param streamId: The C{NetStream} id that this message is intended for.
-        @type streamId: C{int}
-        @param timestamp: The current timestamp for the stream that this message
-            was sent.
-        @type timestamp: C{int}
-        @param callback: A callable that will be executed once the data has been
-            fully written to the RTMP stream.
-        """
-        if self.isFull():
-            self.pending.append((data, datatype, streamId, timestamp, callback))
-
-            return
-
-        ChannelMuxer.send(self, data, datatype, streamId, timestamp, callback)
 
     def next(self):
         """
         Called iteratively to produce an RTMP encoded stream.
         """
-        while self.pending and not self.isFull():
-            ChannelMuxer.send(self, *self.pending.pop(0))
-
         ChannelMuxer.next(self)
 
         self.flush()
