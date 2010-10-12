@@ -565,6 +565,10 @@ class RTMPProtocol(protocol.Protocol, BaseStream):
         if not self.encoder_task:
             self._startEncoding()
 
+    def setFrameSize(self, size):
+        self.sendMessage(message.FrameSize(size))
+        self.encoder.setFrameSize(size)
+
     @expose
     def createStream(self):
         """
