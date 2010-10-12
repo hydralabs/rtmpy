@@ -207,6 +207,16 @@ class NetStream(rtmp.NetStream):
         self.state = 'publishing'
 
     @expose
+    def receiveAudio(self, audio):
+        """
+        """
+
+    @expose
+    def receiveVideo(self, video):
+        """
+        """
+
+    @expose
     def publish(self, name, type_='live'):
         """
         Called by the peer to start pushing video/audio data.
@@ -307,6 +317,63 @@ class NetStream(rtmp.NetStream):
 
         if func and name == 'onMetaData':
             func(meta)
+
+    @expose
+    def play(self, name, *args):
+        d = defer.maybeDeferred(self.nc.playStream, name, self, *args)
+
+        def cb(res):
+            """
+            The stream has started playing
+            """
+            self._audioChannel = self.nc.getStreamingChannel(self)
+            self._audioChannel.setType(message.AUDIO_DATA)
+
+            self._videoChannel = self.nc.getStreamingChannel(self)
+            self._videoChannel.setType(message.VIDEO_DATA)
+
+            print 'playing', res
+            self.state = 'playing'
+
+            # wtf
+            self.sendMessage(message.ControlMessage(4, 1))
+            self.sendMessage(message.ControlMessage(0, 1))
+
+            self.sendStatus('NetStream.Play.Reset',
+                description='Playing and resetting %s' % (name,),
+                clientid=self.nc.clientId)
+
+            self.sendStatus('NetStream.Play.Start',
+                description='Started playing %s' % (name,),
+                clientid=self.nc.clientId)
+
+            self.nc.call('onStatus', {'code': 'NetStream.Data.Start'})
+
+            return res
+
+        def eb(fail):
+            code = getattr(fail.value, 'code', 'NetStream.Play.Failed')
+            description = fail.getErrorMessage() or 'Internal Server Error'
+
+            self.sendStatus(status.error(code, description))
+
+            return fail
+
+        d.addErrback(eb)
+        d.addCallback(cb)
+
+        return d
+
+    def onMetaData(self, data):
+        """
+        """
+        self.call('onMetaData', data)
+
+    def videoDataReceived(self, data, timestamp):
+        self._videoChannel.sendData(data, timestamp)
+
+    def audioDataReceived(self, data, timestamp):
+        self._audioChannel.sendData(data, timestamp)
 
 
 class ServerProtocol(rtmp.RTMPProtocol):
@@ -540,7 +607,7 @@ class StreamPublisher(object):
         """
         Adds a subscriber to this publisher.
         """
-        print 'adding subscriber', self.timestamp
+        print 'adding subscriber', self.timestamp, subscriber
 
         self.subscribers[subscriber] = {
             'timestamp': self.timestamp
@@ -575,8 +642,10 @@ class StreamPublisher(object):
         to_remove = []
 
         for subscriber, context in self.subscribers.iteritems():
+            relTimestamp = timestamp - context['timestamp']
+
             try:
-                subscriber.videoDataReceived(data, timestamp - context['timestamp'])
+                subscriber.videoDataReceived(data, relTimestamp)
             except:
                 to_remove.append(subscriber)
 
