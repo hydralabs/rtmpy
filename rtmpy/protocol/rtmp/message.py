@@ -642,7 +642,7 @@ class VideoData(StreamingMessage):
     A message containing video data.
     """
 
-    RTMP_TYPE = AUDIO_DATA
+    RTMP_TYPE = VIDEO_DATA
 
     def dispatch(self, listener, timestamp):
         """
