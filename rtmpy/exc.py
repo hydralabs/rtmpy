@@ -6,7 +6,13 @@ RTMPy exception types.
 """
 
 
-class NetConnectionError(Exception):
+class BaseError(Exception):
+    """
+    Base exception class from which all others must be subclassed.
+    """
+
+
+class NetConnectionError(BaseError):
     """
     Base error class for all NetConnection errors.
     """
@@ -52,7 +58,7 @@ class InvalidApplication(NetConnectionError):
     code = 'NetConnection.Connect.InvalidApp'
 
 
-class PublishError(Exception):
+class PublishError(BaseError):
     """
     Base error for all NetStream publishing errors.
     """
@@ -65,3 +71,17 @@ class BadNameError(PublishError):
     """
 
     code = 'NetStream.Publish.BadName'
+
+
+class PlayError(BaseError):
+    """
+    Base error for all NetStream playing errors.
+    """
+
+
+class StreamNotFound(PlayError):
+    """
+    Raised when the corresponding stream could not be found for a play request.
+    """
+
+    code = 'NetStream.Play.StreamNotFound'
