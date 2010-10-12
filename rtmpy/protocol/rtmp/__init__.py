@@ -569,6 +569,19 @@ class RTMPProtocol(protocol.Protocol, BaseStream):
         self.sendMessage(message.FrameSize(size))
         self.encoder.setFrameSize(size)
 
+    def getStreamingChannel(self, stream):
+        """
+        """
+        self.setFrameSize(4096)
+
+        channel = self.encoder.aquireChannel()
+
+        if not channel:
+            # todo: make this better
+            raise RuntimeError('No streaming channel available')
+
+        return codec.StreamingChannel(channel, stream.streamId, self.transport)
+
     @expose
     def createStream(self):
         """

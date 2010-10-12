@@ -747,3 +747,61 @@ class Encoder(ChannelMuxer):
         self.stream.consume()
 
         self.bytes += len(s)
+
+
+class StreamingChannel(object):
+    """
+    """
+
+    def __init__(self, channel, streamId, output):
+        self.type = None
+        self.channel = channel
+        self.streamId = streamId
+        self.output = output
+        self.stream = BufferedByteStream()
+
+        self._lastHeader = None
+        self._oldStream = channel.stream
+        channel.stream = self.stream
+
+        h = header.Header(channel.channelId)
+
+        # encode a continuation header for speed
+        header.encode(self.stream, h, h)
+
+        self._continuationHeader = self.stream.getvalue()
+        self.stream.consume()
+
+    def __del__(self):
+        try:
+            self.channel.stream = self._oldStream
+        except:
+            pass
+
+    def setType(self, type):
+        self.type = type
+
+    def sendData(self, data, timestamp):
+        c = self.channel
+        relTimestamp = timestamp - c.timestamp
+
+        h = header.Header(c.channelId, relTimestamp, self.type, len(data), self.streamId)
+
+        if self._lastHeader is None:
+            h.full = True
+
+        c.setHeader(h)
+        c.append(data)
+
+        header.encode(self.stream, h, self._lastHeader)
+        self._lastHeader = h
+
+        c.marshallOneFrame()
+
+        while not c.complete():
+            self.stream.write(self._continuationHeader)
+            c.marshallOneFrame()
+
+        c.reset()
+        self.output.write(self.stream.getvalue())
+        self.stream.consume()
