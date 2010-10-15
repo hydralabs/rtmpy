@@ -278,6 +278,13 @@ class NetStream(rtmp.NetStream):
 
         return d
 
+    def unpublish(self):
+        """
+        Called when the producer stream has gone away. Perform clean up here.
+        """
+        # todo inform the nc that the stream went away
+        self.sendStatus('NetStream.Play.UnpublishNotify')
+
     def onVideoData(self, data, timestamp):
         """
         Called when a video packet has been received from the peer.
@@ -335,7 +342,6 @@ class NetStream(rtmp.NetStream):
             self._videoChannel = self.nc.getStreamingChannel(self)
             self._videoChannel.setType(message.VIDEO_DATA)
 
-            print 'playing', res
             self.state = 'playing'
 
             # wtf
@@ -377,6 +383,10 @@ class NetStream(rtmp.NetStream):
 
     def audioDataReceived(self, data, timestamp):
         self._audioChannel.sendData(data, timestamp)
+
+    def deleteStream(self):
+        """
+        """
 
 
 class ServerProtocol(rtmp.RTMPProtocol):
@@ -584,6 +594,8 @@ class ServerProtocol(rtmp.RTMPProtocol):
         @type stream: L{NetStream}
         @param streamName: The name of the stream being unpublished. Not used.
         """
+        self.application.unpublishStream(streamName, stream)
+
         return self.application.onUnpublish(self.client, stream)
 
     @expose
@@ -636,8 +648,6 @@ class StreamPublisher(object):
         """
         Adds a subscriber to this publisher.
         """
-        print 'adding subscriber', self.timestamp, subscriber
-
         self.subscribers[subscriber] = {
             'timestamp': self.timestamp
         }
@@ -718,6 +728,12 @@ class StreamPublisher(object):
     def stop(self):
         pass
 
+    def unpublish(self):
+        for a in self.subscribers:
+            a.unpublish()
+
+        self.subscribers = {}
+
 
 class Application(object):
     """
@@ -796,6 +812,19 @@ class Application(object):
             raise exc.BadNameError('%s is already used' % (name,))
 
         return publisher
+
+    def unpublishStream(self, name, stream):
+        try:
+            source = self.streams[name]
+        except KeyError:
+            raise exc.BadNameError('Unknown stream %r' % (name,))
+
+        if source.client.id != stream.client.id:
+            raise exc.StreamError('Unable to unpublish stream')
+
+        source.unpublish()
+
+        del self.streams[name]
 
     def addSubscriber(self, stream, subscriber):
         """

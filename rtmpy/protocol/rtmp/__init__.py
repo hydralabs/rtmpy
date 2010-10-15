@@ -333,6 +333,12 @@ class NetStream(BaseStream):
         """
         self.nc.sendMessage(msg, whenDone, stream=self)
 
+    def deleteStream(self):
+        """
+        Called when this stream has been deleted from the NetConnection. Use it
+        to clean up.
+        """
+
 
 class DecodingDispatcher(object):
     """
@@ -610,10 +616,10 @@ class RTMPProtocol(protocol.Protocol, BaseStream):
         if streamId == 0:
             return # can't delete the NetConnection
 
-        try:
-            del self.streams[streamId]
-        except KeyError:
-            pass
+        stream = self.streams.pop(streamId, None)
+
+        if stream:
+            stream.deleteStream()
 
     def onFrameSize(self, size, timestamp):
         """
