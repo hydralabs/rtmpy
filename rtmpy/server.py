@@ -525,6 +525,8 @@ class ServerProtocol(rtmp.RTMPProtocol):
         @param type_: Not quite sure of the significance of this yet - valid
             values appear to be 'live', 'append', 'record'.
         """
+        streamName = util.ParamedString(streamName)
+
         if not self.connected:
             raise exc.ConnectError('Cannot publish stream - not connected')
 

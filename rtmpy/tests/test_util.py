@@ -81,6 +81,31 @@ class UnknownPlatformUptimeTestCase(unittest.TestCase):
         self.assertNotEquals(util.boottime, None)
 
 
+class ParamedStringTestCase(unittest.TestCase):
+    """
+    Tests for L{util.ParamedString}
+    """
+
+    def test_create(self):
+        """
+        Simple creation.
+        """
+        x = util.ParamedString('foobar')
+
+        self.assertEqual(x, 'foobar')
+
+    def test_params(self):
+        """
+        """
+        x = util.ParamedString('foobar?foo=foo&bar=bar&bar=baz')
+
+        self.assertEqual(x, 'foobar')
+        self.assertEqual(x.foo, 'foo')
+        self.assertEqual(x.bar, ['bar', 'baz'])
+
+        self.assertRaises(AttributeError, getattr, x, 'baz')
+
+
 if not sys.platform.startswith('linux'):
     LinuxUptimeTestCase.skip = 'Tested platform is not linux'
 

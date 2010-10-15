@@ -9,9 +9,48 @@ RTMPy Utilities.
 @since: 0.1
 """
 
-import os.path, sys, time, random
+import os.path
+import sys
+import time
+import random
+import urlparse
+
 
 from pyamf.util import BufferedByteStream
+
+
+class ParamedString(unicode):
+    """
+    Names of streams can have url query strings attached as additional parameters.
+
+    This class
+    """
+
+    def __new__(cls, name):
+        result = urlparse.urlparse(name)
+
+        x = unicode.__new__(cls, result[2])
+
+        x._set_query(result[4])
+
+        return x
+
+    def _set_query(self, qs):
+        unicode.__setattr__(self, '_query', urlparse.parse_qs(qs))
+
+    def __getattr__(self, name):
+        try:
+            value = self._query[name]
+        except KeyError:
+            raise AttributeError('Unknown attribute %r' % (name,))
+
+        if len(value) == 1:
+            return value[0]
+
+        return value
+
+    def __setattr__(self, name, value):
+        self._query[name] = value
 
 
 #: The number of milliseconds since the epoch.
