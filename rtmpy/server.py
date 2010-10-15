@@ -173,6 +173,9 @@ class Client(object):
         self.nc = nc
         self.id = None
 
+    def call(self, name, *args):
+        self.nc.call(name, *args)
+
 
 class NetStream(rtmp.NetStream):
     """
@@ -393,6 +396,30 @@ class ServerProtocol(rtmp.RTMPProtocol):
 
         self.connected = False
         self.application = None
+
+    def getInvokableTarget(self, name):
+        target = rtmp.RTMPProtocol.getInvokableTarget(self, name)
+
+        if target:
+            return target
+
+        # all client methods are publicly accessible
+        client = getattr(self, 'client', None)
+
+        if client:
+            target = getattr(client, name, None)
+
+            if target:
+                return target
+
+        application = getattr(self, 'application', None)
+
+        if application and hasattr(application.__class__, name):
+            # todo think about protecting some methods?
+            target = getattr(application, name, None)
+
+            if target:
+                return target
 
     @expose('connect')
     def onConnect(self, args):
