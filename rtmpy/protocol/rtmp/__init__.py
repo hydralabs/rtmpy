@@ -316,6 +316,10 @@ class NetStream(BaseStream):
 
         self.nc = nc
 
+    @property
+    def client(self):
+        return self.nc.client
+
     def sendMessage(self, msg, whenDone=None):
         """
         Sends an RTMP message to the peer. This a low level method and is not
