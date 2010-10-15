@@ -58,7 +58,15 @@ class InvalidApplication(NetConnectionError):
     code = 'NetConnection.Connect.InvalidApp'
 
 
-class PublishError(BaseError):
+class StreamError(BaseError):
+    """
+    Base NetStream errors.
+    """
+
+    code = 'NetStream.Failed'
+
+
+class PublishError(StreamError):
     """
     Base error for all NetStream publishing errors.
     """
