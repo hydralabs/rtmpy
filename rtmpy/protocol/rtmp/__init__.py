@@ -443,6 +443,9 @@ class RTMPProtocol(protocol.Protocol, BaseStream):
             del_attr('encoder_task')
             del_attr('encoder')
 
+            for streamId in self.streams.keys()[:]:
+                self.deleteStream(streamId)
+
             del_attr('streams')
 
     def _stream_dataReceived(self, data):
