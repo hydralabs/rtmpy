@@ -437,16 +437,20 @@ class RTMPProtocol(protocol.Protocol, BaseStream):
         if self.state == self.HANDSHAKE:
             del_attr('handshaker')
         elif self.state == self.STREAM:
+            for streamId, stream in self.streams.copy().iteritems():
+                if stream is self:
+                    continue
+
+                stream.closeStream()
+                self.deleteStream(streamId)
+
+            del_attr('streams')
+
             del_attr('decoder_task')
             del_attr('decoder')
 
             del_attr('encoder_task')
             del_attr('encoder')
-
-            for streamId in self.streams.keys()[:]:
-                self.deleteStream(streamId)
-
-            del_attr('streams')
 
     def _stream_dataReceived(self, data):
         try:
