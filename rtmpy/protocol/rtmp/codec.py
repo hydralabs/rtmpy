@@ -657,7 +657,7 @@ class ChannelMuxer(Codec):
             channel = self.aquireChannel()
 
         if not channel:
-            self.pending.append(data, datatype, streamId, timestamp, callback)
+            self.pending.append((data, datatype, streamId, timestamp, callback))
 
             return
 
@@ -683,6 +683,9 @@ class ChannelMuxer(Codec):
 
             return
 
+        if callback:
+            self.callbacks[channel] = callback
+
         self.activeChannels.append(channel)
 
     def next(self):
@@ -701,6 +704,14 @@ class ChannelMuxer(Codec):
             if self._encodeOneFrame(channel):
                 channel.reset()
                 to_release.append(channel)
+
+                callback = self.callbacks.pop(channel, None)
+
+                if callback:
+                    try:
+                        callback()
+                    except:
+                        pass
 
         for channel in to_release:
             self.releaseChannel(channel.channelId)
@@ -747,6 +758,9 @@ class Encoder(ChannelMuxer):
         self.stream.consume()
 
         self.bytes += len(s)
+
+    def __iter__(self):
+        return self
 
 
 class StreamingChannel(object):
