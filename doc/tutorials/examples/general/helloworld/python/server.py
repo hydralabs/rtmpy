@@ -5,18 +5,15 @@ from twisted.internet import reactor
 
 class LiveApplication(server.Application):
     """
-    Live app.
+    The simplest application possible.
     """
-
-    def clientDisconnected(self, client, reason):
-        print 'client "%s" disconnected: %s' % (client, reason)
 
 
 app = LiveApplication()
 
 reactor.listenTCP(1935, server.ServerFactory({
     'live': app,
-    'oflaDemo': app
+    'oflaDemo': app # provides default support for the red5 publisher swf
 }))
 
 reactor.run()
