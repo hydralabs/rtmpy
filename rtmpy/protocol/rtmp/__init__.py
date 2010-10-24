@@ -111,7 +111,7 @@ class BaseStream(object):
         whenDone = kwargs.get('whenDone', None)
 
         if not whenDone:
-            self.sendMessage(message.Notify(name, *args))
+            self.sendMessage(message.Invoke(name, 0, None, *args))
 
             return
 
@@ -119,7 +119,7 @@ class BaseStream(object):
         invokeId = self.lastInvokeId
 
         d = defer.Deferred()
-        m = message.Invoke(name, invokeId, *args)
+        m = message.Invoke(name, invokeId, None, *args)
         self.activeInvokes[invokeId] = d
 
         self.sendMessage(m, whenDone=whenDone)
