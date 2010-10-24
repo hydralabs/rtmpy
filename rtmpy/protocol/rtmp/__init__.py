@@ -580,7 +580,7 @@ class RTMPProtocol(protocol.Protocol, BaseStream):
         self.encoder.send(buf.getvalue(), msg.RTMP_TYPE, stream.streamId,
             stream.timestamp, whenDone)
 
-        if not self.encoder_task:
+        if self.encoder.active and not self.encoder_task:
             self._startEncoding()
 
     def setFrameSize(self, size):
