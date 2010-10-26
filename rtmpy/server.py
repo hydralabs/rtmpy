@@ -604,6 +604,10 @@ class ServerProtocol(rtmp.RTMPProtocol):
         Called when the stream is released. Not sure about this one.
         """
 
+    def closeStream(self):
+        if self.application:
+            self.application.disconnect(self.client)
+
     def playStream(self, name, subscriber, *args):
         """
         """
@@ -774,6 +778,8 @@ class Application(object):
         """
         Removes the C{client} from this application.
         """
+        self.onDisconnect(client)
+
         del self.clients[client.id]
 
         client.id = None
@@ -895,7 +901,6 @@ class Application(object):
         """
         Called when a client disconnects.
         """
-        self.disconnect(client)
 
 
 class ServerFactory(protocol.ServerFactory):

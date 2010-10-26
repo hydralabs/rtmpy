@@ -444,6 +444,8 @@ class RTMPProtocol(protocol.Protocol, BaseStream):
                 stream.closeStream()
                 self.deleteStream(streamId)
 
+            self.closeStream()
+
             del_attr('streams')
 
             del_attr('decoder_task')
