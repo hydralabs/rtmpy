@@ -569,6 +569,11 @@ class RTMPProtocol(protocol.Protocol, BaseStream):
         @param whenDone: A callback fired when the message has been written to
             the RTMP stream. See L{BaseStream.sendMessage}
         """
+        try:
+            e = self.encoder
+        except AttributeError:
+            return
+
         if stream is None:
             stream = self
 
@@ -579,10 +584,10 @@ class RTMPProtocol(protocol.Protocol, BaseStream):
         # fast enough and the penalty for setting up a new thread is too high.
         msg.encode(buf)
 
-        self.encoder.send(buf.getvalue(), msg.RTMP_TYPE, stream.streamId,
+        e.send(buf.getvalue(), msg.RTMP_TYPE, stream.streamId,
             stream.timestamp, whenDone)
 
-        if self.encoder.active and not self.encoder_task:
+        if e.active and not self.encoder_task:
             self._startEncoding()
 
     def setFrameSize(self, size):
