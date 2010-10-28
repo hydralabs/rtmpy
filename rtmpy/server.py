@@ -751,6 +751,7 @@ class Application(object):
     def __init__(self):
         self.clients = {}
         self.streams = {}
+        self._streamingClients = {}
 
     def startup(self):
         """
@@ -779,6 +780,20 @@ class Application(object):
         Removes the C{client} from this application.
         """
         self.onDisconnect(client)
+
+        publisher = self._streamingClients.pop(client, None)
+
+        if publisher:
+            name = publisher.stream.name
+
+            try:
+                self.unpublishStream(publisher, name)
+            except exc.BadNameError:
+                pass
+            except:
+                log.err()
+
+            del self.streams[name]
 
         del self.clients[client.id]
 
@@ -813,6 +828,7 @@ class Application(object):
         if publisher is None:
             # brand new publish
             publisher = self.streams[name] = StreamPublisher(stream, client)
+            self._streamingClients[client] = publisher
 
         if client.id != publisher.client.id:
             raise exc.BadNameError('%s is already used' % (name,))
@@ -829,8 +845,6 @@ class Application(object):
             raise exc.StreamError('Unable to unpublish stream')
 
         source.unpublish()
-
-        del self.streams[name]
 
     def addSubscriber(self, stream, subscriber):
         """
