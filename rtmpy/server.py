@@ -646,6 +646,12 @@ class StreamPublisher(object):
     def _updateTimestamp(self, timestamp):
         """
         """
+        if timestamp < self.timestamp:
+            # break the laws of physics and rewind time ..
+
+            for subscriber, context in self.subscribers.iteritems():
+                context['timestamp'] = timestamp
+
         self.timestamp = timestamp
 
     def addSubscriber(self, subscriber):
