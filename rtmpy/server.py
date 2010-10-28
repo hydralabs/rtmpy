@@ -641,18 +641,19 @@ class StreamPublisher(object):
 
         self.subscribers = {}
         self.meta = {}
-        self.timestamp = 0
+        self.timestamp = self.baseTimestamp = 0
 
     def _updateTimestamp(self, timestamp):
         """
         """
-        if timestamp < self.timestamp:
-            # break the laws of physics and rewind time ..
+        if timestamp == 0:
+            self.baseTimestamp = self.timestamp
 
-            for subscriber, context in self.subscribers.iteritems():
-                context['timestamp'] = timestamp
+            return self.timestamp
 
-        self.timestamp = timestamp
+        self.timestamp = self.baseTimestamp + timestamp
+
+        return self.timestamp
 
     def addSubscriber(self, subscriber):
         """
@@ -669,12 +670,7 @@ class StreamPublisher(object):
         """
         Removes the subscriber from this publisher.
         """
-        print 'removing subscriber'
-
-        try:
-            del self.subscribers[subscriber]
-        except KeyError:
-            pass
+        self.subscribers.pop(subscriber)
 
     # events called by the stream
 
@@ -686,7 +682,7 @@ class StreamPublisher(object):
         @type data: C{str}
         @param timestamp: The timestamp at which this data was received.
         """
-        self._updateTimestamp(timestamp)
+        timestamp = self._updateTimestamp(timestamp)
 
         to_remove = []
 
@@ -711,7 +707,7 @@ class StreamPublisher(object):
         @type data: C{str}
         @param timestamp: The timestamp at which this data was received.
         """
-        self._updateTimestamp(timestamp)
+        timestamp = self._updateTimestamp(timestamp)
         to_remove = []
 
         for subscriber, context in self.subscribers.iteritems():
