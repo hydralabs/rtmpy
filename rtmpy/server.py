@@ -7,7 +7,7 @@ Server implementation.
 
 from zope.interface import Interface, Attribute, implements
 from twisted.internet import protocol, defer
-from twisted.python import failure
+from twisted.python import failure, log
 
 from rtmpy import util, exc, versions
 from rtmpy.protocol.rtmp import message, expose, status
@@ -690,6 +690,7 @@ class StreamPublisher(object):
             try:
                 subscriber.videoDataReceived(data, relTimestamp)
             except:
+                log.err()
                 to_remove.append(subscriber)
 
         if to_remove:
@@ -711,6 +712,7 @@ class StreamPublisher(object):
             try:
                 subscriber.audioDataReceived(data, timestamp - context['timestamp'])
             except:
+                log.err()
                 to_remove.append(subscriber)
 
         if to_remove:
