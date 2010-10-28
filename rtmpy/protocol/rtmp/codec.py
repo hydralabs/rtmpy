@@ -116,15 +116,17 @@ class BaseChannel(object):
         else:
             self.header = header.merge(self.header, new)
 
-        # receiving a new message and no timestamp has been supplied means
-        # we use the last known
-        if self._bodyRemaining == -1 and new.timestamp == -1:
-            self.setTimestamp(self._lastDelta)
+
+        if new.timestamp == -1:
+            # receiving a new message and no timestamp has been supplied means
+            # we use the last known
+            if self.bytes == 0:
+                self.setTimestamp(self._lastDelta, True)
+        else:
+            if not new.continuation:
+                self.setTimestamp(new.timestamp, not new.full)
 
         self._bodyRemaining = self.header.bodyLength - self.bytes
-
-        if new.timestamp > 0:
-            self.setTimestamp(new.timestamp, not new.full)
 
         return old
 
@@ -189,11 +191,10 @@ class BaseChannel(object):
             self._lastDelta = timestamp
             self.timestamp += timestamp
         else:
-            #if timestamp < self.timestamp:
-            #    raise ValueError('Cannot set a negative timestamp')
+            if self.timestamp == 0:
+                self._lastDelta = timestamp
 
             self.timestamp = timestamp
-            self._lastDelta = 0
 
     def __repr__(self):
         s = []
@@ -333,6 +334,7 @@ class FrameReader(Codec):
     channels to be interleaved together.
     """
 
+    _currentChannel = None
     channel_class = ConsumingChannel
 
     def readHeader(self):
@@ -363,21 +365,30 @@ class FrameReader(Codec):
         C{StopIteration} is raised, otherwise C{IOError}.
         """
         pos = self.stream.tell()
+        channel = self._currentChannel
 
-        try:
-            h = self.readHeader()
+        if channel is None:
+            try:
+                h = self.readHeader()
+            except IOError:
+                self.stream.seek(pos, 0)
 
-            channel = self.getChannel(h.channelId)
+                raise StopIteration
+
+            pos = self.stream.tell()
+
+            channel = self._currentChannel = self.getChannel(h.channelId)
+
             channel.setHeader(h)
 
+        try:
             bytes = channel.marshallOneFrame()
         except IOError:
             self.stream.seek(pos, 0)
 
-            if self.stream.at_eof():
-                self.stream.consume()
-
             raise StopIteration
+        else:
+            self._currentChannel = None
 
         self.bytes += self.stream.tell() - pos
         complete = channel.complete()
