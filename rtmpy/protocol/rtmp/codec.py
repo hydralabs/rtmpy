@@ -816,7 +816,11 @@ class StreamingChannel(object):
 
     def sendData(self, data, timestamp):
         c = self.channel
-        relTimestamp = timestamp - c.timestamp
+
+        if timestamp < c.timestamp:
+            relTimestamp = timestamp
+        else:
+            relTimestamp = timestamp - c.timestamp
 
         h = header.Header(c.channelId, relTimestamp, self.type, len(data), self.streamId)
 
