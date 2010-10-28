@@ -141,13 +141,6 @@ class FrameReaderTestCase(unittest.TestCase):
 
         self.assertEqual(self.stream.getvalue(), 'foo')
 
-    def test_consume(self):
-        self.stream.write('woot')
-
-        self.assertRaises(StopIteration, self.reader.next)
-
-        self.assertEqual(self.stream.getvalue(), '')
-
     def test_eof(self):
         self.assertTrue(self.stream.at_eof())
         self.assertRaises(StopIteration, self.reader.next)

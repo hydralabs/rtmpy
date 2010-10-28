@@ -410,6 +410,9 @@ class RTMPProtocol(protocol.Protocol, BaseStream):
 
         return reason
 
+    def closeStream(self):
+        pass
+
     def connectionMade(self):
         """
         Called when this a connection has been made.

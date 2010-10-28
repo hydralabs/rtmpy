@@ -375,7 +375,9 @@ class FrameReader(Codec):
 
                 raise StopIteration
 
-            pos = self.stream.tell()
+            new_pos = self.stream.tell()
+            self.bytes += new_pos - pos
+            pos = new_pos
 
             channel = self._currentChannel = self.getChannel(h.channelId)
 
@@ -495,7 +497,12 @@ class Decoder(ChannelDemuxer):
         otherwise C{StopIteration} will be raised if the end of the stream is
         reached.
         """
-        data, meta = ChannelDemuxer.next(self)
+        try:
+            data, meta = ChannelDemuxer.next(self)
+        except StopIteration:
+            self.stream.consume()
+
+            raise
 
         if self.bytes >= self._nextInterval:
             self.dispatcher.bytesInterval(self.bytes)
