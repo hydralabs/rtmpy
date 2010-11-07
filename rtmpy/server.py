@@ -846,9 +846,14 @@ class Application(object):
             raise exc.BadNameError('Unknown stream %r' % (name,))
 
         if source.client.id != stream.client.id:
-            raise exc.StreamError('Unable to unpublish stream')
+            raise exc.BadNameError('Unable to unpublish stream')
 
-        source.unpublish()
+        try:
+            source.unpublish()
+        except:
+            log.err()
+
+        del self.streams[name]
 
     def addSubscriber(self, stream, subscriber):
         """
