@@ -797,7 +797,7 @@ class Application(object):
             except:
                 log.err()
 
-            del self.streams[name]
+            self.streams.pop(name, None)
 
         del self.clients[client.id]
 

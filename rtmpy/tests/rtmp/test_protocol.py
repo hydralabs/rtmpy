@@ -10,7 +10,7 @@ from twisted.internet import error, defer, reactor
 from twisted.test.proto_helpers import StringTransportWithDisconnection
 
 from rtmpy.protocol import rtmp
-from rtmpy.protocol.rtmp import message
+from rtmpy.protocol.rtmp import message, status
 from rtmpy import exc
 
 
@@ -343,7 +343,7 @@ class BasicResponseTestCase(ProtocolTestCase):
         self.assertEqual(self.messages, [])
 
     def test_sendStatus(self):
-        self.stream.sendStatus('blarg', 'foo', one=1, two='two')
+        self.stream.sendStatus('blarg', 'foo', description='spam', one=1, two='two')
 
         msg, whenDone, stream = self.messages.pop(0)
 
@@ -354,14 +354,16 @@ class BasicResponseTestCase(ProtocolTestCase):
         self.assertIsInstance(msg, message.Invoke)
         self.assertEqual(msg.id, 0)
         self.assertEqual(msg.name, 'onStatus')
-        self.assertEqual(msg.argv, ['foo', {'code': 'blarg', 'level': 'status', 'one': 1, 'two': 'two'}])
+
+        s = status.Status('status', 'blarg', description='spam', one=1, two='two')
+        self.assertEqual(msg.argv, ['foo', s])
 
     def test_send_status_no_args(self):
         """
         If not supplied, the resulting L{message.Invoke} should result in
-        C{argv=[None, {'code': ...}
+        C{argv=[None, <status.Status ...}
         """
-        self.stream.sendStatus('spam')
+        self.stream.sendStatus('spam', description='eggs')
 
         msg, whenDone, stream = self.messages.pop(0)
 
@@ -372,7 +374,30 @@ class BasicResponseTestCase(ProtocolTestCase):
         self.assertIsInstance(msg, message.Invoke)
         self.assertEqual(msg.id, 0)
         self.assertEqual(msg.name, 'onStatus')
-        self.assertEqual(msg.argv, [None, {'code': 'spam', 'level': 'status'}])
+
+        s = status.Status('status', 'spam', description='eggs')
+        self.assertEqual(msg.argv, [None, s])
+
+    def test_send_status_instance(self):
+        """
+        Sending a L{status.Status} instance should allow sending other types of
+        status messages (e.g. level='error')
+        """
+        s = status.Status('error', 'spam', description='eggs')
+
+        self.stream.sendStatus(s)
+
+        msg, whenDone, stream = self.messages.pop(0)
+
+        self.assertEqual(self.messages, [])
+        self.assertIdentical(stream, self.stream)
+        self.assertEqual(whenDone, None)
+
+        self.assertIsInstance(msg, message.Invoke)
+        self.assertEqual(msg.id, 0)
+        self.assertEqual(msg.name, 'onStatus')
+
+        self.assertEqual(msg.argv, [None, s])
 
 
 class InvokableStream(rtmp.NetStream):
