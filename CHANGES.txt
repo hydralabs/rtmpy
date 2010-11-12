@@ -6,8 +6,12 @@ versions of RTMPy.
 
 .. contents::
 
-0.1 (2010-10-21)
+
+0.1.1 (unreleased)
 ------------------
+
+0.1 (2010-10-21)
+----------------
 - Ability to publish and subscribe to live streams. Provide support for AMF0 and
   AMF3 connections.
 - Encoder and decoder for the RTMP protocol

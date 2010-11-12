@@ -19,4 +19,4 @@ U{RTMP<http://osflash.org/documentation/rtmp>}.
 __all__ = ['__version__']
 
 #: RTMPy version number.
-__version__ = (0, 1)
+__version__ = (0, 1, 1)
