@@ -13,21 +13,37 @@ import os.path
 import sys
 import time
 import random
-import urlparse
+from urlparse import urlparse
 
+try:
+    from urlparse import parse_qs
+except ImportError:
+    # support for Python2.4
+    from cgi import parse_qs
 
 from pyamf.util import BufferedByteStream
 
 
+
 class ParamedString(unicode):
     """
-    Names of streams can have url query strings attached as additional parameters.
+    Names of streams can have url query strings attached as additional
+    parameters.
 
-    This class
+    An example::
+
+        >>> q = ParamedString('foobar?spam=eggs&multi=baz&multi=gak')
+        >>> q == 'foobar'
+        True
+        >>> q.spam
+        'eggs'
+        >>> q.multi
+        ['baz', 'gak']
     """
 
+
     def __new__(cls, name):
-        result = urlparse.urlparse(name)
+        result = urlparse(name)
 
         x = unicode.__new__(cls, result[2])
 
@@ -35,8 +51,10 @@ class ParamedString(unicode):
 
         return x
 
+
     def _set_query(self, qs):
-        unicode.__setattr__(self, '_query', urlparse.parse_qs(qs))
+        unicode.__setattr__(self, '_query', parse_qs(qs))
+
 
     def __getattr__(self, name):
         try:
@@ -48,6 +66,7 @@ class ParamedString(unicode):
             return value[0]
 
         return value
+
 
     def __setattr__(self, name, value):
         self._query[name] = value
