@@ -1,5 +1,17 @@
-# Copyright (c) The RTMPy Project.
-# See LICENSE.txt for details.
+# Copyright the RTMPy Project
+#
+# RTMPy is free software: you can redistribute it and/or modify it under the
+# terms of the GNU Lesser General Public License as published by the Free
+# Software Foundation, either version 2.1 of the License, or (at your option)
+# any later version.
+#
+# RTMPy is distributed in the hope that it will be useful, but WITHOUT ANY
+# WARRANTY; without even the implied warranty of MERCHANTABILITY or FITNESS
+# FOR A PARTICULAR PURPOSE.  See the GNU Lesser General Public License for more
+# details.
+#
+# You should have received a copy of the GNU Lesser General Public License along
+# with RTMPy.  If not, see <http://www.gnu.org/licenses/>.
 
 """
 Collection of commonly used constants with status codes.
@@ -116,7 +128,7 @@ class StatusCodes:
     #: Flash Player did not detect any supported tracks (video, audio or data)
     #: and will not try to play the file.
     NS_PLAY_NOSUPPORTEDTRACKFOUND = "NetStream.Play.NoSupportedTrackFound"
-    
+
     #: Playlist playback is complete.
     NS_PLAY_COMPLETE = "NetStream.Play.Complete"
 

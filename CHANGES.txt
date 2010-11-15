@@ -9,6 +9,7 @@ versions of RTMPy.
 
 0.1.1 (unreleased)
 ------------------
+- Switched license from MIT to LGPLv2.1 (or newer)
 
 0.1 (2010-10-21)
 ----------------

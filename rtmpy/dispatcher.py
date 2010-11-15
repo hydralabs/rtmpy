@@ -1,10 +1,22 @@
 # -*- test-case-name: rtmpy.tests.test_dispatcher -*-
+
+# Copyright the RTMPy Project
+#
+# RTMPy is free software: you can redistribute it and/or modify it under the
+# terms of the GNU Lesser General Public License as published by the Free
+# Software Foundation, either version 2.1 of the License, or (at your option)
+# any later version.
+#
+# RTMPy is distributed in the hope that it will be useful, but WITHOUT ANY
+# WARRANTY; without even the implied warranty of MERCHANTABILITY or FITNESS
+# FOR A PARTICULAR PURPOSE.  See the GNU Lesser General Public License for more
+# details.
+#
+# You should have received a copy of the GNU Lesser General Public License along
+# with RTMPy.  If not, see <http://www.gnu.org/licenses/>.
 #
 # A lot of this code is copied from the Twisted codebase but adapted to remove
 # the XML stuff from it.
-#
-# Copyright (c) The RTMPy Project.
-# See LICENSE.txt for details.
 
 """
 Event Dispatching and Callback utilities.

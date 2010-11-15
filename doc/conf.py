@@ -1,8 +1,20 @@
 # -*- coding: utf-8 -*-
+
+# Copyright the RTMPy Project
 #
-# Copyright (c) The RTMPy Project.
-# See LICENSE.txt for details.
+# RTMPy is free software: you can redistribute it and/or modify it under the
+# terms of the GNU Lesser General Public License as published by the Free
+# Software Foundation, either version 2.1 of the License, or (at your option)
+# any later version.
 #
+# RTMPy is distributed in the hope that it will be useful, but WITHOUT ANY
+# WARRANTY; without even the implied warranty of MERCHANTABILITY or FITNESS
+# FOR A PARTICULAR PURPOSE.  See the GNU Lesser General Public License for more
+# details.
+#
+# You should have received a copy of the GNU Lesser General Public License along
+# with RTMPy.  If not, see <http://www.gnu.org/licenses/>.
+
 # This file is execfile()d with the current directory set to its containing dir.
 #
 # Note that not all possible configuration values are present in this
@@ -27,7 +39,7 @@ needs_sphinx = '1.0'
 
 # Add any Sphinx extension module names here, as strings. They can be extensions
 # coming with Sphinx (named 'sphinx.ext.*') or your custom ones.
-# 
+#
 # Grab sphinxcontrib.epydoc from http://packages.python.org/sphinxcontrib-epydoc
 extensions = ['sphinx.ext.intersphinx', 'sphinxcontrib.epydoc']
 
@@ -102,7 +114,7 @@ exclude_patterns = ['build', 'tutorials/examples']
 # documentation. Each value is a list of regular expressions, the reference
 # target must match (see re.match()) to be cross-referenced with the base url.
 epydoc_mapping = {
-   'http://api.pyamf.org/0.5.1/': [r'pyamf\.'],
+   'http://api.pyamf.org/0.6/': [r'pyamf\.'],
    'http://api.rtmpy.org/': [r'rtmpy\.'],
 }
 
@@ -122,7 +134,7 @@ html_theme = 'beam'
 #html_theme_options = {}
 
 # Add any paths that contain custom themes here, relative to this directory.
-html_theme_path = ['themes']
+html_theme_path = ['/Users/nick/opensource/rtmpy/rtmpy/doc/themes']
 
 # The name for this set of Sphinx documents.  If None, it defaults to
 # "<project> v<release> documentation".

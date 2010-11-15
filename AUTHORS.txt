@@ -1,0 +1,6 @@
+People who have contributed to RTMPy, listed in alphabetical order:
+
+Arnar Birgisson
+Nick Joyce
+Jacob Feisley
+Thijs Triemstra
