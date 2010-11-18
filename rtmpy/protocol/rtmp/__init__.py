@@ -287,14 +287,17 @@ class BaseStream(object):
         """
         self._callExposedMethod(name, *args)
 
+
     def getInvokableTarget(self, name):
         """
-        Returns a callable based on the supplied name, or C{None} if not found.
+        Used to match a callable based on the supplied name when a notify or
+        invoke is encountered. Returns C{None} if not found.
 
         This allows fine grained control over what this stream can expose to the
         peer.
 
         @param name: The name of the function to be mapped to a callable.
+        @return: A callable or C{None}
         """
         func_name = _exposed_funcs.get(name, None)
 
@@ -302,6 +305,7 @@ class BaseStream(object):
             return
 
         return getattr(self, func_name)
+
 
     def sendMessage(self, msg, whenDone=None):
         """
