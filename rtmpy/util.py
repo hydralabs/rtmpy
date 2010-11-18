@@ -262,3 +262,14 @@ def generateBytes(length, readable=False):
         bytes += chr(random.randint(i, j))
 
     return bytes
+
+
+
+def get_callable_target(obj, name):
+    """
+    Returns a callable object based on the attribute of C{obj}.
+    """
+    target = getattr(obj, name, None)
+
+    if target and hasattr(target, '__call__'):
+        return target

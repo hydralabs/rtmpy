@@ -118,6 +118,55 @@ class ParamedStringTestCase(unittest.TestCase):
         self.assertRaises(AttributeError, getattr, x, 'baz')
 
 
+
+class GetCallableTargetTestCase(unittest.TestCase):
+    """
+    Tests for L{util.get_callable_target}
+    """
+
+    def setUp(self):
+        class TestObject(object):
+            not_callable = False
+
+            def callable(self):
+                pass
+
+        self.object = TestObject()
+
+
+    def test_no_attr(self):
+        """
+        Should return C{None} if no attribute exists
+        """
+        self.assertFalse(hasattr(self.object, 'foo'))
+        self.assertIdentical(None, util.get_callable_target(self.object, 'foo'))
+
+
+    def test_not_callable(self):
+        """
+        Should return C{None} if attribute exists but not callable.
+        """
+        self.assertTrue(hasattr(self.object, 'not_callable'))
+        self.assertFalse(hasattr(self.object.not_callable, '__call__'))
+
+        self.assertIdentical(None, util.get_callable_target(self.object,
+            'not_callable'))
+
+
+    def test_callable(self):
+        """
+        Should return a callable if the attribute exists and is callable.
+        """
+        self.assertTrue(hasattr(self.object, 'callable'))
+        self.assertTrue(hasattr(self.object.callable, '__call__'))
+
+        c = util.get_callable_target(self.object, 'callable')
+
+        self.assertNotIdentical(None, c)
+        self.assertTrue(c, '__call__')
+
+
+
 if not sys.platform.startswith('linux'):
     LinuxUptimeTestCase.skip = 'Tested platform is not linux'
 
