@@ -417,6 +417,18 @@ class ServerProtocol(rtmp.RTMPProtocol):
         self.application = None
 
     def getInvokableTarget(self, name):
+        """
+        Used to match a callable based on the supplied name when a notify or
+        invoke is encountered. Returns C{None} if not found.
+
+        If no match is found from the superclass, the C{client} and then the
+        C{application} are checked in that order.
+
+        All methods on a client/application is considered B{public} and
+        accessible by the peer.
+
+        @see: L{rtmp.RTMPProtocol.getInvokableTarget}
+        """
         target = rtmp.RTMPProtocol.getInvokableTarget(self, name)
 
         if target:
