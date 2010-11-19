@@ -15,7 +15,7 @@
 
 """
 RTMPy is a U{Twisted<http://twistedmatrix.com>} protocol implementing
-U{RTMP<http://osflash.org/documentation/rtmp>}.
+U{RTMP<http://en.wikipedia.org/wiki/Real_Time_Messaging_Protocol>}.
 
 @see: U{http://rtmpy.org}
 
