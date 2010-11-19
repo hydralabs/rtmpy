@@ -15,6 +15,8 @@
 
 """
 Parses RTMP dumps from Wireshark - converted to c array format.
+
+@since: 0.1.1
 """
 
 from pyamf.util import BufferedByteStream
