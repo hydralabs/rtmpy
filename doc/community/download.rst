@@ -4,7 +4,7 @@
 
 .. contents::
 
-RTMPy is released under the :doc:`MIT license <../license>`. For installation
+RTMPy is released under the :doc:`LGPL 2.1 (or newer) license <../license>`. For installation
 instructions, see the included :doc:`Installation Guide <../install>`.
 
 
