@@ -420,8 +420,7 @@ class RTMPProtocol(protocol.Protocol, BaseStream):
         Called when something fatal has occurred. Logs any errors and closes the
         connection.
         """
-        # weirdly, if log.err is used - trial breaks?!
-        log.msg(failure=reason)
+        log.err(reason)
         self.transport.loseConnection()
 
         return reason

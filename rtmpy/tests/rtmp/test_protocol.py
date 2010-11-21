@@ -159,6 +159,12 @@ class ConnectionLostTestCase(ProtocolTestCase):
         self.protocol.connectionLost(error.ConnectionDone())
 
 
+
+class TestRuntimeError(RuntimeError):
+    pass
+
+
+
 class CooperateTestCase(ProtocolTestCase):
     """
     Tests for encoding/decoding cooperation
@@ -171,15 +177,19 @@ class CooperateTestCase(ProtocolTestCase):
         self.protocol.handshakeSuccess('')
 
     def test_fail_decode(self):
+        """
+        If something goes wrong whilst decoding, ensure that protocol disconnects
+        """
         def boom(*args):
-            raise RuntimeError
+            raise TestRuntimeError
 
         self.patch(self.protocol.decoder, 'next', boom)
 
         def eb(f):
-            f.trap(RuntimeError)
+            f.trap(TestRuntimeError)
 
             self.assertFalse(self.transport.connected)
+            self.flushLoggedErrors(TestRuntimeError)
 
         d = self.protocol._startDecoding().addErrback(eb)
 
@@ -187,14 +197,15 @@ class CooperateTestCase(ProtocolTestCase):
 
     def test_fail_encode(self):
         def boom(*args):
-            raise RuntimeError
+            raise TestRuntimeError
 
         self.patch(self.protocol.encoder, 'next', boom)
 
         def eb(f):
-            f.trap(RuntimeError)
+            f.trap(TestRuntimeError)
 
             self.assertFalse(self.transport.connected)
+            self.flushLoggedErrors(TestRuntimeError)
 
         d = self.protocol._startEncoding().addErrback(eb)
 
