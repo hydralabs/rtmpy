@@ -27,7 +27,6 @@ The Encoder/Decoder is not thread safe.
 """
 
 import collections
-import copy
 
 from pyamf.util import BufferedByteStream
 
