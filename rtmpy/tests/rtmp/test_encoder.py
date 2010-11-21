@@ -65,13 +65,13 @@ class EncoderTestCase(BaseTestCase):
 
 class AquireChannelTestCase(BaseTestCase):
     """
-    Tests for L{codec.Encoder.aquireChannel}
+    Tests for L{codec.Encoder.acquireChannel}
     """
 
     def test_simple(self):
         self.assertEqual(self.encoder.channelsInUse, 0)
 
-        c = self.encoder.aquireChannel()
+        c = self.encoder.acquireChannel()
 
         self.assertTrue(isinstance(c, codec.ProducingChannel))
 
@@ -86,10 +86,10 @@ class AquireChannelTestCase(BaseTestCase):
         """
 
         for i in xrange(codec.MIN_CHANNEL_ID, codec.MAX_CHANNELS):
-            self.assertNotEqual(self.encoder.aquireChannel(), None)
+            self.assertNotEqual(self.encoder.acquireChannel(), None)
 
         self.assertEqual(self.encoder.channelsInUse, 65596)
-        self.assertEqual(self.encoder.aquireChannel(), None)
+        self.assertEqual(self.encoder.acquireChannel(), None)
 
 
 class ReleaseChannelTestCase(BaseTestCase):
@@ -101,7 +101,7 @@ class ReleaseChannelTestCase(BaseTestCase):
         self.assertRaises(codec.EncodeError, self.encoder.releaseChannel, 3)
 
     def test_aquired(self):
-        c = self.encoder.aquireChannel()
+        c = self.encoder.acquireChannel()
 
         self.assertEqual(self.encoder.channelsInUse, 1)
 

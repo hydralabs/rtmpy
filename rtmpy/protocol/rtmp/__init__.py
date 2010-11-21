@@ -617,7 +617,7 @@ class RTMPProtocol(protocol.Protocol, BaseStream):
         """
         self.setFrameSize(4096)
 
-        channel = self.encoder.aquireChannel()
+        channel = self.encoder.acquireChannel()
 
         if not channel:
             # todo: make this better

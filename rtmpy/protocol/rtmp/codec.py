@@ -554,7 +554,7 @@ class ChannelMuxer(Codec):
 
         self.minChannelId = MIN_CHANNEL_ID
         self.releasedChannels = collections.deque()
-        self.aquiredChannels = []
+        self.acquiredChannels = []
         self.activeChannels = []
         self.internalChannels = {}
         self.channelsInUse = 0
@@ -574,7 +574,7 @@ class ChannelMuxer(Codec):
 
         return property(**locals())
 
-    def aquireChannel(self):
+    def acquireChannel(self):
         """
         Aquires and returns the next available L{Channel} or C{None}.
 
@@ -597,7 +597,7 @@ class ChannelMuxer(Codec):
 
         c = self.getChannel(channelId)
 
-        self.aquiredChannels.append(c)
+        self.acquiredChannels.append(c)
 
         return c
 
@@ -612,7 +612,7 @@ class ChannelMuxer(Codec):
 
         try:
             # FIXME: this is expensive
-            self.aquiredChannels.remove(c)
+            self.acquiredChannels.remove(c)
         except ValueError:
             raise EncodeError('Attempted to release channel %r but that '
                 'channel is not active' % (channelId,))
@@ -682,7 +682,7 @@ class ChannelMuxer(Codec):
             # written right away
             channel = self.getChannel(2)
         else:
-            channel = self.aquireChannel()
+            channel = self.acquireChannel()
 
         if not channel:
             self.pending.append((data, datatype, streamId, timestamp, callback))
