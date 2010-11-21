@@ -17,7 +17,6 @@
 """
 
 from twisted.trial import unittest
-from twisted.python import failure
 from twisted.internet import defer, reactor, protocol
 from twisted.test.proto_helpers import StringTransport, StringIOWithoutClosing
 
