@@ -127,7 +127,6 @@ class BaseChannel(object):
         else:
             self.header = header.merge(self.header, new)
 
-
         if new.timestamp == -1:
             # receiving a new message and no timestamp has been supplied means
             # we use the last known
