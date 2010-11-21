@@ -396,9 +396,6 @@ class NetStream(rtmp.NetStream):
     def audioDataReceived(self, data, timestamp):
         self._audioChannel.sendData(data, timestamp)
 
-    def deleteStream(self):
-        """
-        """
 
 
 class ServerProtocol(rtmp.RTMPProtocol):
