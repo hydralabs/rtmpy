@@ -438,19 +438,20 @@ class ServerProtocol(rtmp.RTMPProtocol):
         client = getattr(self, 'client', None)
 
         if client:
-            target = getattr(client, name, None)
+            target = util.get_callable_target(client, name)
 
             if target:
                 return target
 
         application = getattr(self, 'application', None)
 
-        if application and hasattr(application.__class__, name):
-            # todo think about protecting some methods?
-            target = getattr(application, name, None)
+        # todo: think about how to protect methods
+        if application:
+            target = util.get_callable_target(application, name)
 
             if target:
                 return target
+
 
     @expose('connect')
     def onConnect(self, args):
@@ -617,7 +618,11 @@ class ServerProtocol(rtmp.RTMPProtocol):
         """
         self.application.unpublishStream(streamName, stream)
 
-        return self.application.onUnpublish(self.client, stream)
+        try:
+            self.application.onUnpublish(self.client, stream)
+        except Exception, e:
+            log.err()
+
 
     @expose
     def releaseStream(self, name):
