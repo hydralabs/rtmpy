@@ -4,8 +4,21 @@
 
 .. contents::
 
-RTMPy is released under the :doc:`MIT license <../license>`. For installation
+RTMPy is released under the :doc:`LGPL 2.1 (or newer) license <../license>`. For installation
 instructions, see the included :doc:`Installation Guide <../install>`.
+
+
+Latest Stable Release - 0.1
+===========================
+
+:doc:`../whatsnew/0.1`
+
+The files below also include a copy of the documentation.
+
++-----------------+-----------------------------------+
+| **Gzipped Tar** | `RTMPy-0.1.tar.gz`_               |
++-----------------+-----------------------------------+
+
 
 Latest Development Source Code
 ==============================
@@ -27,3 +40,4 @@ For installing this development version::
 
 
 .. _Git: 		http://git-scm.com/
+.. _RTMPy-0.1.tar.gz:	http://pypi.python.org/packages/source/R/RTMPy/RTMPy-0.1.tar.gz#md5=a4ccc082a7b97c48bb7e6fc41750102d

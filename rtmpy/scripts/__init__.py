@@ -15,4 +15,6 @@
 
 """
 Package file. Nothing to see here.
+
+@since: 0.1.1
 """
