@@ -360,6 +360,7 @@ class BytesReadTestCase(BaseTestCase):
         x = message.BytesRead(bytes=20)
         self.assertEquals(x.__dict__, {'bytes': 20})
 
+
     def test_encode(self):
         # test default encode
         x = message.BytesRead()
@@ -378,6 +379,20 @@ class BytesReadTestCase(BaseTestCase):
         self.assertEquals(e, None)
 
         self.assertEquals(self.buffer.getvalue(), '\x00\x00\x00\x32')
+
+
+    def test_4GB_threshold(self):
+        """
+        Test wrapping when encoding byte values > 4GB.
+
+        @see: #54
+        """
+        x = message.BytesRead(bytes=message.BytesRead.FOUR_GB_THRESHOLD)
+
+        x.encode(self.buffer)
+
+        self.assertEqual(self.buffer.getvalue(), '\x00\x00\x00\x00')
+
 
     def test_decode(self):
         x = message.BytesRead()

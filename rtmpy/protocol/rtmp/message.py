@@ -312,6 +312,8 @@ class BytesRead(Message):
 
     RTMP_TYPE = BYTES_READ
 
+    FOUR_GB_THRESHOLD = 0xee800000
+
     def __init__(self, bytes=None):
         self.bytes = bytes
 
@@ -329,7 +331,7 @@ class BytesRead(Message):
             raise EncodeError('Bytes read not set')
 
         try:
-            buf.write_ulong(self.bytes)
+            buf.write_ulong(self.bytes % self.FOUR_GB_THRESHOLD)
         except TypeError:
             raise EncodeError('Bytes read wrong type '
                 '(expected int, got %r)' % (type(self.bytes),))
