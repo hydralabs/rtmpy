@@ -1037,12 +1037,10 @@ class ServerFactory(protocol.ServerFactory):
         @return: A L{defer.Deferred} when the process is complete. The result
             will be the application instance that was successfully unregistered.
         """
-        try:
-            app = self._pendingApplications.pop(name)
+        app = self._pendingApplications.pop(name, None)
 
+        if app is not None:
             return defer.succeed(app)
-        except KeyError:
-            pass
 
         try:
             app = self.applications[name]
