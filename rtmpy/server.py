@@ -994,6 +994,7 @@ class ServerFactory(protocol.ServerFactory):
             player will use when connecting to this server. An example::
 
             RTMP uri: http://appserver.mydomain.com/webApp; name: webApp.
+
         @param app: The L{IApplication} object that will interact with the
             RTMP clients.
         @return: A deferred signalling the completion of the registration
