@@ -792,8 +792,6 @@ class Application(object):
         """
         Removes the C{client} from this application.
         """
-        self.onDisconnect(client)
-
         publisher = self._streamingClients.pop(client, None)
 
         if publisher:
@@ -811,6 +809,12 @@ class Application(object):
         del self.clients[client.id]
 
         client.id = None
+
+        try:
+            self.onDisconnect(client)
+        except Exception, e:
+            log.err()
+
 
     def buildClient(self, protocol, **kwargs):
         """
