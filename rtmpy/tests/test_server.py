@@ -302,6 +302,8 @@ class ServerFactoryTestCase(unittest.TestCase):
     def setUp(self):
         self.factory = server.ServerFactory()
         self.protocol = self.factory.buildProtocol(None)
+        self.transport = StringTransport()
+        self.protocol.transport = self.transport
 
         self.protocol.connectionMade()
         self.protocol.handshakeSuccess('')
@@ -589,3 +591,41 @@ class ApplicationInterfaceTestCase(ServerFactoryTestCase):
 
         self.assertTrue(self.executed)
         self.flushLoggedErrors(TestRuntimeError)
+
+
+class PublishingTestCase(ServerFactoryTestCase):
+    """
+    Tests for all facets of publishing a stream
+    """
+
+    def setUp(self):
+        ServerFactoryTestCase.setUp(self)
+
+        self.app = server.Application()
+        self.client = self.app.buildClient(self.protocol)
+        self.app.acceptConnection(self.client)
+
+        self.stream = self.createStream()
+
+        return self.factory.registerApplication('foo', self.app)
+
+
+    def createStream(self):
+        """
+        Returns the L{server.NetStream} as created by the protocol
+        """
+        return self.protocol.getStream(self.protocol.createStream())
+
+
+    def test_publish(self):
+        """
+        Test app, client and protocol state on a successful first time publish
+        """
+        d = self.stream.publish('foo')
+
+        def cb(res):
+            print 'woot'
+
+        return d.addCallback(cb)
+
+
