@@ -254,9 +254,11 @@ class NetStream(rtmp.NetStream):
             else:
                 s = status.status('NetStream.Publish.Start',
                     description='%s is now published.' % (name,),
-                    clientid=self.nc.clientId)
+                    clientid=self.client.id)
 
             self.sendStatus(s)
+
+            return result
 
         d.addBoth(send_status)
 

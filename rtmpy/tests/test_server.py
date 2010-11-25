@@ -602,31 +602,76 @@ class PublishingTestCase(ServerFactoryTestCase):
     def setUp(self):
         ServerFactoryTestCase.setUp(self)
 
+        self.stream_status = {}
+
         self.app = server.Application()
         self.client = self.app.buildClient(self.protocol)
-        self.app.acceptConnection(self.client)
-
-        self.stream = self.createStream()
 
         return self.factory.registerApplication('foo', self.app)
+
+
+    def connect(self):
+        self.app.acceptConnection(self.client)
+
+        self.protocol.connected = True
+        self.protocol.client = self.client
+        self.protocol.application = self.app
 
 
     def createStream(self):
         """
         Returns the L{server.NetStream} as created by the protocol
         """
-        return self.protocol.getStream(self.protocol.createStream())
+        stream = self.protocol.getStream(self.protocol.createStream())
+
+        def capture_status(s):
+            self.stream_status[stream] = s
+
+        stream.sendStatus = capture_status
+
+        return stream
+
+    def assertStatus(self, stream, s):
+        self.assertEqual(self.stream_status[stream], s)
 
 
     def test_publish(self):
         """
         Test app, client and protocol state on a successful first time publish
         """
-        d = self.stream.publish('foo')
+        self.connect()
 
-        def cb(res):
-            print 'woot'
+        s = self.createStream()
+
+        d = s.publish('foo')
+
+        def cb(result):
+            # app
+            self.assertIdentical(result, self.app.streams['foo'])
+
+            # stream
+            self.assertIdentical(s.publisher, result)
+            self.assertEqual(s.state, 'publishing')
+
+            # result
+            self.assertIdentical(result.stream, s)
+            self.assertIdentical(result.client, self.client)
+            self.assertEqual(result.subscribers, {})
+            self.assertEqual(result.timestamp, 0)
+
+            # rtmp status
+            self.assertStatus(s, {
+                'code': 'NetStream.Publish.Start',
+                'description': 'foo is now published.',
+                'clientid': self.client.id,
+                'level': 'status'
+            })
+
 
         return d.addCallback(cb)
 
 
+    def test_not_connected(self):
+        """
+        Test when
+        """
