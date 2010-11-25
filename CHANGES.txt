@@ -9,7 +9,12 @@ versions of RTMPy.
 
 0.1.1 (unreleased)
 ------------------
+- Switch to Distribute (Ticket:63)
+- Allow > 4GB streams to be consumed (Ticket:54)
+- Application.onDisconnect implemented (Ticket:66)
+- Ensure that ParamedString will work with Python 2.4 (Ticket:76)
 - Switched license from MIT to LGPLv2.1 (or newer) (Ticket:64)
+
 
 0.1 (2010-10-21)
 ----------------
