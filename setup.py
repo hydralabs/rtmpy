@@ -14,7 +14,8 @@
 # with RTMPy.  If not, see <http://www.gnu.org/licenses/>.
 
 
-from ez_setup import use_setuptools
+from distribute_setup import use_setuptools
+use_setuptools(download_delay=3)
 
 use_setuptools()
 
