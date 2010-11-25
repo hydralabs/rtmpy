@@ -17,7 +17,6 @@
 """
 
 from twisted.trial import unittest
-from twisted.python import failure
 from twisted.internet import defer, reactor, protocol
 from twisted.test.proto_helpers import StringTransport, StringIOWithoutClosing
 
@@ -631,6 +630,7 @@ class PublishingTestCase(ServerFactoryTestCase):
 
         return stream
 
+
     def assertStatus(self, stream, s):
         self.assertEqual(self.stream_status[stream], s)
 
@@ -675,3 +675,21 @@ class PublishingTestCase(ServerFactoryTestCase):
         """
         Test when
         """
+        s = self.createStream()
+
+        self.assertFalse(self.protocol.connected)
+
+        d = s.publish('foo')
+
+        def eb(f):
+            x = f.trap(exc.ConnectError)
+
+            self.assertEqual(f.getErrorMessage(), 'Cannot publish stream - not connected')
+
+            self.assertStatus(s, {
+                'code': 'NetConnection.Call.Failed',
+                'description': 'Cannot publish stream - not connected',
+                'level': 'error'
+            })
+
+        return d.addErrback(eb)
