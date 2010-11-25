@@ -303,6 +303,8 @@ class ServerFactoryTestCase(unittest.TestCase):
     def setUp(self):
         self.factory = server.ServerFactory()
         self.protocol = self.factory.buildProtocol(None)
+        self.transport = StringTransport()
+        self.protocol.transport = self.transport
 
         self.protocol.connectionMade()
         self.protocol.handshakeSuccess('')
@@ -535,3 +537,96 @@ class ConnectingTestCase(unittest.TestCase):
         d.addCallback(check_status)
 
         return d
+
+
+class TestRuntimeError(RuntimeError):
+    pass
+
+
+class ApplicationInterfaceTestCase(ServerFactoryTestCase):
+    """
+    Tests for L{server.ServerProtocol} implementing the L{server.IApplication}
+    interface correctly.
+    """
+
+    def setUp(self):
+        ServerFactoryTestCase.setUp(self)
+
+        self.app = server.Application()
+        self.client = self.app.buildClient(self.protocol)
+        self.app.acceptConnection(self.client)
+
+        return self.factory.registerApplication('foo', self.app)
+
+    def test_onDisconnect(self):
+        """
+        Ensure that C{onDisconnect} is called when calling C{app.disconnect}
+        """
+        self.executed = False
+
+        def foo(client):
+            self.assertIdentical(self.client, client)
+            self.executed = True
+
+        self.app.onDisconnect = foo
+
+        self.app.disconnect(self.client)
+
+        self.assertTrue(self.executed)
+
+    def test_onDisconnect_error(self):
+        """
+        Ensure that if onDisconnect raises an error, that execution continues
+        smoothly.
+        """
+        self.executed = False
+
+        def foo(client):
+            self.executed = True
+
+            raise TestRuntimeError('Die!!')
+
+        self.app.onDisconnect = foo
+
+        self.app.disconnect(self.client)
+
+        self.assertTrue(self.executed)
+        self.flushLoggedErrors(TestRuntimeError)
+
+
+class PublishingTestCase(ServerFactoryTestCase):
+    """
+    Tests for all facets of publishing a stream
+    """
+
+    def setUp(self):
+        ServerFactoryTestCase.setUp(self)
+
+        self.app = server.Application()
+        self.client = self.app.buildClient(self.protocol)
+        self.app.acceptConnection(self.client)
+
+        self.stream = self.createStream()
+
+        return self.factory.registerApplication('foo', self.app)
+
+
+    def createStream(self):
+        """
+        Returns the L{server.NetStream} as created by the protocol
+        """
+        return self.protocol.getStream(self.protocol.createStream())
+
+
+    def test_publish(self):
+        """
+        Test app, client and protocol state on a successful first time publish
+        """
+        d = self.stream.publish('foo')
+
+        def cb(res):
+            print 'woot'
+
+        return d.addCallback(cb)
+
+
