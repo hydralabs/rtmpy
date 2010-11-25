@@ -275,9 +275,9 @@ class NetStream(rtmp.NetStream):
             d = defer.maybeDeferred(self.nc.unpublishStream, self, self.name)
 
             def send_status(res):
-                self.sendStatus('NetStream.Unpublish.Success',
+                self.sendStatus(status.status('NetStream.Unpublish.Success',
                     description='%s is now unpublished.' % (self.name,),
-                    clientid=self.nc.clientId)
+                    clientid=self.nc.clientId))
 
                 return res
 

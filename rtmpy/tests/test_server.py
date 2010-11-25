@@ -18,7 +18,7 @@
 
 from twisted.trial import unittest
 from twisted.internet import defer, reactor, protocol
-from twisted.test.proto_helpers import StringTransport, StringIOWithoutClosing
+from twisted.test.proto_helpers import StringTransportWithDisconnection, StringIOWithoutClosing
 
 from rtmpy import server, exc
 from rtmpy.protocol.rtmp import message, ExtraResult
@@ -302,8 +302,9 @@ class ServerFactoryTestCase(unittest.TestCase):
     def setUp(self):
         self.factory = server.ServerFactory()
         self.protocol = self.factory.buildProtocol(None)
-        self.transport = StringTransport()
+        self.transport = StringTransportWithDisconnection()
         self.protocol.transport = self.transport
+        self.transport.protocol = self.protocol
 
         self.protocol.connectionMade()
         self.protocol.handshakeSuccess('')
@@ -693,3 +694,32 @@ class PublishingTestCase(ServerFactoryTestCase):
             })
 
         return d.addErrback(eb)
+
+
+    def test_kill_connection_after_successful_publish(self):
+        """
+        After a successful publish, the peer disconnects rudely. Check app state
+        """
+        self.connect()
+        s = self.createStream()
+
+        d = s.publish('foo')
+
+        def kill_connection(result):
+            self.transport.loseConnection()
+
+            self.assertEqual(self.app.streams, {})
+            self.assertEqual(self.app.clients, {})
+
+            self.assertStatus(s, {
+                'code': 'NetStream.Unpublish.Success',
+                'description': u'foo is now unpublished.',
+                'clientid': self.client.id,
+                'level': 'status'
+            })
+            
+
+
+        d.addCallback(kill_connection)
+
+        return d
