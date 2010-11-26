@@ -17,7 +17,6 @@
 from distribute_setup import use_setuptools
 use_setuptools(download_delay=3)
 
-use_setuptools()
 
 import sys
 from setuptools import setup, find_packages
@@ -57,6 +56,7 @@ def get_version():
 
     return '.'.join([str(x) for x in __version__])
 
+
 def get_install_requirements():
     """
     Returns a list of dependencies for RTMPy to function correctly on the
@@ -69,10 +69,12 @@ def get_install_requirements():
 
     return install_requires
 
+
 keyw = """\
 rtmp flv rtmps rtmpe rtmpt rtmpte amf amf0 amf3 flex flash http https
 streaming video audio sharedobject webcam record playback pyamf client
 flashplayer air actionscript decoder encoder gateway server"""
+
 
 setup(name = "RTMPy",
     version = get_version(),
