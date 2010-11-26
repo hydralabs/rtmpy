@@ -310,6 +310,19 @@ class ServerFactoryTestCase(unittest.TestCase):
         self.protocol.handshakeSuccess('')
 
 
+    def connect(self, app, protocol):
+        client = app.buildClient(self.protocol)
+
+        app.acceptConnection(client)
+
+        protocol.connected = True
+        protocol.client = client
+        protocol.application = app
+
+        return client
+
+
+
 class ConnectingTestCase(unittest.TestCase):
     """
     Tests all facets of connecting to an RTMP server.
@@ -605,17 +618,8 @@ class PublishingTestCase(ServerFactoryTestCase):
         self.stream_status = {}
 
         self.app = server.Application()
-        self.client = self.app.buildClient(self.protocol)
 
         return self.factory.registerApplication('foo', self.app)
-
-
-    def connect(self):
-        self.app.acceptConnection(self.client)
-
-        self.protocol.connected = True
-        self.protocol.client = self.client
-        self.protocol.application = self.app
 
 
     def createStream(self):
@@ -640,7 +644,7 @@ class PublishingTestCase(ServerFactoryTestCase):
         """
         Test app, client and protocol state on a successful first time publish
         """
-        self.connect()
+        self.client = self.connect(self.app, self.protocol)
 
         s = self.createStream()
 
@@ -700,7 +704,7 @@ class PublishingTestCase(ServerFactoryTestCase):
         """
         After a successful publish, the peer disconnects rudely. Check app state
         """
-        self.connect()
+        self.client = self.connect(self.app, self.protocol)
         s = self.createStream()
 
         d = s.publish('foo')
@@ -723,3 +727,7 @@ class PublishingTestCase(ServerFactoryTestCase):
         d.addCallback(kill_connection)
 
         return d
+
+
+class PlayTestCase(ServerFactoryTestCase):
+    pass
