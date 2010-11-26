@@ -9,6 +9,7 @@ versions of RTMPy.
 
 0.1.1 (unreleased)
 ------------------
+- Allow stream names to be reused if a peer disconnects uncleanly (Ticket:74)
 - Switch to Distribute (Ticket:63)
 - Allow > 4GB streams to be consumed (Ticket:54)
 - Application.onDisconnect implemented (Ticket:66)
