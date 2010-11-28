@@ -632,21 +632,29 @@ class ServerProtocol(rtmp.RTMPProtocol):
         Called when the stream is released. Not sure about this one.
         """
 
+
     def closeStream(self):
         if self.application:
             self.application.disconnect(self.client)
 
+
     def playStream(self, name, subscriber, *args):
         """
+        Retu
         """
         try:
             publisher = self.application.getStreamByName(name)
-        except:
-            raise exc.StreamNotFound('Unknown stream %r' % (name,))
+        except KeyError:
+            d = defer.Deferred()
+        else:
+            d = defer.succeed(publisher)
 
-        publisher.addSubscriber(subscriber)
+        def whenPublished(publisher):
+            publisher.addSubscriber(subscriber)
 
-        return publisher
+        d.addCallback(whenPublished)
+
+        return d
 
 
 class StreamPublisher(object):
@@ -784,16 +792,20 @@ class Application(object):
         self.clients = {}
         self.streams = {}
         self._streamingClients = {}
+        self._pendingPublishedCallbacks = {}
+
 
     def startup(self):
         """
         Called when the application is starting up.
         """
 
+
     def shutdown(self):
         """
         Called when the application is closed.
         """
+
 
     def getStreamByName(self, name):
         """
@@ -806,6 +818,7 @@ class Application(object):
         Called when this application has accepted the client connection.
         """
         self.clients[client.id] = client
+
 
     def disconnect(self, client):
         """
@@ -849,7 +862,51 @@ class Application(object):
 
         return c
 
-    def publishStream(self, client, stream, name, type_='live'):
+
+    def whenPublished(self, name, cb):
+        """
+        Will call C{cb} when a stream has been published under C{name}
+
+        C{cb} will be called with one argument, the stream object itself.
+        """
+        if not callable(cb):
+            raise TypeError('cb must be callable for whenPublished')
+
+        try:
+            publisher = self.streams[name]
+        except KeyError:
+            cbs = self._pendingPublishedCallbacks.setdefault(name, [])
+
+            cbs.append(cb)
+
+            return
+
+        try:
+            cb(publisher)
+        except:
+            log.err()
+
+
+    def _runCallbacksForPublishedStream(self, name, stream):
+        """
+        Iterates over the list of callables to be executed when a stream named
+        C{name} is successfully published.
+        """
+        try:
+            cbs = self._pendingPublishedCallbacks[name]
+        except KeyError:
+            return
+
+        for cb in cbs:
+            try:
+                cb(stream)
+            except:
+                log.err()
+
+        del self._pendingPublishedCallbacks[name]
+
+
+    def publishStream(self, client, requestor, name, type_='live'):
         """
         The C{stream} is requesting to publish an audio/video stream under the
         name C{name}. Reject the publish request by raising an exception.
@@ -859,17 +916,20 @@ class Application(object):
         @param name: The name of the stream that will be published.
         @param type_: Ignored for now.
         """
-        publisher = self.streams.get(name, None)
+        stream = self.streams.get(name, None)
 
-        if publisher is None:
+        if stream is None:
             # brand new publish
-            publisher = self.streams[name] = StreamPublisher(stream, client)
-            self._streamingClients[client] = publisher
+            stream = self.streams[name] = StreamPublisher(requestor, client)
+            self._streamingClients[client] = stream
 
-        if client.id != publisher.client.id:
+        if client.id != stream.client.id:
             raise exc.BadNameError('%s is already used' % (name,))
 
-        return publisher
+        self._runCallbacksForPublishedStream(name, stream)
+
+        return stream
+
 
     def unpublishStream(self, name, stream):
         try:
@@ -886,6 +946,7 @@ class Application(object):
             log.err()
 
         del self.streams[name]
+
 
     def addSubscriber(self, stream, subscriber):
         """
