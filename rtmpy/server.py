@@ -343,8 +343,8 @@ class NetStream(rtmp.NetStream):
             func(meta)
 
     @expose
-    def play(self, name, *args):
-        d = defer.maybeDeferred(self.nc.playStream, name, self, *args)
+    def play(self, name, start=-2, len=-1, reset=True, *args):
+        d = defer.maybeDeferred(self.nc.playStream, self, name, start, len, reset, *args)
 
         def cb(res):
             """
@@ -638,7 +638,7 @@ class ServerProtocol(rtmp.RTMPProtocol):
             self.application.disconnect(self.client)
 
 
-    def playStream(self, name, subscriber, *args):
+    def playStream(self, subscriber, name, start, len, reset, *args):
         """
         Retu
         """
