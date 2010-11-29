@@ -343,8 +343,8 @@ class NetStream(rtmp.NetStream):
             func(meta)
 
     @expose
-    def play(self, name, start=-2, len=-1, reset=True, *args):
-        d = defer.maybeDeferred(self.nc.playStream, self, name, start, len, reset, *args)
+    def play(self, name, *args):
+        d = defer.maybeDeferred(self.nc.playStream, name, self, *args)
 
         def cb(res):
             """
@@ -633,25 +633,21 @@ class ServerProtocol(rtmp.RTMPProtocol):
         Called when the stream is released. Not sure about this one.
         """
 
-
     def closeStream(self):
         if self.application:
             self.application.disconnect(self.client)
 
-
-    def playStream(self, subscriber, name, start, len, reset, *args):
+    def playStream(self, name, subscriber, *args):
         """
-        Retu
         """
-        try:
-            publisher = self.application.getStreamByName(name)
-        except KeyError:
-            d = defer.Deferred()
-        else:
-            d = defer.succeed(publisher)
+        d = defer.Deferred()
 
         def whenPublished(publisher):
             publisher.addSubscriber(subscriber)
+
+            return publisher
+
+        self.application.whenPublished(name, d.callback)
 
         d.addCallback(whenPublished)
 

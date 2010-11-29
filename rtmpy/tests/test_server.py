@@ -741,8 +741,6 @@ class PublishingTestCase(ServerFactoryTestCase):
                 'clientid': self.client.id,
                 'level': 'status'
             })
-            
-
 
         d.addCallback(kill_connection)
 
@@ -764,8 +762,53 @@ class PlayTestCase(ServerFactoryTestCase):
 
 
     def test_pending(self):
+        """
+        Test if the stream does not exist, the play command is put in a
+        suspended state, until a stream with the right name is published.
+        """
         client = self.connect(self.app, self.protocol)
 
         s = self.createStream(self.protocol)
 
-        s.play('foo')
+        self.assertFalse('foo' in self.app.streams)
+
+        d = s.play('foo')
+
+        self.assertFalse(d.called)
+
+        def cb(res):
+            self.assertTrue('foo' in self.app.streams)
+
+            self.assertTrue(s in res.subscribers)
+
+        from twisted.internet import reactor
+
+        reactor.callLater(0, self.app.publishStream, client, s, 'foo')
+
+        d.addCallback(cb)
+
+        return d
+
+    def test_existing(self):
+        """
+        Test if the stream does already exist, the play command is immediately
+        completed.
+        """
+        client = self.connect(self.app, self.protocol)
+
+        s = self.createStream(self.protocol)
+
+        self.assertFalse('foo' in self.app.streams)
+
+        self.app.publishStream(client, s, 'foo')
+
+        d = s.play('foo')
+
+        self.assertTrue(d.called)
+
+        def cb(res):
+            self.assertTrue(s in res.subscribers)
+
+        d.addCallback(cb)
+
+        return d
