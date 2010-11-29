@@ -337,6 +337,7 @@ class ConnectingTestCase(unittest.TestCase):
 
         self.control = self.protocol.getStream(0)
 
+
     def assertStatus(self, code=None, description=None, level='status'):
         """
         Ensures that a status message has been sent.
@@ -363,6 +364,7 @@ class ConnectingTestCase(unittest.TestCase):
 
         self.assertEqual(args['level'], level)
 
+
     def assertErrorStatus(self, code=None, description=None):
         """
         Ensures that a status message has been sent.
@@ -374,6 +376,7 @@ class ConnectingTestCase(unittest.TestCase):
             description = 'Internal Server Error'
 
         self.assertStatus(code, description, 'error')
+
 
     def assertMessage(self, msg, type_, **state):
         """
@@ -423,7 +426,8 @@ class ConnectingTestCase(unittest.TestCase):
             self.assertEqual(res, {
                 'code': 'NetConnection.Connect.Failed',
                 'description': "Bad connect packet (missing 'app' key)",
-                'level': 'error'
+                'level': 'error',
+                'objectEncoding': 0
             })
 
         d.addCallback(cb)
@@ -445,7 +449,8 @@ class ConnectingTestCase(unittest.TestCase):
             self.assertEqual(res, {
                 'code': 'NetConnection.Connect.Failed',
                 'description': 'woot',
-                'level': 'error'
+                'level': 'error',
+                'objectEncoding': 0
             })
 
 
@@ -462,7 +467,8 @@ class ConnectingTestCase(unittest.TestCase):
             self.assertEqual(res, {
                 'code': 'NetConnection.Connect.InvalidApp',
                 'description': "Unknown application 'what'",
-                'level': 'error'
+                'level': 'error',
+                'objectEncoding': 0
             })
 
         d.addCallback(cb)
@@ -522,7 +528,8 @@ class ConnectingTestCase(unittest.TestCase):
             self.assertEqual(res, {
                 'code': 'NetConnection.Connect.Rejected',
                 'level': 'error',
-                'description': 'Authorization is required'
+                'description': 'Authorization is required',
+                'objectEncoding': 0
             })
 
             self.assertEqual(self.messages, [])

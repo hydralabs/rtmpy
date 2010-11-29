@@ -511,7 +511,8 @@ class ServerProtocol(rtmp.RTMPProtocol):
             code = getattr(fail.value, 'code', 'NetConnection.Connect.Failed')
             description = fail.getErrorMessage() or 'Internal Server Error'
 
-            return status.error(code, description)
+            return status.error(code, description,
+                objectEncoding=args.pop('objectEncoding', self.objectEncoding))
 
         def chain_errback(f):
             self._pendingConnection.errback(f)
