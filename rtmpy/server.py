@@ -633,7 +633,14 @@ class ServerProtocol(rtmp.RTMPProtocol):
         Called when the stream is released. Not sure about this one.
         """
 
+
     def closeStream(self):
+        """
+        Called when the stream is asked to close itself.
+
+        Since this class is considered the B{NetConnection} equivalent, we
+        propagate the event to the attached application (if one exists)
+        """
         if self.application:
             self.application.disconnect(self.client)
 
