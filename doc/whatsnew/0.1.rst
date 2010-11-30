@@ -2,6 +2,17 @@
   What's New in RTMPy 0.1
 **************************
 
-TODO.
+RTMPy 0.1 is the first step to a fully functioning RTMP library. The focus of
+this release is to produce solid codecs and provide basic server functionality.
 
 .. contents::
+
+Highlighted Features
+====================
+
+* Solid RTMP Encoder and Decoder (see rtmpy.protocol.rtmp.codec)
+* Support for receiving and redistributing live streams (publish/subscribe in
+  the Flash vernacular).
+* Provide a basic server framework mirrored on FMS.
+* AMF0 and AMF3 support (thanks to PyAMF!)
+* Support for > 4GB streams - have streamed over 400GB without failure.
