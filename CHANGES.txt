@@ -7,7 +7,7 @@ versions of RTMPy.
 .. contents::
 
 
-0.1.1 (unreleased)
+0.1.1 (2010-11-30)
 ------------------
 - Allow stream names to be reused if a peer disconnects uncleanly (Ticket:74)
 - Switch to Distribute (Ticket:63)
