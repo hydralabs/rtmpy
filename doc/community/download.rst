@@ -40,4 +40,4 @@ For installing this development version::
 
 
 .. _Git: 		http://git-scm.com/
-.. _RTMPy-0.1.1.tar.gz:	http://pypi.python.org/packages/source/R/RTMPy/RTMPy-0.1.1.tar.gz#md5=a4ccc082a7b97c48bb7e6fc41750102d
+.. _RTMPy-0.1.1.tar.gz:	http://pypi.python.org/packages/source/R/RTMPy/RTMPy-0.1.1.tar.gz
