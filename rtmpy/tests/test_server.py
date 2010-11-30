@@ -321,6 +321,19 @@ class ServerFactoryTestCase(unittest.TestCase):
 
         return client
 
+    def createStream(self, protocol):
+        """
+        Returns the L{server.NetStream} as created by the protocol
+        """
+        return protocol.getStream(protocol.createStream())
+
+        def capture_status(s):
+            self.stream_status[stream] = s
+
+        stream.sendStatus = capture_status
+
+        return stream
+
 
 
 class ConnectingTestCase(unittest.TestCase):
@@ -737,4 +750,22 @@ class PublishingTestCase(ServerFactoryTestCase):
 
 
 class PlayTestCase(ServerFactoryTestCase):
-    pass
+    """
+    Tests for L{NetStream.play}
+    """
+
+
+    def setUp(self):
+        ServerFactoryTestCase.setUp(self)
+
+        self.app = server.Application()
+
+        return self.factory.registerApplication('foo', self.app)
+
+
+    def test_pending(self):
+        client = self.connect(self.app, self.protocol)
+
+        s = self.createStream(self.protocol)
+
+        s.play('foo')
