@@ -77,15 +77,15 @@ flashplayer air actionscript decoder encoder gateway server"""
 
 
 setup(name = "RTMPy",
+    url = "http://rtmpy.org",
     version = get_version(),
+    author = "The RTMPy Project",
+    author_email = "rtmpy-dev@rtmpy.org",
     description = "Twisted protocol for RTMP",
     long_description = open('README.txt', 'rt').read(),
     cmdclass = {
        'test': TestCommand
     },
-    url = "http://rtmpy.org",
-    author = "The RTMPy Project",
-    author_email = "rtmpy-dev@rtmpy.org",
     keywords = keyw,
     packages = find_packages(exclude=["*.tests"]),
     install_requires = get_install_requirements(),
