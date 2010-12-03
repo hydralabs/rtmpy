@@ -46,7 +46,7 @@ setup(
     install_requires = setupinfo.get_install_requirements(),
     tests_require = setupinfo.get_test_requirements(),
     test_suite = "rtmpy.tests.get_suite",
-    #ext_modules = get_extensions(),
+    ext_modules = setupinfo.get_extensions(),
     zip_safe = True,
     license = "LGPL 2.1 License",
     platforms = ["any"],

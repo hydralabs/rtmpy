@@ -2,15 +2,20 @@
 Meta data and helper functions for setup
 """
 
+import os.path
 import sys
 
 from setuptools.command import test
+from setuptools import Extension
 
 try:
     from Cython.Distutils import build_ext
+
     have_cython = True
 except ImportError:
     from setuptools.command.build_ext import build_ext
+
+    have_cython = False
 
 
 keywords = """
@@ -100,32 +105,71 @@ def get_test_requirements():
 
 
 
+def get_cpyamf_pxd_dir():
+    """
+    Return the directory that will be included to allow Cython to find
+    cpyamf/*.pxd files (if cpyamf is installed)
+    """
+    try:
+        import cpyamf
+    except ImportError:
+        print ("WARNING: cpyamf is not installed")
+
+        return
+
+    # TODO: what to do about pyamf in an egg here?
+    return os.path.dirname(os.path.dirname(cpyamf.__file__))
+
+
+
+def make_extension(mod_name, **extra_options):
+    """
+    Tries is best to return an Extension instance based on the mod_name
+    """
+    include_dirs = extra_options.setdefault('include_dirs', [])
+
+    base_name = os.path.join(mod_name.replace('.', os.path.sep))
+
+    if have_cython:
+        cpd = get_cpyamf_pxd_dir()
+
+        if cpd and cpd not in include_dirs:
+            include_dirs.append(cpd)
+
+        for ext in ['.pyx', '.py']:
+            source = base_name + ext
+
+            if os.path.exists(source):
+                return Extension(mod_name, [source], **extra_options)
+
+        print('WARNING: Could not find Cython source for %r' % (mod_name,))
+    else:
+        source = base_name + '.c'
+
+        if os.path.exists(source):
+            return Extension(mod_name, [source], **extra_options)
+
+        print ('WARNING: Could not build extension for %r, no source found' % (
+            mod_name))
+
+
 def get_extensions():
-    src_ext = '.pyx'
-
-    if not have_cython:
-        src_ext = '.c'
-
+    """
+    Return a list of Extension instances that can be compiled.
+    """
     extensions = []
+    mods = [
+        'rtmpy.protocol.rtmp.header'
+    ]
 
-    base_name = 'rtmpy'
-    root_dir = os.path.normpath(os.path.join(os.getcwd(), base_name))
+    for m in mods:
+        e = make_extension(m)
 
-    for root, _, files in os.walk(root_dir):
-        for f in files:
-            name, e = os.path.splitext(f)
+        if e:
+            extensions.append(e)
 
-            if e != src_ext:
-                continue
-
-            src = os.path.join(base_name, root[len(root_dir) + 1:], name)
-            mod = src.replace(os.path.sep, '.')
-
-            print src + src_ext, mod
-            extensions.append(Extension(mod, [src + src_ext]))
-
-    print extensions
     return extensions
+
 
 
 def get_trove_classifiers():
@@ -138,7 +182,7 @@ def get_trove_classifiers():
         version = get_version()
 
         if 'dev' in version:
-            return 'Development Status :: 3 - Alpha'
+            return 'Development Status :: 2 - Pre-Alpha'
         elif 'alpha' in version:
             return 'Development Status :: 3 - Alpha'
         elif 'beta' in version:
