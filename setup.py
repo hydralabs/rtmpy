@@ -13,89 +13,44 @@
 # You should have received a copy of the GNU Lesser General Public License along
 # with RTMPy.  If not, see <http://www.gnu.org/licenses/>.
 
+import sys
+import os.path
+
+
+try:
+    import Cython
+    # may need to work around setuptools bug by providing a fake Pyrex
+    sys.path.insert(0, os.path.join(os.path.dirname(__file__), "fake_pyrex"))
+except ImportError:
+    pass
+
 
 from distribute_setup import use_setuptools
 use_setuptools(download_delay=3)
 
-
-import sys
 from setuptools import setup, find_packages
-from setuptools.command import test
+
+import setupinfo
 
 
-class TestCommand(test.test):
-    """
-    Ensures that unittest2 is imported if required and replaces the old
-    unittest module.
-    """
-
-    def run_tests(self):
-        try:
-            import unittest2
-            import sys
-
-            sys.modules['unittest'] = unittest2
-        except ImportError:
-            pass
-
-        return test.test.run_tests(self)
-
-
-
-def get_test_requirements():
-    tests_require = []
-
-    if sys.version_info < (2, 7):
-        tests_require.append('unittest2')
-
-    return tests_require
-
-
-def get_version():
-    from rtmpy import __version__
-
-    return '.'.join([str(x) for x in __version__])
-
-
-def get_install_requirements():
-    """
-    Returns a list of dependencies for RTMPy to function correctly on the
-    target platform.
-    """
-    install_requires = ['Twisted>=2.5.0', 'PyAMF>=0.6']
-
-    if sys.platform.startswith('win'):
-        install_requires.append('PyWin32')
-
-    return install_requires
-
-
-keyw = """\
-rtmp flv rtmps rtmpe rtmpt rtmpte amf amf0 amf3 flex flash http https
-streaming video audio sharedobject webcam record playback pyamf client
-flashplayer air actionscript decoder encoder gateway server"""
-
-
-setup(name = "RTMPy",
+setup(
+    name = "RTMPy",
     url = "http://rtmpy.org",
-    version = get_version(),
+    version = setupinfo.get_version(),
     author = "The RTMPy Project",
     author_email = "rtmpy-dev@rtmpy.org",
     description = "Twisted protocol for RTMP",
     long_description = open('README.txt', 'rt').read(),
-    cmdclass = {
-       'test': TestCommand
-    },
-    keywords = keyw,
+    keywords = setupinfo.keywords,
     packages = find_packages(exclude=["*.tests"]),
-    install_requires = get_install_requirements(),
-    tests_require = get_test_requirements(),
+    install_requires = setupinfo.get_install_requirements(),
+    tests_require = setupinfo.get_test_requirements(),
     test_suite = "rtmpy.tests.get_suite",
+    #ext_modules = get_extensions(),
     zip_safe = True,
     license = "LGPL 2.1 License",
     platforms = ["any"],
     classifiers = [
-        "Development Status :: 2 - Pre-Alpha",
         "Framework :: Twisted",
         "Natural Language :: English",
         "Intended Audience :: Developers",
@@ -108,4 +63,5 @@ setup(name = "RTMPy",
         "Programming Language :: Python :: 2.6",
         "Programming Language :: Python :: 2.7",
         "Topic :: Software Development :: Libraries :: Python Modules",
-    ])
+    ] + setupinfo.get_trove_classifiers(),
+    **setupinfo.extra_setup_args())
