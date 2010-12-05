@@ -82,7 +82,7 @@ class AquireChannelTestCase(BaseTestCase):
 
     def test_overflow(self):
         """
-        Attempt to aquire 62 channels
+        Attempt to acquire MAX_CHANNELS + 1 channels.
         """
 
         for i in xrange(codec.MAX_CHANNELS - 1):
