@@ -678,19 +678,18 @@ class VideoData(StreamingMessage):
 
 
 #: Map event types to event classes
-TYPE_MAP = {
-    FRAME_SIZE: FrameSize,
-    BYTES_READ: BytesRead,
-    CONTROL: ControlMessage,
-    DOWNSTREAM_BANDWIDTH: DownstreamBandwidth,
-    UPSTREAM_BANDWIDTH: UpstreamBandwidth,
-    NOTIFY: Notify,
-    INVOKE: Invoke,
-    FLEX_MESSAGE: FlexMessage,
-    AUDIO_DATA: AudioData,
-    VIDEO_DATA: VideoData,
-    # TODO: Shared object etc.
-}
+TYPE_MAP = {}
+
+for k, v in globals().items():
+    try:
+        if not IMessage.implementedBy(v):
+            continue
+    except TypeError:
+        continue
+
+    TYPE_MAP[v.type] = v
+
+del k, v
 
 
 def get_type_class(datatype):
