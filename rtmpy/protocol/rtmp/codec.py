@@ -720,7 +720,7 @@ class ChannelMuxer(Codec):
                 if callback:
                     try:
                         callback()
-                    except:
+                    except Exception:
                         pass
 
         for channel in to_release:
