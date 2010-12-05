@@ -16,7 +16,7 @@
 """
 RTMP codecs. Encoders and decoders for RTMP streams.
 
-This module purposefully does not have third party dependancies (save for PyAMF,
+This module purposefully does not have third party dependencies (save for PyAMF,
 which does all the byte packing).
 
 The Encoder/Decoder is not thread safe.
