@@ -30,14 +30,13 @@ into fixed size body chunks.
 """
 
 from twisted.python import log, failure
-from twisted.internet import protocol, task, defer
+from twisted.internet import protocol, task
 import pyamf
 from pyamf.util import BufferedByteStream
 from zope.interface import Interface, Attribute
 
-from rtmpy.core import message, status, expose
+from rtmpy.core import message
 from rtmpy.protocol.rtmp import codec
-from rtmpy import exc, core
 
 
 class IChannelMeta(Interface):
@@ -51,282 +50,6 @@ class IChannelMeta(Interface):
     bodyLength = Attribute("The length of the channel body.")
     streamId = Attribute("An C{int} representing the linked stream.")
 
-
-#: Maximum number of streams that can be active per RTMP stream
-MAX_STREAMS = 0xffff
-
-
-
-class RemoteCallFailed(failure.Failure):
-    """
-    """
-
-
-class ExtraResult(object):
-    """
-    """
-
-    def __init__(self, result, extra=None):
-        self.result = result
-        self.extra = extra
-
-
-class BaseStream(object):
-    """
-    """
-
-    def __init__(self, streamId):
-        self.streamId = streamId
-
-        self.timestamp = 0
-        self.lastInvokeId = -1
-        self.activeInvokes = {}
-
-    def reset(self):
-        # TODO: check active invokes and errback
-        self.timestamp = 0
-        self.lastInvokeId = -1
-        self.activeInvokes = {}
-
-    def call(self, name, *args, **kwargs):
-        whenDone = kwargs.get('whenDone', None)
-
-        if not whenDone:
-            self.sendMessage(message.Invoke(name, 0, None, *args))
-
-            return
-
-        self.lastInvokeId += 1
-        invokeId = self.lastInvokeId
-
-        d = defer.Deferred()
-        m = message.Invoke(name, invokeId, None, *args)
-        self.activeInvokes[invokeId] = d
-
-        self.sendMessage(m, whenDone=whenDone)
-
-        return d
-
-    def sendStatus(self, code_or_status, command=None, **kwargs):
-        """
-        Informs the peer of a change of status.
-
-        @param code_or_status: A status message or L{status.Status} instance.
-            If a string is supplied it will be converted to an L{status.Status}.
-        @param command: The command object part of the L{message.Invoke}
-            message. Not quite sure what this achieves right now. Defaults to
-            L{None}.
-        @param kwargs: If a string status message is supplied then any extra
-            kwargs will form part of the generated L{status.Status} message.
-        """
-        if isinstance(code_or_status, status.Status):
-            status_obj = code_or_status
-        else:
-            status_obj = status.status(code_or_status, **kwargs)
-
-        msg = message.Invoke('onStatus', 0, *[command, status_obj])
-
-        self.sendMessage(msg)
-
-    def setTimestamp(self, timestamp, relative=True):
-        """
-        Sets the timestamp for this stream. The timestamp is measured in
-        milliseconds since an arbitrary epoch. This could be since the stream
-        started sending or receiving audio/video etc.
-
-        @param relative: Whether the supplied timestamp is relative to the
-            previous.
-        """
-        if relative:
-            self.timestamp += timestamp
-        else:
-            if timestamp < self.timestamp:
-                raise ValueError('Cannot set a negative timestamp')
-
-            self.timestamp = timestamp
-
-    def _handleInvokeResponse(self, result, id_):
-        """
-        Called to handle the response to an invoked method
-        """
-        if id_ == 0:
-            return result
-
-        d = self.activeInvokes.pop(id_, None)
-
-        if d is None:
-            self.sendMessage(message.Invoke('_error', id_, None, {}))
-
-            raise RuntimeError('Missing activeInvoke for id %r' % (id_,))
-
-        def write_error(fail):
-            code = getattr(fail.type, 'code', 'NetConnection.Call.Failed')
-
-            msg = message.Invoke('_error', id_, None, {
-                'level': 'error',
-                'code': code,
-                'description': fail.getErrorMessage()
-            })
-
-            self.sendMessage(msg)
-
-            return fail
-
-        def write_result(result):
-            if isinstance(result, ExtraResult):
-                msg = message.Invoke('_result', id_, result.extra, result.result)
-            else:
-                msg = message.Invoke('_result', id_, None, result)
-
-            self.sendMessage(msg)
-
-            return result
-
-        d.addCallbacks(write_result, write_error)
-
-        return result
-
-    def _callExposedMethod(self, name, *args):
-        """
-        Returns a L{defer.Deferred} that will hold the result of the called
-        method.
-
-        @param name: The name of the method to call
-        @param args: The supplied args from the invoke/notify call.
-        """
-        d = defer.Deferred()
-
-        # a request from the peer to call a local method
-        try:
-            func = self.getInvokableTarget(name)
-        except:
-            d.errback()
-
-            return d
-
-        if len(args) >= 1 and args[0] is None:
-            args = args[1:]
-
-        if func is None:
-            d.errback(exc.CallFailed('Unknown method %r' % (name,)))
-        else:
-            d = defer.maybeDeferred(func, *args)
-
-        return d
-
-    def onInvoke(self, name, id_, args, timestamp):
-        """
-        Called when an invoke message has been received from the peer. This
-        could be a request or a response depending on whether id_ is 'in use'.
-
-        @return: A deferred containing the result of the invoke call. This is
-            not strictly necessary but useful for testing purposes.
-        @retype: L{defer.Deferred}
-        """
-        d = self.activeInvokes.pop(id_, None)
-
-        if d:
-            # handle the response
-            if name == '_error':
-                d.errback(RemoteCallFailed(args))
-            elif name == '_result':
-                d.callback(*args)
-            else:
-                log.msg('Unhandled name for invoke response %r' % (name,))
-
-            return d
-
-        d = self._callExposedMethod(name, *args)
-
-        if id_ > 0:
-            self.activeInvokes[id_] = d
-
-        d.addBoth(self._handleInvokeResponse, id_)
-
-        return d
-
-    def onNotify(self, name, args, timestamp):
-        """
-        Call an exposed method on this peer but without regard to any return
-        value.
-
-        @param name: The name of the method to call
-        @param args: A list of arguments for this method.
-        @param timestamp: The timestamp at which this notify was called.
-        """
-        self._callExposedMethod(name, *args)
-
-
-    def getInvokableTarget(self, name):
-        """
-        Used to match a callable based on the supplied name when a notify or
-        invoke is encountered. Returns C{None} if not found.
-
-        This allows fine grained control over what this stream can expose to the
-        peer.
-
-        @param name: The name of the function to be mapped to a callable.
-        @return: A callable or C{None}
-        """
-        func_name = core._exposed_funcs.get(name, None)
-
-        if not func_name:
-            return
-
-        return getattr(self, func_name)
-
-
-    def sendMessage(self, msg, whenDone=None):
-        """
-        Sends an RTMP message to the peer. This a low level method and is not
-        part of any public api. If its use is necessary then this is a bug.
-
-        Must be implemented by subclasses.
-
-        @param msg: The RTMP message to be sent by this stream.
-        @type: L{message.Message}
-        @param whenDone: An optional callback that is fired once the complete
-            encoded RTMP message has been sent to the peer. This is not the same
-            as a U{defer.Deferred} instance. When called it receives no params.
-        """
-        raise NotImplementedError
-
-
-class NetStream(BaseStream):
-    """
-    A stream within an RTMP connection. A stream can either send or receive
-    video/audio, or in the Flash vernacular - publish or subscribe.
-
-    Not sure about data just yet.
-    """
-
-    def __init__(self, nc, streamId):
-        BaseStream.__init__(self, streamId)
-
-        self.nc = nc
-
-    @property
-    def client(self):
-        return self.nc.client
-
-    def sendMessage(self, msg, whenDone=None):
-        """
-        Sends an RTMP message to the peer. This a low level method and is not
-        part of any public api. If its use is necessary then this is a bug.
-
-        @param msg: The RTMP message to be sent by this stream.
-        @type: L{message.Message}
-        @param whenDone: An optional callback that is fired once the complete
-            encoded RTMP message has been sent to the peer. This is not the same
-            as a U{defer.Deferred} instance. When called it receives no params.
-        """
-        self.nc.sendMessage(msg, whenDone, stream=self)
-
-    def deleteStream(self):
-        """
-        Called when this stream has been deleted from the NetConnection. Use it
-        to clean up.
-        """
 
 
 class DecodingDispatcher(object):
@@ -376,17 +99,12 @@ class RTMPProtocol(protocol.Protocol, BaseStream):
         connect packet.
     """
 
-    stream_class = NetStream
-
     HANDSHAKE = 'handshake'
     STREAM = 'stream'
 
     objectEncoding = pyamf.AMF0
     clientId = None
 
-    def __init__(self):
-        # this protocol is the NetConnection
-        BaseStream.__init__(self, 0)
 
     def logAndDisconnect(self, reason, *args, **kwargs):
         """
@@ -397,9 +115,6 @@ class RTMPProtocol(protocol.Protocol, BaseStream):
         self.transport.loseConnection()
 
         return reason
-
-    def closeStream(self):
-        pass
 
     def connectionMade(self):
         """
@@ -428,16 +143,7 @@ class RTMPProtocol(protocol.Protocol, BaseStream):
         if self.state == self.HANDSHAKE:
             del_attr('handshaker')
         elif self.state == self.STREAM:
-            for streamId, stream in self.streams.copy().iteritems():
-                if stream is self:
-                    continue
-
-                stream.closeStream()
-                self.deleteStream(streamId)
-
             self.closeStream()
-
-            del_attr('streams')
 
             del_attr('decoder_task')
             del_attr('decoder')
@@ -528,26 +234,6 @@ class RTMPProtocol(protocol.Protocol, BaseStream):
         self.decoder_task = None
         self.encoder_task = None
 
-        self.streams = {
-            0: self
-        }
-        self._nextStreamId = 1
-
-    # IStreamFactory
-    def getStream(self, streamId):
-        """
-        Returns the L{NetStream} instance related to the C{streamId}.
-        """
-        s = self.streams.get(streamId, None)
-
-        if s is None:
-            # the peer needs to call 'createStream' to make new streams.
-            raise KeyError('Unknown stream %r' % (streamId,))
-
-        return s
-
-    # INetConnection
-
     def sendMessage(self, msg, whenDone=None, stream=None):
         """
         Sends an RTMP message to the peer. Not part of a public api, use
@@ -597,34 +283,6 @@ class RTMPProtocol(protocol.Protocol, BaseStream):
             raise RuntimeError('No streaming channel available')
 
         return codec.StreamingChannel(channel, stream.streamId, self.transport)
-
-    @expose
-    def createStream(self):
-        """
-        Creates a new L{NetStream} and associates it with this protocol.
-        """
-        streamId = self._nextStreamId
-        self.streams[streamId] = self.stream_class(self, streamId)
-
-        self._nextStreamId += 1
-
-        return streamId
-
-    @expose
-    def deleteStream(self, streamId):
-        """
-        Deletes an existing L{NetStream} associated with this NetConnection.
-
-        @todo: What about error handling or if the NetStream is still receiving
-            or streaming data?
-        """
-        if streamId == 0:
-            return # can't delete the NetConnection
-
-        stream = self.streams.pop(streamId, None)
-
-        if stream:
-            stream.deleteStream()
 
     def onFrameSize(self, size, timestamp):
         """

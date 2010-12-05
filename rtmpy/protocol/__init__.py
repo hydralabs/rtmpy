@@ -33,8 +33,3 @@ packets are split up into fixed size body chunks.
 #: The default RTMP port is a registered port at U{IANA<http://iana.org>}
 RTMP_PORT = 1935
 
-RTMPE_PROTOCOL_VERSION = 6
-MAX_PROTOCOL_VERSION = 31
-
-#: Maximum number of streams that can be active per RTMP stream
-MAX_STREAMS = 0xffff
