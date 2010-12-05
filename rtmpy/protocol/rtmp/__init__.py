@@ -35,6 +35,7 @@ import pyamf
 from pyamf.util import BufferedByteStream
 from zope.interface import Interface, Attribute
 
+from rtmpy import core
 from rtmpy.core import message
 from rtmpy.protocol.rtmp import codec
 
@@ -88,7 +89,7 @@ class DecodingDispatcher(object):
         self.protocol.sendMessage(message.BytesRead(bytes))
 
 
-class RTMPProtocol(protocol.Protocol, BaseStream):
+class RTMPProtocol(protocol.Protocol, core.BaseStream):
     """
     Provides basic handshaking and RTMP protocol support.
 
