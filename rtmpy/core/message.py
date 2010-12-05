@@ -131,6 +131,7 @@ class IMessageListener(Interface):
     Receives dispatched messages.
     """
 
+
     def onInvoke(invoke, timestamp):
         """
         Called when an invoke event have been received.
@@ -140,6 +141,7 @@ class IMessageListener(Interface):
         @param timestamp: The timestamp that this message was dispatched.
         """
 
+
     def onNotify(notify, timestamp):
         """
         Similar to L{onInvoke} but no response is expected and will be ignored.
@@ -148,6 +150,7 @@ class IMessageListener(Interface):
         @param timestamp: The timestamp that this message was dispatched.
         """
 
+
     def onAudioData(data, timestamp):
         """
         Called when audio data is received.
@@ -155,6 +158,7 @@ class IMessageListener(Interface):
         @param data: The audio bytes received.
         @param timestamp: The timestamp that this message was dispatched.
         """
+
 
     def onVideoData(data, timestamp):
         """
@@ -174,6 +178,7 @@ class IMessageListener(Interface):
         @param timestamp: The timestamp that this message was dispatched.
         """
 
+
     def onBytesRead(bytes, timestamp):
         """
         Called when the peer reports the number of raw bytes read from the
@@ -183,6 +188,7 @@ class IMessageListener(Interface):
         @type bytes: C{int}
         @param timestamp: The timestamp that this message was dispatched.
         """
+
 
     def onControlMessage(message, timestamp):
         """
@@ -196,6 +202,7 @@ class IMessageListener(Interface):
         @param timestamp: The timestamp that this message was dispatched.
         """
 
+
     def onDownstreamBandwidth(bandwidth, timestamp):
         """
         Called when the connected endpoint reports its downstream bandwidth
@@ -206,6 +213,7 @@ class IMessageListener(Interface):
         @type bandwidth: C{int}
         @param timestamp: The timestamp that this message was dispatched.
         """
+
 
     def onUpstreamBandwidth(bandwidth, extra, timestamp):
         """
@@ -242,6 +250,7 @@ class Message(object):
         """
         raise NotImplementedError
 
+
     def decode(self, buf):
         """
         Called to decode the event from C{buf}.
@@ -250,6 +259,7 @@ class Message(object):
         """
         raise NotImplementedError
 
+
     def dispatch(self, listener, timestamp):
         """
         Called to dispatch the event into listener.
@@ -257,6 +267,7 @@ class Message(object):
         @type listener: L{IEventListener}
         """
         raise NotImplementedError
+
 
     def __repr__(self):
         t = self.__class__
@@ -273,6 +284,7 @@ class Message(object):
         return s % (t.__module__, t.__name__, id(self))
 
 
+
 class FrameSize(Message):
     """
     A frame size message. This determines the maximum number of bytes for the
@@ -282,16 +294,20 @@ class FrameSize(Message):
     @type size: C{int}
     """
 
+
     type = FRAME_SIZE
+
 
     def __init__(self, size=None):
         self.size = size
+
 
     def decode(self, buf):
         """
         Decode a frame size message.
         """
         self.size = buf.read_ulong()
+
 
     def encode(self, buf):
         """
@@ -306,11 +322,13 @@ class FrameSize(Message):
             raise EncodeError('Frame size wrong type '
                 '(expected int, got %r)' % (type(self.size),))
 
+
     def dispatch(self, listener, timestamp):
         """
         Dispatches the message to the listener.
         """
         listener.onFrameSize(self.size, timestamp)
+
 
 
 class BytesRead(Message):
@@ -325,14 +343,17 @@ class BytesRead(Message):
 
     FOUR_GB_THRESHOLD = 0xee800000
 
+
     def __init__(self, bytes=None):
         self.bytes = bytes
+
 
     def decode(self, buf):
         """
         Decode a bytes read message.
         """
         self.bytes = buf.read_ulong()
+
 
     def encode(self, buf):
         """
@@ -347,11 +368,13 @@ class BytesRead(Message):
             raise EncodeError('Bytes read wrong type '
                 '(expected int, got %r)' % (type(self.bytes),))
 
+
     def dispatch(self, listener, timestamp):
         """
         Dispatches the message to the listener.
         """
         listener.onBytesRead(self.bytes, timestamp)
+
 
 
 class ControlMessage(Message):
@@ -365,11 +388,13 @@ class ControlMessage(Message):
     PING = 6
     PONG = 7
 
+
     def __init__(self, type=None, value1=0, value2=None, value3=None):
         self.type = type
         self.value1 = value1
         self.value2 = value2
         self.value3 = value3
+
 
     def decode(self, buf):
         """
@@ -383,6 +408,7 @@ class ControlMessage(Message):
             self.value3 = buf.read_long()
         except IOError:
             pass
+
 
     def encode(self, buf):
         """
@@ -417,11 +443,13 @@ class ControlMessage(Message):
                 raise EncodeError('TypeError encoding value3 '
                     '(expected int, got %r)' % (type(self.value3),))
 
+
     def dispatch(self, listener, timestamp):
         """
         Dispatches the event to the listener.
         """
         return listener.onControlMessage(self, timestamp)
+
 
 
 class DownstreamBandwidth(Message):
@@ -431,14 +459,17 @@ class DownstreamBandwidth(Message):
 
     type = DOWNSTREAM_BANDWIDTH
 
+
     def __init__(self, bandwidth=None):
         self.bandwidth = bandwidth
+
 
     def decode(self, buf):
         """
         Decode a downstream bandwidth message.
         """
         self.bandwidth = buf.read_ulong()
+
 
     def encode(self, buf):
         """
@@ -453,11 +484,13 @@ class DownstreamBandwidth(Message):
             raise EncodeError('TypeError for downstream bandwidth '
                 '(expected int, got %r)' % (type(self.bandwidth),))
 
+
     def dispatch(self, listener, timestamp):
         """
         Dispatches the message to the listener.
         """
         return listener.onDownstreamBandwidth(self.bandwidth, timestamp)
+
 
 
 class UpstreamBandwidth(Message):
@@ -471,9 +504,11 @@ class UpstreamBandwidth(Message):
 
     type = UPSTREAM_BANDWIDTH
 
+
     def __init__(self, bandwidth=None, extra=None):
         self.bandwidth = bandwidth
         self.extra = extra
+
 
     def decode(self, buf):
         """
@@ -481,6 +516,7 @@ class UpstreamBandwidth(Message):
         """
         self.bandwidth = buf.read_ulong()
         self.extra = buf.read_uchar()
+
 
     def encode(self, buf):
         """
@@ -504,12 +540,14 @@ class UpstreamBandwidth(Message):
             raise EncodeError('TypeError: extra '
                 '(expected int, got %r)' % (type(self.extra),))
 
+
     def dispatch(self, listener, timestamp):
         """
         Dispatches the message to the listener.
         """
         return listener.onUpstreamBandwidth(
             self.bandwidth, self.extra, timestamp)
+
 
 
 class Notify(Message):
@@ -523,9 +561,11 @@ class Notify(Message):
 
     type = NOTIFY
 
+
     def __init__(self, name=None, *args):
         self.name = name
         self.argv = list(args)
+
 
     def decode(self, buf):
         """
@@ -535,6 +575,7 @@ class Notify(Message):
 
         self.name = decoder.next()
         self.argv = [x for x in decoder]
+
 
     def encode(self, buf):
         """
@@ -547,11 +588,13 @@ class Notify(Message):
         for a in args:
             encoder.writeElement(a)
 
+
     def dispatch(self, listener, timestamp):
         """
         Dispatches the message to the listener.
         """
         return listener.onNotify(self.name, self.argv, timestamp)
+
 
 
 class Invoke(Message):
@@ -563,10 +606,12 @@ class Invoke(Message):
 
     encoding = pyamf.AMF0
 
+
     def __init__(self, name=None, id=None, *args):
         self.name = name
         self.id = id
         self.argv = list(args)
+
 
     def decode(self, buf):
         """
@@ -577,6 +622,7 @@ class Invoke(Message):
         self.name = decoder.next()
         self.id = decoder.next()
         self.argv = [x for x in decoder]
+
 
     def encode(self, buf):
         """
@@ -589,11 +635,13 @@ class Invoke(Message):
         for a in args:
             encoder.writeElement(a)
 
+
     def dispatch(self, listener, timestamp):
         """
         Dispatches the message to the listener.
         """
         listener.onInvoke(self.name, self.id, self.argv, timestamp)
+
 
 
 class FlexMessage(Invoke):
@@ -614,6 +662,7 @@ class FlexMessage(Invoke):
         return Invoke.decode(self, buf)
 
 
+
 class StreamingMessage(Message):
     """
     An message containing streaming data.
@@ -622,8 +671,10 @@ class StreamingMessage(Message):
     @type data: C{str}
     """
 
+
     def __init__(self, data=None):
         self.data = data
+
 
     def decode(self, buf):
         """
@@ -633,6 +684,7 @@ class StreamingMessage(Message):
             self.data = buf.read()
         except IOError:
             self.data = ''
+
 
     def encode(self, buf):
         """
@@ -648,6 +700,7 @@ class StreamingMessage(Message):
                 type(self.data),))
 
 
+
 class AudioData(StreamingMessage):
     """
     A message containing audio data.
@@ -655,11 +708,13 @@ class AudioData(StreamingMessage):
 
     type = AUDIO_DATA
 
+
     def dispatch(self, listener, timestamp):
         """
         Dispatches the message to the listener.
         """
         listener.onAudioData(self.data, timestamp)
+
 
 
 class VideoData(StreamingMessage):
@@ -669,11 +724,13 @@ class VideoData(StreamingMessage):
 
     type = VIDEO_DATA
 
+
     def dispatch(self, listener, timestamp):
         """
         Dispatches the message to the listener.
         """
         return listener.onVideoData(self.data, timestamp)
+
 
 
 #: Map event types to event classes
@@ -689,6 +746,7 @@ for k, v in globals().items():
     TYPE_MAP[v.type] = v
 
 del k, v
+
 
 
 def get_type_class(datatype):
