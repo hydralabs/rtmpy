@@ -46,18 +46,13 @@ class EncoderTestCase(BaseTestCase):
         """
         Ensure that messages are queued when all channels are busy
         """
-        self.encoder.channelsInUse = 0xffff
-        while not self.encoder.isFull():
-            self.encoder.send('foo', 8, 6, 0)
+        self.encoder.channelsInUse = codec.MAX_CHANNELS
 
         self.encoder.send('bar', 12, 2, 3)
 
         self.assertEqual(self.encoder.pending, [('bar', 12, 2, 3, None)])
 
-        self.encoder.next()
-
-        self.assertEqual(self.encoder.pending, [('bar', 12, 2, 3, None)])
-
+        self.encoder.channelsInUse -= 1
         self.encoder.next()
 
         self.assertEqual(self.encoder.pending, [])
@@ -85,10 +80,10 @@ class AquireChannelTestCase(BaseTestCase):
         Attempt to acquire MAX_CHANNELS + 1 channels.
         """
 
-        for i in xrange(codec.MAX_CHANNELS - 1):
-            self.assertNotEqual(self.encoder.acquireChannel(), None)
+        self.encoder.channelsInUse = codec.MAX_CHANNELS - 1
+        self.assertNotEqual(self.encoder.acquireChannel(), None)
 
-        self.assertEqual(self.encoder.channelsInUse, 65596)
+        self.assertEqual(self.encoder.channelsInUse, codec.MAX_CHANNELS)
         self.assertEqual(self.encoder.acquireChannel(), None)
 
 

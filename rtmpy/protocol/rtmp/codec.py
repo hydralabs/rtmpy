@@ -602,7 +602,7 @@ class ChannelMuxer(Codec):
         except IndexError:
             channelId = self.channelsInUse + 1
 
-            if channelId >= MAX_CHANNELS:
+            if channelId > MAX_CHANNELS:
                 return None
 
         self.channelsInUse += 1
@@ -721,7 +721,7 @@ class ChannelMuxer(Codec):
         """
         Encodes one RTMP frame from all the active channels.
         """
-        while self.pending and self.channelsInUse != MAX_CHANNELS:
+        while self.pending and self.channelsInUse <= MAX_CHANNELS:
             self.send(*self.pending.pop(0))
 
         if not self.activeChannels:
