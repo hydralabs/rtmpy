@@ -86,7 +86,7 @@ class MessageTestCase(unittest.TestCase):
         x.foo = 'bar'
 
         self.assertEqual(repr(x),
-            "<rtmpy.protocol.rtmp.message.Message foo='bar' at 0x%x>" % id(x))
+            "<rtmpy.core.message.Message foo='bar' at 0x%x>" % id(x))
 
 
 class FrameSizeTestCase(BaseTestCase):

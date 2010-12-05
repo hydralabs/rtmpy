@@ -35,8 +35,9 @@ import pyamf
 from pyamf.util import BufferedByteStream
 from zope.interface import Interface, Attribute
 
-from rtmpy.protocol.rtmp import message, codec
-from rtmpy import exc
+from rtmpy.core import message, status, expose
+from rtmpy.protocol.rtmp import codec
+from rtmpy import exc, core
 
 
 class IChannelMeta(Interface):
@@ -54,43 +55,11 @@ class IChannelMeta(Interface):
 #: Maximum number of streams that can be active per RTMP stream
 MAX_STREAMS = 0xffff
 
-#: A dictionary of
-_exposed_funcs = {}
 
 
 class RemoteCallFailed(failure.Failure):
     """
     """
-
-
-def expose(func):
-    """
-    A decorator that provides an easy way to expose methods that the peer can
-    'call' via RTMP C{invoke} or C{notify} messages.
-
-    Example usage::
-
-        @expose
-        def someRemoteMethod(self, foo, bar):
-            pass
-
-        @expose('foo-bar')
-        def anotherExposedMethod(self, *args):
-            pass
-
-    If expose is called with no args, the function name is used.
-    """
-    if hasattr(func, '__call__'):
-        _exposed_funcs[func.func_name] = func.func_name
-
-        return func
-
-    def decorator(f):
-        _exposed_funcs[func] = f.func_name
-
-        return f
-
-    return decorator
 
 
 class ExtraResult(object):
@@ -299,7 +268,7 @@ class BaseStream(object):
         @param name: The name of the function to be mapped to a callable.
         @return: A callable or C{None}
         """
-        func_name = _exposed_funcs.get(name, None)
+        func_name = core._exposed_funcs.get(name, None)
 
         if not func_name:
             return
