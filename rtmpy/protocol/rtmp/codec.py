@@ -30,7 +30,9 @@ import collections
 
 from pyamf.util import BufferedByteStream
 
-from rtmpy.protocol.rtmp import header, message
+from rtmpy.protocol.rtmp import header
+from rtmpy.core import message
+
 
 __all__ = [
     'Encoder',
