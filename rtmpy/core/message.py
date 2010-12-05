@@ -53,7 +53,6 @@ INVOKE = 0x14
 FLV_DATA = 0x16
 
 
-STREAMABLE_TYPES = [AUDIO_DATA, VIDEO_DATA]
 
 
 class IMessageListener(Interface):
