@@ -97,7 +97,7 @@ def encode(stream, header, previous=None):
         else:
             size = min_bytes_required(header, previous)
 
-    channelId = header.channelId
+    channelId = header.channelId + 2
 
     if channelId < 64:
         stream.write_uchar(size | channelId)
@@ -157,7 +157,7 @@ def decode(stream):
     if channelId == 1:
         channelId = stream.read_uchar() + 64 + (stream.read_uchar() << 8)
 
-    header = Header(channelId)
+    header = Header(channelId - 2)
 
     if bits == 3:
         header.continuation = True
