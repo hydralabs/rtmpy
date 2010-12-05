@@ -251,12 +251,15 @@ class ProducingChannel(BaseChannel):
 
     @ivar buffer: Any data waiting to be written to the underlying stream.
     @type buffer: L{BufferedByteStream}
+    @ivar acquired: Whether this channel is acquired. See L{ChannelMuxer.
+        acquireChannel}
     """
 
     def __init__(self, channelId, stream, frameSize):
         BaseChannel.__init__(self, channelId, stream, frameSize)
 
         self.buffer = BufferedByteStream()
+        self.acquired = False
 
     def reset(self):
         """
@@ -553,7 +556,6 @@ class ChannelMuxer(Codec):
         self.pending = []
 
         self.releasedChannels = collections.deque()
-        self.acquiredChannels = []
         self.activeChannels = []
         self.internalChannels = {}
         self.channelsInUse = 0
@@ -584,8 +586,7 @@ class ChannelMuxer(Codec):
         self.channelsInUse += 1
 
         c = self.getChannel(channelId)
-
-        self.acquiredChannels.append(c)
+        c.acquired = True
 
         return c
 
@@ -598,13 +599,11 @@ class ChannelMuxer(Codec):
         """
         c = self.getChannel(channelId)
 
-        try:
-            # FIXME: this is expensive
-            self.acquiredChannels.remove(c)
-        except ValueError:
-            raise EncodeError('Attempted to release channel %r but that '
-                'channel is not active' % (channelId,))
+        if c.acquired is False:
+            raise EncodeError('Attempted to release an inactive channel '
+                '(channelId=%r)' % (channelId,))
 
+        c.acquired = False
         self.releasedChannels.appendleft(channelId)
         self.channelsInUse -= 1
 
