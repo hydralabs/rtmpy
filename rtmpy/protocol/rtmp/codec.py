@@ -43,11 +43,9 @@ __all__ = [
 #: The default number of bytes per RTMP frame (excluding header)
 FRAME_SIZE = 128
 #: Maximum number of channels that can be active per RTMP connection
-MAX_CHANNELS = 0xffff + 64
-#: The minimum channel id that non-command messages can use
-MIN_CHANNEL_ID = 3
+MAX_CHANNELS = 0xffff + 64 - 2
 #: The number of bytes marshalled to/from the RTMP stream before the peer should
-#: be informed. This is a rough guestimate based on RTMP dumps of Flash<->FMS.
+#: be informed. This is a rough guesstimate based on RTMP dumps of Flash<->FMS.
 BYTES_INTERVAL = 0x131800
 
 
@@ -554,7 +552,6 @@ class ChannelMuxer(Codec):
 
         self.pending = []
 
-        self.minChannelId = MIN_CHANNEL_ID
         self.releasedChannels = collections.deque()
         self.acquiredChannels = []
         self.activeChannels = []
@@ -564,17 +561,6 @@ class ChannelMuxer(Codec):
         self.nextHeaders = {}
         self.timestamps = {}
         self.callbacks = {}
-
-    @apply
-    def minChannelId():
-        def fget(self):
-            return self._minChannelId
-
-        def fset(self, value):
-            self._minChannelId = value
-            self._maxChannels = MAX_CHANNELS - value
-
-        return property(**locals())
 
     def acquireChannel(self):
         """
@@ -590,7 +576,7 @@ class ChannelMuxer(Codec):
         try:
             channelId = self.releasedChannels.popleft()
         except IndexError:
-            channelId = self.channelsInUse + self._minChannelId
+            channelId = self.channelsInUse + 1
 
             if channelId >= MAX_CHANNELS:
                 return None
@@ -633,7 +619,7 @@ class ChannelMuxer(Codec):
 
         @note: Need a better name for this
         """
-        return self.channelsInUse == self._maxChannels
+        return self.channelsInUse == MAX_CHANNELS
 
     def writeHeader(self, channel):
         """
@@ -682,7 +668,7 @@ class ChannelMuxer(Codec):
             # we have to special case command types because a channel only be
             # busy with one message at a time. Command messages are always
             # written right away
-            channel = self.getChannel(2)
+            channel = self.getChannel(0)
         else:
             channel = self.acquireChannel()
 
@@ -701,7 +687,7 @@ class ChannelMuxer(Codec):
         channel.append(data)
         self.nextHeaders[channel] = h
 
-        if channel.channelId == 2:
+        if channel.channelId == 0:
             while not self._encodeOneFrame(channel):
                 pass
 
