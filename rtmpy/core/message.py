@@ -17,7 +17,7 @@
 RTMP message implementations.
 """
 
-from zope.interface import Interface, implements
+from zope.interface import Interface, implements, Attribute
 import pyamf
 
 
@@ -52,6 +52,77 @@ INVOKE = 0x14
 #: FLV data
 FLV_DATA = 0x16
 
+
+
+class BaseError(Exception):
+    """
+    Base error class for all things C{message}.
+    """
+
+
+
+class DecodeError(BaseError):
+    """
+    Base error class for decoding RTMP messages.
+    """
+
+
+
+class TrailingDataError(DecodeError):
+    """
+    Raised if decoding a message does not consume the whole buffer.
+    """
+
+
+
+class EncodeError(BaseError):
+    """
+    Base error class for encoding RTMP messages.
+    """
+
+
+
+class UnknownEventType(BaseError):
+    """
+    Raised if an unknown event type is found.
+    """
+
+
+
+class IMessage(Interface):
+    """
+    An RTMP message in all its forms.
+
+    @see: U{RTMP datatypes on OSFlash<http://osflash.org/documentation/
+        rtmp#rtmp_datatypes>}
+    """
+
+
+    def encode(buffer):
+        """
+        Encodes the event instance to C{stream}.
+
+        @type buffer: L{pyamf.util.BufferedByteStream}
+        """
+
+
+    def decode(buffer):
+        """
+        Decodes the event instance from C{stream}.
+
+        @type buffer: L{pyamf.util.BufferedByteStream}
+        """
+
+
+    def dispatch(listener, timestamp):
+        """
+        Dispatch the event to the listener. Calls the correct method with the
+        correct args according to L{IEventListener}.
+
+        @param listener: Receives the event dispatch request.
+        @type listener: L{IEventListener}
+        @param timestamp: The timestamp that this message was dispatched.
+        """
 
 
 
@@ -150,76 +221,18 @@ class IMessageListener(Interface):
         """
 
 
-class IMessage(Interface):
-    """
-    An RTMP message in all its forms.
-
-    @see: U{RTMP datatypes on OSFlash<http://osflash.org/documentation/
-        rtmp#rtmp_datatypes>}
-    """
-
-    def encode(stream):
-        """
-        Encodes the event instance to C{stream}.
-
-        @type stream: L{pyamf.util.BufferedByteStream}
-        @raise EncodeError:
-        """
-
-    def decode(stream):
-        """
-        Decodes the event instance from C{stream}.
-
-        @type stream: L{pyamf.util.BufferedByteStream}
-        """
-
-    def dispatch(listener, timestamp):
-        """
-        Dispatch the event to the listener. Calls the correct method with the
-        correct args according to L{IEventListener}.
-
-        @param listener: Receives the event dispatch request.
-        @type listener: L{IEventListener}
-        @param timestamp: The timestamp that this message was dispatched.
-        """
-
-
-class BaseError(Exception):
-    """
-    Base error class for all things C{event}.
-    """
-
-
-class DecodeError(BaseError):
-    """
-    Base error class for decoding RTMP events.
-    """
-
-
-class TrailingDataError(DecodeError):
-    """
-    Raised if decoding an event does not consume the whole buffer.
-    """
-
-
-class EncodeError(BaseError):
-    """
-    Base error class for encoding RTMP events.
-    """
-
-
-class UnknownEventType(BaseError):
-    """
-    Raised if an unknown event type is found.
-    """
-
 
 class Message(object):
     """
     An abstract class that all message types extend.
     """
 
+
     implements(IMessage)
+
+
+    type = Attribute('The int RTMP type for this message.')
+
 
     def encode(self, buf):
         """
