@@ -539,9 +539,6 @@ class AudioDataTestCase(BaseTestCase):
     Tests for L{message.AudioData}
     """
 
-    def test_streaming(self):
-        self.assertTrue(message.AUDIO_DATA in message.STREAMABLE_TYPES)
-
     def test_create(self):
         x = message.AudioData()
         self.assertEquals(x.__dict__, {'data': None})
@@ -595,9 +592,6 @@ class VideoDataTestCase(BaseTestCase):
     """
     Tests for L{message.VideoData}
     """
-
-    def test_streaming(self):
-        self.assertTrue(message.VIDEO_DATA in message.STREAMABLE_TYPES)
 
     def test_create(self):
         x = message.VideoData()
