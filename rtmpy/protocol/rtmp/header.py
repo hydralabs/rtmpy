@@ -90,46 +90,46 @@ def encode(stream, header, previous=None):
     @param previous: The previous header (if any).
     """
     if previous is None:
-        size = 0
+        mask = 0
     else:
         if header.continuation:
-            size = 0xc0
+            mask = 0xc0
         else:
-            size = min_bytes_required(header, previous)
+            mask = get_size_mask(header, previous)
 
     channelId = header.channelId + 2
 
     if channelId < 64:
-        stream.write_uchar(size | channelId)
+        stream.write_uchar(mask | channelId)
     elif channelId < 320:
-        stream.write_uchar(size)
+        stream.write_uchar(mask)
         stream.write_uchar(channelId - 64)
     else:
         channelId -= 64
 
-        stream.write_uchar(size + 1)
+        stream.write_uchar(mask + 1)
         stream.write_uchar(channelId & 0xff)
         stream.write_uchar(channelId >> 0x08)
 
-    if size == 0xc0:
+    if mask == 0xc0:
         return
 
-    if size <= 0x80:
+    if mask <= 0x80:
         if header.timestamp >= 0xffffff:
             stream.write_24bit_uint(0xffffff)
         else:
             stream.write_24bit_uint(header.timestamp)
 
-    if size <= 0x40:
+    if mask <= 0x40:
         stream.write_24bit_uint(header.bodyLength)
         stream.write_uchar(header.datatype)
 
-    if size == 0:
+    if mask == 0:
         stream.endian = '<'
         stream.write_ulong(header.streamId)
         stream.endian = '!'
 
-    if size <= 0x80:
+    if mask <= 0x80:
         if header.timestamp >= 0xffffff:
             stream.write_ulong(header.timestamp)
 
@@ -222,7 +222,7 @@ def merge(old, new):
     return merged
 
 
-def min_bytes_required(old, new):
+def get_size_mask(old, new):
     """
     Returns the number of bytes needed to de/encode the header based on the
     differences between the two.
