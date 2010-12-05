@@ -265,9 +265,8 @@ class Message(object):
 
         s = '<%s.%s '
 
-        if keys:
-            for k in keys:
-                s += '%s=%r ' % (k, self.__dict__[k])
+        for k in keys:
+            s += '%s=%r ' % (k, self.__dict__[k])
 
         s += 'at 0x%x>'
 
