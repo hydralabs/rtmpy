@@ -75,7 +75,7 @@ class AquireChannelTestCase(BaseTestCase):
 
         self.assertTrue(isinstance(c, codec.ProducingChannel))
 
-        self.assertEqual(c.channelId, 3)
+        self.assertEqual(c.channelId, 1)
         self.assertEqual(c.header, None)
 
         self.assertEqual(self.encoder.channelsInUse, 1)
@@ -85,7 +85,7 @@ class AquireChannelTestCase(BaseTestCase):
         Attempt to aquire 62 channels
         """
 
-        for i in xrange(codec.MIN_CHANNEL_ID, codec.MAX_CHANNELS):
+        for i in xrange(codec.MAX_CHANNELS - 1):
             self.assertNotEqual(self.encoder.acquireChannel(), None)
 
         self.assertEqual(self.encoder.channelsInUse, 65596)
