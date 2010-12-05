@@ -36,7 +36,10 @@ from rtmpy.core import message
 
 __all__ = [
     'Encoder',
-    'Decoder'
+    'Decoder',
+    'DecodeError',
+    'EncodeError',
+    'StreamingChannel'
 ]
 
 
