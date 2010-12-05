@@ -678,7 +678,7 @@ class ChannelMuxer(Codec):
         @param callback: A callable that will be executed once the data has been
             fully written to the RTMP stream.
         """
-        if message.is_command_type(datatype):
+        if is_command_type(datatype):
             # we have to special case command types because a channel only be
             # busy with one message at a time. Command messages are always
             # written right away
@@ -861,3 +861,11 @@ class StreamingChannel(object):
         c.reset()
         self.output.write(self.stream.getvalue())
         self.stream.consume()
+
+
+def is_command_type(datatype):
+    """
+    Determines if the data type supplied is a command type. This means that the
+    related RTMP message must be marshalled on channel id = 2.
+    """
+    return datatype <= message.UPSTREAM_BANDWIDTH
