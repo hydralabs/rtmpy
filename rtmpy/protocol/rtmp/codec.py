@@ -368,7 +368,7 @@ class FrameReader(Codec):
 
          * the raw bytes for the frame
          * whether the channel is considered complete (i.e. all the data has been
-            received)
+           received)
          * An L{IChannelMeta} instance.
 
         If an attempt to read from the stream comes to a natural end then
