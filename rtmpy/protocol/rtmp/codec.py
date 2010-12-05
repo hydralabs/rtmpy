@@ -314,6 +314,14 @@ class Codec(object):
         for channel in self.channels.values():
             channel.setFrameSize(size)
 
+    def buildChannel(self, channelId):
+        """
+        Called to build a channel suitable for use with this codec.
+
+        Must be implemented by subclasses.
+        """
+        raise NotImplementedError
+
     def getChannel(self, channelId):
         """
         Returns a channel based on channelId. If the channel doesn't exist,
@@ -332,7 +340,7 @@ class Codec(object):
             raise IndexError('Attempted to get channelId %d which is > %d' % (
                 channelId, MAX_CHANNELS))
 
-        channel = self.channel_class(channelId, self.stream, self.frameSize)
+        channel = self.buildChannel(channelId)
         self.channels[channelId] = channel
 
         channel.reset()
@@ -351,7 +359,13 @@ class FrameReader(Codec):
     """
 
     _currentChannel = None
-    channel_class = ConsumingChannel
+
+    def buildChannel(self, channelId):
+        """
+        Builds a channel object that is capable of marshalling frames from the
+        stream.
+        """
+        return ConsumingChannel(channelId, self.stream, self.frameSize)
 
     def readHeader(self):
         """
@@ -551,8 +565,6 @@ class ChannelMuxer(Codec):
     @ivar callbacks: A collection of channel->callback (if any).
     """
 
-    channel_class = ProducingChannel
-
     def __init__(self, stream=None):
         Codec.__init__(self, stream=stream)
 
@@ -566,6 +578,13 @@ class ChannelMuxer(Codec):
         self.nextHeaders = {}
         self.timestamps = {}
         self.callbacks = {}
+
+    def buildChannel(self, channelId):
+        """
+        Returns a channel that is capable of receiving data and marshalling RTMP
+        frames to the stream.
+        """
+        return ProducingChannel(channelId, self.stream, self.frameSize)
 
     def acquireChannel(self):
         """
