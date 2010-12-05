@@ -615,14 +615,6 @@ class ChannelMuxer(Codec):
         if cb:
             cb()
 
-    def isFull(self):
-        """
-        Whether the all the channels for this RTMP stream are in use.
-
-        @note: Need a better name for this
-        """
-        return self.channelsInUse == MAX_CHANNELS
-
     def writeHeader(self, channel):
         """
         Encodes the next header for C{channel}.
@@ -710,7 +702,7 @@ class ChannelMuxer(Codec):
         """
         Encodes one RTMP frame from all the active channels.
         """
-        while self.pending and not self.isFull():
+        while self.pending and self.channelsInUse != MAX_CHANNELS:
             self.send(*self.pending.pop(0))
 
         if not self.activeChannels:
