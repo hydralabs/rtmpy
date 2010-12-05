@@ -283,7 +283,7 @@ class FrameSize(Message):
     @type size: C{int}
     """
 
-    RTMP_TYPE = FRAME_SIZE
+    type = FRAME_SIZE
 
     def __init__(self, size=None):
         self.size = size
@@ -322,7 +322,7 @@ class BytesRead(Message):
     @type bytes: C{int}
     """
 
-    RTMP_TYPE = BYTES_READ
+    type = BYTES_READ
 
     FOUR_GB_THRESHOLD = 0xee800000
 
@@ -360,7 +360,7 @@ class ControlMessage(Message):
     A control message. Akin to Red5's Ping event.
     """
 
-    RTMP_TYPE = CONTROL
+    type = CONTROL
 
     UNDEFINED = -1
     PING = 6
@@ -430,7 +430,7 @@ class DownstreamBandwidth(Message):
     A downstream bandwidth message.
     """
 
-    RTMP_TYPE = DOWNSTREAM_BANDWIDTH
+    type = DOWNSTREAM_BANDWIDTH
 
     def __init__(self, bandwidth=None):
         self.bandwidth = bandwidth
@@ -470,7 +470,7 @@ class UpstreamBandwidth(Message):
     @param extra: Not sure what this is supposed to represent at the moment.
     """
 
-    RTMP_TYPE = UPSTREAM_BANDWIDTH
+    type = UPSTREAM_BANDWIDTH
 
     def __init__(self, bandwidth=None, extra=None):
         self.bandwidth = bandwidth
@@ -522,7 +522,7 @@ class Notify(Message):
     @param args: A list of method arguments.
     """
 
-    RTMP_TYPE = NOTIFY
+    type = NOTIFY
 
     def __init__(self, name=None, *args):
         self.name = name
@@ -560,7 +560,7 @@ class Invoke(Message):
     Similar to L{Notify} but a reply is expected.
     """
 
-    RTMP_TYPE = INVOKE
+    type = INVOKE
 
     encoding = pyamf.AMF0
 
@@ -603,7 +603,7 @@ class FlexMessage(Invoke):
     encoding/decoding.
     """
 
-    RTMP_TYPE = FLEX_MESSAGE
+    type = FLEX_MESSAGE
 
     encoding = pyamf.AMF3
 
@@ -654,7 +654,7 @@ class AudioData(StreamingMessage):
     A message containing audio data.
     """
 
-    RTMP_TYPE = AUDIO_DATA
+    type = AUDIO_DATA
 
     def dispatch(self, listener, timestamp):
         """
@@ -668,7 +668,7 @@ class VideoData(StreamingMessage):
     A message containing video data.
     """
 
-    RTMP_TYPE = VIDEO_DATA
+    type = VIDEO_DATA
 
     def dispatch(self, listener, timestamp):
         """
