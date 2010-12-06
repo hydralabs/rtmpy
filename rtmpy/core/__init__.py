@@ -17,9 +17,18 @@
 Core primitives and logic for all things RTMP.
 """
 
+import collections
+
+from twisted.python import failure, log
+from twisted.internet import defer
+
+from rtmpy import exc
+from rtmpy.core import message, status
+
 
 #: A dictionary of
 _exposed_funcs = {}
+
 
 
 def expose(func):
@@ -263,7 +272,7 @@ class BaseStream(object):
         @param name: The name of the function to be mapped to a callable.
         @return: A callable or C{None}
         """
-        func_name = core._exposed_funcs.get(name, None)
+        func_name = _exposed_funcs.get(name, None)
 
         if not func_name:
             return
