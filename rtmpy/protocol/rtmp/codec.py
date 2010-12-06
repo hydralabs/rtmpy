@@ -746,14 +746,6 @@ class ChannelMuxer(Codec):
             self.releaseChannel(channel.channelId)
             self.activeChannels.remove(channel)
 
-    @property
-    def active(self):
-        """
-        Whether the encoder is active (i.e. a call to C{next()} will not raise
-        C{StopIteration}.
-        """
-        return self.activeChannels
-
 
 class Encoder(ChannelMuxer):
     """
