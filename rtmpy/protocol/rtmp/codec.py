@@ -49,11 +49,6 @@ __all__ = [
 FRAME_SIZE = 128
 #: Maximum number of channels that can be active per RTMP connection
 MAX_CHANNELS = 0xffff + 64 - 2
-#: The number of bytes marshalled to/from the RTMP stream before the peer should
-#: be informed. This is a rough guesstimate based on RTMP dumps of Flash<->FMS.
-# TODO: This value should be refactored out - the peers up/down bandwidth
-#       values should be used in its place
-BYTES_INTERVAL = 0x131800
 #: An RTMP channel with an id of 0 is special as it is considered the control
 #  stream. It cannot be deleted and is integral to the RTMP protocol.
 COMMAND_CHANNEL_ID = 0
@@ -533,17 +528,16 @@ class Decoder(ChannelDemuxer):
 
 
     channel_class = ConsumingChannel
-    bytesInterval = BYTES_INTERVAL
 
 
     def __init__(self, dispatcher, stream_factory, stream=None,
-                 bytesInterval=None):
+                 bytesInterval=0):
         ChannelDemuxer.__init__(self, stream=stream)
 
         self.dispatcher = dispatcher
         self.stream_factory = stream_factory
 
-        self.setBytesInterval(bytesInterval or self.bytesInterval)
+        self.setBytesInterval(bytesInterval)
 
 
     def setBytesInterval(self, bytesInterval):
@@ -574,7 +568,7 @@ class Decoder(ChannelDemuxer):
 
             raise
 
-        if self.bytes >= self._nextInterval:
+        if self.bytesInterval and self.bytes >= self._nextInterval:
             self.dispatcher.bytesInterval(self.bytes)
             self._nextInterval += self.bytesInterval
 
