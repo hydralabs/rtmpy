@@ -570,7 +570,7 @@ class ChannelMuxer(Codec):
         self.pending = []
 
         self.releasedChannels = collections.deque()
-        self.activeChannels = []
+        self.activeChannels = {}
         self.channelsInUse = 0
 
         self.nextHeaders = {}
@@ -699,7 +699,7 @@ class ChannelMuxer(Codec):
 
             return
 
-        self.activeChannels.append(channel)
+        self.activeChannels[channel] = channel.channelId
 
     def next(self):
         """
@@ -720,7 +720,7 @@ class ChannelMuxer(Codec):
 
         for channel in to_release:
             self.releaseChannel(channel.channelId)
-            self.activeChannels.remove(channel)
+            del self.activeChannels[channel]
 
 
 class Encoder(ChannelMuxer):
