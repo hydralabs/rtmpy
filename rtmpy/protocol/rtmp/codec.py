@@ -34,6 +34,7 @@ from rtmpy.protocol.rtmp import header
 from rtmpy.core import message
 
 
+
 __all__ = [
     'Encoder',
     'Decoder',
@@ -41,6 +42,7 @@ __all__ = [
     'EncodeError',
     'StreamingChannel'
 ]
+
 
 
 #: The default number of bytes per RTMP frame (excluding header)
@@ -57,10 +59,12 @@ BYTES_INTERVAL = 0x131800
 COMMAND_CHANNEL_ID = 0
 
 
+
 class BaseError(Exception):
     """
     Base error class for all things C{codec}.
     """
+
 
 
 class DecodeError(BaseError):
@@ -69,10 +73,12 @@ class DecodeError(BaseError):
     """
 
 
+
 class EncodeError(BaseError):
     """
     Raised if there is an error encoding an RTMP byte stream.
     """
+
 
 
 class BaseChannel(object):
@@ -97,6 +103,7 @@ class BaseChannel(object):
     @type bytes: C{int}
     """
 
+
     def __init__(self, channelId, stream, frameSize):
         self.channelId = channelId
         self.stream = stream
@@ -107,16 +114,19 @@ class BaseChannel(object):
 
         self.header = None
 
+
     def reset(self):
         self.bytes = 0
         self._bodyRemaining = -1
         self.frameRemaining = self.frameSize
+
 
     def complete(self):
         """
         Whether this channel has completed its content length requirements.
         """
         return self._bodyRemaining == 0
+
 
     def setHeader(self, new):
         """
@@ -148,6 +158,7 @@ class BaseChannel(object):
 
         return old
 
+
     def marshallFrame(self, size):
         """
         Marshalls an RTMP frame from the C{stream}.
@@ -157,6 +168,7 @@ class BaseChannel(object):
         @param size: The number of bytes to be marshalled.
         """
         raise NotImplementedError
+
 
     def marshallOneFrame(self):
         """
@@ -178,6 +190,7 @@ class BaseChannel(object):
 
         return ret
 
+
     def setFrameSize(self, size):
         """
         Sets the size of the RTMP frame for this channel.
@@ -189,6 +202,7 @@ class BaseChannel(object):
             self.frameRemaining = size
 
         self.frameSize = size
+
 
     def setTimestamp(self, timestamp, relative=True):
         """
@@ -207,6 +221,7 @@ class BaseChannel(object):
                 self._lastDelta = timestamp
 
             self.timestamp = timestamp
+
 
     def __repr__(self):
         s = []
@@ -232,10 +247,12 @@ class BaseChannel(object):
         )
 
 
+
 class ConsumingChannel(BaseChannel):
     """
     Reads RTMP frames.
     """
+
 
     def marshallFrame(self, size):
         """
@@ -245,6 +262,7 @@ class ConsumingChannel(BaseChannel):
         C{IOError} will be raised.
         """
         return self.stream.read(size)
+
 
 
 class ProducingChannel(BaseChannel):
@@ -257,11 +275,13 @@ class ProducingChannel(BaseChannel):
         acquireChannel}
     """
 
+
     def __init__(self, channelId, stream, frameSize):
         BaseChannel.__init__(self, channelId, stream, frameSize)
 
         self.buffer = BufferedByteStream()
         self.acquired = False
+
 
     def reset(self):
         """
@@ -273,17 +293,20 @@ class ProducingChannel(BaseChannel):
         self.buffer.truncate()
         self.header = None
 
+
     def append(self, data):
         """
         Appends data to the buffer in preparation of encoding in RTMP.
         """
         self.buffer.append(data)
 
+
     def marshallFrame(self, size):
         """
         Writes a section of the buffer as part of the RTMP frame.
         """
         self.stream.write(self.buffer.read(size))
+
 
 
 class Codec(object):
@@ -297,12 +320,14 @@ class Codec(object):
         L{setFrameSize} instead.
     """
 
+
     def __init__(self, stream=None):
         self.stream = stream or BufferedByteStream()
 
         self.channels = {}
         self.frameSize = FRAME_SIZE
         self.bytes = 0
+
 
     def setFrameSize(self, size):
         """
@@ -313,6 +338,7 @@ class Codec(object):
         for channel in self.channels.values():
             channel.setFrameSize(size)
 
+
     def buildChannel(self, channelId):
         """
         Called to build a channel suitable for use with this codec.
@@ -320,6 +346,7 @@ class Codec(object):
         Must be implemented by subclasses.
         """
         raise NotImplementedError
+
 
     def getChannel(self, channelId):
         """
@@ -347,6 +374,7 @@ class Codec(object):
         return channel
 
 
+
 class FrameReader(Codec):
     """
     A generator object that decodes RTMP frames from a data stream. Feed it data
@@ -357,7 +385,9 @@ class FrameReader(Codec):
     channels to be interleaved together.
     """
 
+
     _currentChannel = None
+
 
     def buildChannel(self, channelId):
         """
@@ -365,6 +395,7 @@ class FrameReader(Codec):
         stream.
         """
         return ConsumingChannel(channelId, self.stream, self.frameSize)
+
 
     def readHeader(self):
         """
@@ -374,11 +405,13 @@ class FrameReader(Codec):
         """
         return header.decode(self.stream)
 
+
     def send(self, data):
         """
         Adds more data to the stream for the reader to consume.
         """
         self.stream.append(data)
+
 
     def next(self):
         """
@@ -436,6 +469,7 @@ class FrameReader(Codec):
         return self
 
 
+
 class ChannelDemuxer(FrameReader):
     """
     The next layer up from reading raw RTMP frames. Reassembles the interleaved
@@ -450,10 +484,12 @@ class ChannelDemuxer(FrameReader):
     @type bucket: channel -> buffered data.
     """
 
+
     def __init__(self, stream=None):
         FrameReader.__init__(self, stream=stream)
 
         self.bucket = {}
+
 
     def next(self):
         """
@@ -483,6 +519,7 @@ class ChannelDemuxer(FrameReader):
         return None, None
 
 
+
 class Decoder(ChannelDemuxer):
     """
     Dispatches decoded RTMP messages to a C{dispatcher}.
@@ -494,8 +531,10 @@ class Decoder(ChannelDemuxer):
     @ivar stream_factory: Builds stream listener objects.
     """
 
+
     channel_class = ConsumingChannel
     bytesInterval = BYTES_INTERVAL
+
 
     def __init__(self, dispatcher, stream_factory, stream=None,
                  bytesInterval=None):
@@ -506,6 +545,7 @@ class Decoder(ChannelDemuxer):
 
         self.setBytesInterval(bytesInterval or self.bytesInterval)
 
+
     def setBytesInterval(self, bytesInterval):
         """
         Sets the interval at which the decoder must inform the dispatcher that
@@ -513,6 +553,7 @@ class Decoder(ChannelDemuxer):
         """
         self.bytesInterval = bytesInterval
         self._nextInterval = self.bytes + self.bytesInterval
+
 
     def next(self):
         """
@@ -546,6 +587,7 @@ class Decoder(ChannelDemuxer):
             stream, meta.datatype, meta.timestamp, data)
 
 
+
 class ChannelMuxer(Codec):
     """
     Manages RTMP channels and marshalls the data so that the channels can be
@@ -564,6 +606,7 @@ class ChannelMuxer(Codec):
     @ivar callbacks: A collection of channel->callback (if any).
     """
 
+
     def __init__(self, stream=None):
         Codec.__init__(self, stream=stream)
 
@@ -576,12 +619,14 @@ class ChannelMuxer(Codec):
         self.nextHeaders = {}
         self.timestamps = {}
 
+
     def buildChannel(self, channelId):
         """
         Returns a channel that is capable of receiving data and marshalling RTMP
         frames to the stream.
         """
         return ProducingChannel(channelId, self.stream, self.frameSize)
+
 
     def acquireChannel(self):
         """
@@ -609,6 +654,7 @@ class ChannelMuxer(Codec):
 
         return c
 
+
     def releaseChannel(self, channelId):
         """
         Releases the channel such that a call to C{acquireChannel} will
@@ -626,6 +672,7 @@ class ChannelMuxer(Codec):
         self.releasedChannels.appendleft(channelId)
         self.channelsInUse -= 1
 
+
     def writeHeader(self, channel):
         """
         Encodes the next header for C{channel}.
@@ -639,17 +686,20 @@ class ChannelMuxer(Codec):
 
         header.encode(self.stream, channel.header, h)
 
+
     def flush(self):
         """
         Flushes the internal buffer.
         """
         raise NotImplementedError
 
+
     def _encodeOneFrame(self, channel):
         self.writeHeader(channel)
         channel.marshallOneFrame()
 
         return channel.complete()
+
 
     def send(self, data, datatype, streamId, timestamp):
         """
@@ -701,6 +751,7 @@ class ChannelMuxer(Codec):
 
         self.activeChannels[channel] = channel.channelId
 
+
     def next(self):
         """
         Encodes one RTMP frame from all the active channels.
@@ -723,6 +774,7 @@ class ChannelMuxer(Codec):
             del self.activeChannels[channel]
 
 
+
 class Encoder(ChannelMuxer):
     """
     Encodes RTMP streams.
@@ -740,10 +792,12 @@ class Encoder(ChannelMuxer):
         (the data).
     """
 
+
     def __init__(self, output, stream=None):
         ChannelMuxer.__init__(self, stream=stream)
 
         self.output = output
+
 
     def next(self):
         """
@@ -752,6 +806,7 @@ class Encoder(ChannelMuxer):
         ChannelMuxer.next(self)
 
         self.flush()
+
 
     def flush(self):
         """
@@ -764,13 +819,16 @@ class Encoder(ChannelMuxer):
 
         self.bytes += len(s)
 
+
     def __iter__(self):
         return self
+
 
 
 class StreamingChannel(object):
     """
     """
+
 
     def __init__(self, channel, streamId, output):
         self.type = None
@@ -791,14 +849,17 @@ class StreamingChannel(object):
         self._continuationHeader = self.stream.getvalue()
         self.stream.consume()
 
+
     def __del__(self):
         try:
             self.channel.stream = self._oldStream
         except:
             pass
 
+
     def setType(self, type):
         self.type = type
+
 
     def sendData(self, data, timestamp):
         c = self.channel
@@ -828,6 +889,7 @@ class StreamingChannel(object):
         c.reset()
         self.output.write(self.stream.getvalue())
         self.stream.consume()
+
 
 
 def is_command_type(datatype):
