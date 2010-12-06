@@ -186,11 +186,6 @@ class BaseStream(object):
         self.lastInvokeId = -1
         self.activeInvokes = {}
 
-    def reset(self):
-        # TODO: check active invokes and errback
-        self.timestamp = 0
-        self.lastInvokeId = -1
-        self.activeInvokes = {}
 
     def call(self, name, *args, **kwargs):
         whenDone = kwargs.get('whenDone', None)
