@@ -76,7 +76,7 @@ class ExtraResult(object):
 
 
 
-class BaseStreamManager(object):
+class StreamManagerMixIn(object):
     """
     Handles all stream based operations.
 

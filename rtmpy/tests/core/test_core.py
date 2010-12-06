@@ -18,7 +18,7 @@ class SimpleStream(object):
 
 
 
-class SimpleStreamManager(core.BaseStreamManager):
+class SimpleStreamManager(core.StreamManagerMixIn):
     """
     L{core.BaseStreamManager} requires that subclasses implement L{buildStream}
     """
