@@ -52,8 +52,8 @@ MAX_CHANNELS = 0xffff + 64 - 2
 # TODO: This value should be refactored out - the peers up/down bandwidth
 #       values should be used in its place
 BYTES_INTERVAL = 0x131800
-#: StreamID 0 is special as it is considered the primary stream. It cannot be
-#: deleted and is integral to the RTMP protocol.
+#: An RTMP channel with an id of 0 is special as it is considered the control
+#  stream. It cannot be deleted and is integral to the RTMP protocol.
 COMMAND_CHANNEL_ID = 0
 
 
