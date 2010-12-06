@@ -312,7 +312,7 @@ class DecoderTestCase(unittest.TestCase):
         self.dispatcher = DispatchTester(self)
         self.stream_factory = MockStreamFactory(self)
         self.decoder = codec.Decoder(self.dispatcher, self.stream_factory,
-            stream=BufferedByteStream(), bytesInterval=codec.BYTES_INTERVAL)
+            stream=BufferedByteStream())
 
         self.expected_streams = None
         self.streams = {}
