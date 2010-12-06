@@ -626,11 +626,6 @@ class ChannelMuxer(Codec):
         self.releasedChannels.appendleft(channelId)
         self.channelsInUse -= 1
 
-        cb = self.callbacks.pop(channelId, None)
-
-        if cb:
-            cb()
-
     def writeHeader(self, channel):
         """
         Encodes the next header for C{channel}.
