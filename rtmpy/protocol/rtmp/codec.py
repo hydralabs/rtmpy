@@ -571,12 +571,10 @@ class ChannelMuxer(Codec):
 
         self.releasedChannels = collections.deque()
         self.activeChannels = []
-        self.internalChannels = {}
         self.channelsInUse = 0
 
         self.nextHeaders = {}
         self.timestamps = {}
-        self.callbacks = {}
 
     def buildChannel(self, channelId):
         """
