@@ -52,6 +52,9 @@ MAX_CHANNELS = 0xffff + 64 - 2
 # TODO: This value should be refactored out - the peers up/down bandwidth
 #       values should be used in its place
 BYTES_INTERVAL = 0x131800
+#: StreamID 0 is special as it is considered the primary stream. It cannot be
+#: deleted and is integral to the RTMP protocol.
+COMMAND_CHANNEL_ID = 0
 
 
 class BaseError(Exception):
@@ -677,7 +680,7 @@ class ChannelMuxer(Codec):
             # we have to special case command types because a channel only be
             # busy with one message at a time. Command messages are always
             # written right away
-            channel = self.getChannel(0)
+            channel = self.getChannel(COMMAND_CHANNEL_ID)
         else:
             channel = self.acquireChannel()
 
@@ -696,7 +699,7 @@ class ChannelMuxer(Codec):
         channel.append(data)
         self.nextHeaders[channel] = h
 
-        if channel.channelId == 0:
+        if channel.channelId == COMMAND_CHANNEL_ID:
             while not self._encodeOneFrame(channel):
                 pass
 
