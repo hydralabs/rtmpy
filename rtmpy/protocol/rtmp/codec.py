@@ -49,6 +49,8 @@ FRAME_SIZE = 128
 MAX_CHANNELS = 0xffff + 64 - 2
 #: The number of bytes marshalled to/from the RTMP stream before the peer should
 #: be informed. This is a rough guesstimate based on RTMP dumps of Flash<->FMS.
+# TODO: This value should be refactored out - the peers up/down bandwidth
+#       values should be used in its place
 BYTES_INTERVAL = 0x131800
 
 
