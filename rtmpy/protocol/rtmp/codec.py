@@ -143,17 +143,6 @@ class BaseChannel(object):
 
         return old
 
-    def _adjustFrameRemaining(self, l):
-        """
-        Adjusts the C{frameRemaining} attribute based on the supplied length.
-        """
-        size = self.frameSize
-
-        while l >= size:
-            l -= size
-
-        self.frameRemaining -= l
-
     def marshallFrame(self, size):
         """
         Marshalls an RTMP frame from the C{stream}.
@@ -169,13 +158,18 @@ class BaseChannel(object):
         Marshalls one RTMP frame and adjusts internal counters accordingly.
         Calls C{marshallFrame} which subclasses must implement.
         """
-        l = min(self.frameRemaining, self.frameSize, self._bodyRemaining)
+        frameSize = self.frameSize
+        l = min(self.frameRemaining, frameSize, self._bodyRemaining)
 
         ret = self.marshallFrame(l)
 
         self.bytes += l
         self._bodyRemaining -= l
-        self._adjustFrameRemaining(l)
+
+        while l >= frameSize:
+            l -= frameSize
+
+        self.frameRemaining -= l
 
         return ret
 
