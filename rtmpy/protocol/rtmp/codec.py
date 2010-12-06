@@ -658,7 +658,7 @@ class ChannelMuxer(Codec):
 
         return channel.complete()
 
-    def send(self, data, datatype, streamId, timestamp, callback=None):
+    def send(self, data, datatype, streamId, timestamp):
         """
         Queues an RTMP message to be encoded. Call C{next} to do the encoding.
 
@@ -673,8 +673,6 @@ class ChannelMuxer(Codec):
         @param timestamp: The current timestamp for the stream that this message
             was sent.
         @type timestamp: C{int}
-        @param callback: A callable that will be executed once the data has been
-            fully written to the RTMP stream.
         """
         if is_command_type(datatype):
             # we have to special case command types because a channel only be
@@ -685,7 +683,7 @@ class ChannelMuxer(Codec):
             channel = self.acquireChannel()
 
         if not channel:
-            self.pending.append((data, datatype, streamId, timestamp, callback))
+            self.pending.append((data, datatype, streamId, timestamp))
 
             return
 
@@ -706,13 +704,7 @@ class ChannelMuxer(Codec):
             channel.reset()
             self.flush()
 
-            if callback:
-                callback()
-
             return
-
-        if callback:
-            self.callbacks[channel] = callback
 
         self.activeChannels.append(channel)
 
@@ -732,14 +724,6 @@ class ChannelMuxer(Codec):
             if self._encodeOneFrame(channel):
                 channel.reset()
                 to_release.append(channel)
-
-                callback = self.callbacks.pop(channel, None)
-
-                if callback:
-                    try:
-                        callback()
-                    except Exception:
-                        pass
 
         for channel in to_release:
             self.releaseChannel(channel.channelId)
