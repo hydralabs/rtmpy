@@ -203,7 +203,7 @@ class BaseStream(object):
         # a request from the peer to call a local method
         try:
             func = self.getInvokableTarget(name)
-        except:
+        except Exception:
             d.errback()
 
             return d
