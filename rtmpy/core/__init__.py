@@ -75,6 +75,106 @@ class ExtraResult(object):
         self.extra = extra
 
 
+
+class BaseStreamManager(object):
+    """
+    Handles all stream based operations.
+
+    Stream ID 0 is special, it is considered as the C{NetConnection} stream.
+
+    @ivar _streams: A C{dict} of id -> stream instances.
+    @ivar _deletedStreamIds: A collection of stream ids that been deleted and
+        can be reused.
+    """
+
+
+    def __init__(self):
+        self._streams = {
+            0: self
+        }
+
+        self._deletedStreamIds = collections.deque()
+
+
+    def buildStream(self, streamId):
+        """
+        Returns a new stream object to be associated with C{streamId}.
+
+        Must be overridden by subclasses.
+
+        @param streamId: The id of the stream to create.
+        @todo: Think about specifying the interface that the returned stream
+            must adhere to.
+        """
+        raise NotImplementedError
+
+
+    def getStream(self, streamId):
+        """
+        Returns the stream related to C{streamId}.
+
+        @param streamId: The id of the stream to get.
+        """
+        s = self._streams.get(streamId, None)
+
+        if s is None:
+            # the peer needs to call 'createStream' to make new streams.
+            raise KeyError('Unknown stream %r' % (streamId,))
+
+        return s
+
+
+    @expose
+    def deleteStream(self, streamId):
+        """
+        Deletes an existing stream.
+
+        @param streamId: The id of the stream to delete.
+        """
+        if streamId == 0:
+            # TODO: Think about going boom if this is attempted
+            return # can't delete the NetConnection
+
+        stream = self._streams.pop(streamId, None)
+
+        if not stream:
+            log.msg('Attempted to delete non-existant RTMP stream %r', streamId)
+        else:
+            self._deletedStreamIds.append(streamId)
+            stream.closeStream()
+
+
+    @expose
+    def createStream(self):
+        """
+        Creates a new stream assigns it a free id.
+
+        @see: L{buildStream}
+        """
+        try:
+            streamId = self._deletedStreamIds.popleft()
+        except IndexError:
+            streamId = len(self._streams)
+
+        self._streams[streamId] = self.buildStream(streamId)
+
+        return streamId
+
+
+    def closeAllStreams(self):
+        """
+        Closes all streams and deletes them from this manager.
+        """
+        streams = self._streams.copy()
+
+        streams.pop(0, None)
+
+        for streamId, stream in streams.items():
+            stream.closeStream()
+            self.deleteStream(streamId)
+
+
+
 class BaseStream(object):
     """
     """
@@ -334,101 +434,3 @@ class NetStream(BaseStream):
     def closeStream(self):
         """
         """
-
-
-class BaseStreamManager(object):
-    """
-    Handles all stream based operations.
-
-    Stream ID 0 is special, it is considered as the C{NetConnection} stream.
-
-    @ivar _streams: A C{dict} of id -> stream instances.
-    @ivar _deletedStreamIds: A collection of stream ids that been deleted and
-        can be reused.
-    """
-
-
-    def __init__(self):
-        self._streams = {
-            0: self
-        }
-
-        self._deletedStreamIds = collections.deque()
-
-
-    def buildStream(self, streamId):
-        """
-        Returns a new stream object to be associated with C{streamId}.
-
-        Must be overridden by subclasses.
-
-        @param streamId: The id of the stream to create.
-        @todo: Think about specifying the interface that the returned stream
-            must adhere to.
-        """
-        raise NotImplementedError
-
-
-    def getStream(self, streamId):
-        """
-        Returns the stream related to C{streamId}.
-
-        @param streamId: The id of the stream to get.
-        """
-        s = self._streams.get(streamId, None)
-
-        if s is None:
-            # the peer needs to call 'createStream' to make new streams.
-            raise KeyError('Unknown stream %r' % (streamId,))
-
-        return s
-
-
-    @expose
-    def deleteStream(self, streamId):
-        """
-        Deletes an existing stream.
-
-        @param streamId: The id of the stream to delete.
-        """
-        if streamId == 0:
-            # TODO: Think about going boom if this is attempted
-            return # can't delete the NetConnection
-
-        stream = self._streams.pop(streamId, None)
-
-        if not stream:
-            log.msg('Attempted to delete non-existant RTMP stream %r', streamId)
-        else:
-            self._deletedStreamIds.append(streamId)
-            stream.closeStream()
-
-
-    @expose
-    def createStream(self):
-        """
-        Creates a new stream assigns it a free id.
-
-        @see: L{buildStream}
-        """
-        try:
-            streamId = self._deletedStreamIds.popleft()
-        except IndexError:
-            streamId = len(self._streams)
-
-        self._streams[streamId] = self.buildStream(streamId)
-
-        return streamId
-
-
-    def closeAllStreams(self):
-        """
-        Closes all streams and deletes them from this manager.
-        """
-        streams = self._streams.copy()
-
-        streams.pop(0, None)
-
-        for streamId, stream in streams.items():
-            stream.closeStream()
-            self.deleteStream(streamId)
