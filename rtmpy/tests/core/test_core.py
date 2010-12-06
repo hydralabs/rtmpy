@@ -25,6 +25,7 @@ from rtmpy import core
 
 class SimpleStream(object):
     """
+    @ivar closed: Set to C{True} when L{closeStream} is called.
     """
 
     closed = False
