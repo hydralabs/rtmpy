@@ -321,21 +321,41 @@ class NetStream(BaseStream):
         self.nc.sendMessage(msg, whenDone, stream=self)
 
 
+    @expose
+    def closeStream(self):
+        """
+        """
 
-class StreamManager(object):
+
+class BaseStreamManager(object):
     """
+    Handles all stream based operations.
+
+    Stream ID 0 is special, it is considered as the C{NetConnection} stream.
+
+    @ivar _streams: A C{dict} of id -> stream instances.
+    @ivar _deletedStreamIds: A collection of stream ids that been deleted and
+        can be reused.
     """
+
 
     def __init__(self):
-        self.streams = {
+        self._streams = {
             0: self
         }
 
-        self._nextStreamId = 1
+        self._deletedStreamIds = collections.deque()
 
 
     def buildStream(self, streamId):
         """
+        Returns a new stream object to be associated with C{streamId}.
+
+        Must be overridden by subclasses.
+
+        @param streamId: The id of the stream to create.
+        @todo: Think about specifying the interface that the returned stream
+            must adhere to.
         """
         raise NotImplementedError
 
@@ -343,8 +363,10 @@ class StreamManager(object):
     def getStream(self, streamId):
         """
         Returns the stream related to C{streamId}.
+
+        @param streamId: The id of the stream to get.
         """
-        s = self.streams.get(streamId, None)
+        s = self._streams.get(streamId, None)
 
         if s is None:
             # the peer needs to call 'createStream' to make new streams.
@@ -356,41 +378,48 @@ class StreamManager(object):
     @expose
     def deleteStream(self, streamId):
         """
-        Deletes an existing L{NetStream} associated with this NetConnection.
+        Deletes an existing stream.
 
-        @todo: What about error handling or if the NetStream is still receiving
-            or streaming data?
+        @param streamId: The id of the stream to delete.
         """
         if streamId == 0:
             # TODO: Think about going boom if this is attempted
             return # can't delete the NetConnection
 
-        stream = self.streams.pop(streamId, None)
+        stream = self._streams.pop(streamId, None)
 
-        if stream:
-            stream.deleteStream()
+        if not stream:
+            log.msg('Attempted to delete non-existant RTMP stream %r', streamId)
+        else:
+            self._deletedStreamIds.append(streamId)
+            stream.closeStream()
 
 
     @expose
     def createStream(self):
         """
-        Creates a new L{NetStream} and associates it with this protocol.
-        """
-        streamId = self._nextStreamId
-        self.streams[streamId] = self.buildStream(streamId)
+        Creates a new stream assigns it a free id.
 
-        self._nextStreamId += 1
+        @see: L{buildStream}
+        """
+        try:
+            streamId = self._deletedStreamIds.popleft()
+        except IndexError:
+            streamId = len(self._streams)
+
+        self._streams[streamId] = self.buildStream(streamId)
 
         return streamId
 
 
-    @expose
-    def closeStream(self):
+    def closeAllStreams(self):
         """
+        Closes all streams and deletes them from this manager.
         """
-        for streamId, stream in self.streams.copy().iteritems():
-            if stream is self:
-                continue
+        streams = self._streams.copy()
 
+        streams.pop(0, None)
+
+        for streamId, stream in streams.items():
             stream.closeStream()
             self.deleteStream(streamId)
