@@ -72,11 +72,15 @@ class DecodingDispatcher(object):
         @param timestamp: The absolute timestamp this message was received.
         @param data: The raw data for the message.
         """
-        m = message.get_type_class(datatype)()
+        try:
+            m = message.get_type_class(datatype)()
 
-        m.decode(BufferedByteStream(data))
+            m.decode(BufferedByteStream(data))
+            m.dispatch(stream, timestamp)
+        except:
+            self.protocol.logAndDisconnect(failure.Failure())
 
-        m.dispatch(stream, timestamp)
+
 
     def bytesInterval(self, bytes):
         """
@@ -86,7 +90,11 @@ class DecodingDispatcher(object):
 
         @param bytes: The number of bytes read when this interval was fired.
         """
-        self.protocol.sendMessage(message.BytesRead(bytes))
+        try:
+            self.protocol.sendMessage(message.BytesRead(bytes))
+        except:
+            self.protocol.logAndDisconnect(failure.Failure())
+
 
 
 class RTMPProtocol(protocol.Protocol, core.BaseStream):
