@@ -305,7 +305,7 @@ class RTMPProtocol(protocol.Protocol, core.BaseStream):
 
         channel = self.encoder.acquireChannel()
 
-        if not channel:
+        if channel is None:
             # todo: make this better
             raise RuntimeError('No streaming channel available')
 
