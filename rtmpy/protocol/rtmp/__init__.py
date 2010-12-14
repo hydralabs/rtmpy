@@ -303,6 +303,7 @@ class RTMPProtocol(protocol.Protocol, core.BaseStream):
 
             raise
 
+
     def getStreamingChannel(self, stream):
         """
         """
