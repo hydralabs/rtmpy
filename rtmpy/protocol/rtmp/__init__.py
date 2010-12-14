@@ -306,8 +306,6 @@ class RTMPProtocol(protocol.Protocol, core.BaseStream):
     def getStreamingChannel(self, stream):
         """
         """
-        self.setFrameSize(4096)
-
         channel = self.encoder.acquireChannel()
 
         if channel is None:
