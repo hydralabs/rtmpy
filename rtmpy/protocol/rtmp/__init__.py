@@ -188,7 +188,7 @@ class RTMPProtocol(protocol.Protocol, core.BaseStream):
 
     def _startDecoding(self):
         """
-        Called to start asynchronously iterating the decoder.
+        Called to start the decoding process.
 
         @return: A C{Deferred} which will kill the task once the decoding is
             done or on error will kill the connection.
