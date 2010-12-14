@@ -60,8 +60,10 @@ class DecodingDispatcher(object):
     @param protocol: The L{RTMPProtocol} instance attached to the decoder.
     """
 
+
     def __init__(self, protocol):
         self.protocol = protocol
+
 
     def dispatchMessage(self, stream, datatype, timestamp, data):
         """
@@ -125,6 +127,7 @@ class RTMPProtocol(protocol.Protocol, core.BaseStream):
 
         return reason
 
+
     def connectionMade(self):
         """
         Called when this a connection has been made.
@@ -136,6 +139,7 @@ class RTMPProtocol(protocol.Protocol, core.BaseStream):
 
         # TODO: apply uptime, version to the handshaker instead of 0, 0
         self.handshaker.start(0, 0)
+
 
     def connectionLost(self, reason):
         """
@@ -164,6 +168,7 @@ class RTMPProtocol(protocol.Protocol, core.BaseStream):
             del_attr('encoder_task')
             del_attr('encoder')
 
+
     def _stream_dataReceived(self, data):
         try:
             self.decoder.send(data)
@@ -173,11 +178,13 @@ class RTMPProtocol(protocol.Protocol, core.BaseStream):
         except:
             self.logAndDisconnect(failure.Failure())
 
+
     def _handshake_dataReceived(self, data):
         try:
             self.handshaker.dataReceived(data)
         except:
             self.logAndDisconnect(failure.Failure())
+
 
     def _startDecoding(self):
         """
@@ -201,6 +208,7 @@ class RTMPProtocol(protocol.Protocol, core.BaseStream):
 
         return self.decoder_task
 
+
     def _startEncoding(self):
         """
         Called to start asynchronously iterate the encoder.
@@ -220,6 +228,7 @@ class RTMPProtocol(protocol.Protocol, core.BaseStream):
         self.encoder_task.addErrback(self.logAndDisconnect)
 
         return self.encoder_task
+
 
     def handshakeSuccess(self, data):
         """
@@ -284,6 +293,7 @@ class RTMPProtocol(protocol.Protocol, core.BaseStream):
         if e.active and not self.encoder_task:
             self._startEncoding()
 
+
     def setFrameSize(self, size):
         self.sendMessage(message.FrameSize(size))
         self.encoder.setFrameSize(size)
@@ -300,6 +310,7 @@ class RTMPProtocol(protocol.Protocol, core.BaseStream):
             raise RuntimeError('No streaming channel available')
 
         return codec.StreamingChannel(channel, stream.streamId, self.transport)
+
 
     def onFrameSize(self, size, timestamp):
         """
