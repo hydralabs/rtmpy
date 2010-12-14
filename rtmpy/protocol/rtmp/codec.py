@@ -408,7 +408,7 @@ class FrameReader(Codec):
         self.stream.append(data)
 
 
-    def next(self):
+    def readFrame(self):
         """
         Called to pull the next RTMP frame out of the stream. A tuple containing
         three items is returned::
@@ -460,6 +460,7 @@ class FrameReader(Codec):
 
         return bytes, complete, h
 
+
     def __iter__(self):
         return self
 
@@ -486,7 +487,7 @@ class ChannelDemuxer(FrameReader):
         self.bucket = {}
 
 
-    def next(self):
+    def readFrame(self):
         """
         Read an RTMP frame and buffer the data (if necessary) until the channel
         is considered complete.
@@ -499,7 +500,7 @@ class ChannelDemuxer(FrameReader):
         C{None, None} will be returned if a frame was read, but no channel was
         complete.
         """
-        data, complete, meta = FrameReader.next(self)
+        data, complete, meta = FrameReader.readFrame(self)
 
         if complete:
             data = self.bucket.pop(meta.channelId, '') + data
@@ -562,7 +563,7 @@ class Decoder(ChannelDemuxer):
         reached.
         """
         try:
-            data, meta = ChannelDemuxer.next(self)
+            data, meta = ChannelDemuxer.readFrame(self)
         except StopIteration:
             self.stream.consume()
 
@@ -580,6 +581,8 @@ class Decoder(ChannelDemuxer):
         self.dispatcher.dispatchMessage(
             stream, meta.datatype, meta.timestamp, data)
 
+
+    __next__ = next
 
 
 class ChannelMuxer(Codec):
@@ -816,6 +819,9 @@ class Encoder(ChannelMuxer):
 
     def __iter__(self):
         return self
+
+
+    __next__ = next
 
 
 
