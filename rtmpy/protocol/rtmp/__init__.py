@@ -144,7 +144,11 @@ class RTMPProtocol(protocol.Protocol, core.BaseStream):
         if self.state == self.HANDSHAKE:
             del_attr('handshaker')
         elif self.state == self.STREAM:
-            self.closeStream()
+            self._decodingBuffer.truncate()
+            self._encodingBuffer.truncate()
+
+            del_attr('_decodingBuffer')
+            del_attr('_encodingBuffer')
 
             del_attr('decoder_task')
             del_attr('decoder')
@@ -229,8 +233,12 @@ class RTMPProtocol(protocol.Protocol, core.BaseStream):
         """
         Handshaking was successful, streaming now commences.
         """
-        self.decoder = codec.Decoder(DecodingDispatcher(self), self)
-        self.encoder = codec.Encoder(self.transport)
+        self._decodingBuffer = BufferedByteStream()
+        self._encodingBuffer = BufferedByteStream()
+
+        self.decoder = codec.Decoder(DecodingDispatcher(self), self,
+            stream=self._decodingBuffer)
+        self.encoder = codec.Encoder(self.transport, stream=self._encodingBuffer)
 
         self.decoder_task = None
         self.encoder_task = None
