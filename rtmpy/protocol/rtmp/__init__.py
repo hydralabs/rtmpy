@@ -275,6 +275,7 @@ class RTMPProtocol(protocol.Protocol, core.BaseStream):
         try:
             e = self.encoder
         except AttributeError:
+            log.err('Attempted to send message %r when no encoder available', msg)
             return
 
         if stream is None:
