@@ -295,8 +295,13 @@ class RTMPProtocol(protocol.Protocol, core.BaseStream):
 
 
     def setFrameSize(self, size):
-        self.sendMessage(message.FrameSize(size))
-        self.encoder.setFrameSize(size)
+        try:
+            self.sendMessage(message.FrameSize(size))
+            self.encoder.setFrameSize(size)
+        except:
+            self.logAndDisconnect(failure.Failure())
+
+            raise
 
     def getStreamingChannel(self, stream):
         """
