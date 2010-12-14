@@ -287,8 +287,7 @@ class RTMPProtocol(protocol.Protocol, core.BaseStream):
         # fast enough and the penalty for setting up a new thread is too high.
         msg.encode(buf)
 
-        e.send(buf.getvalue(), msg.type, stream.streamId,
-            stream.timestamp, whenDone)
+        e.send(buf.getvalue(), msg.type, stream.streamId, stream.timestamp)
 
         if e.active and not self.encoder_task:
             self._startEncoding()
