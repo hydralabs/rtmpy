@@ -187,7 +187,6 @@ class StreamManager(object):
         streams.pop(0)
 
         for streamId, stream in streams.items():
-            stream.closeStream()
             self.deleteStream(streamId)
 
 
