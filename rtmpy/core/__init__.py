@@ -82,11 +82,12 @@ class StreamManager(object):
 
     Stream ID 0 is special, it is considered as the C{NetConnection} stream.
 
-    @ivar _streams: A C{dict} of id -> stream instances.
+    @ivar streams: A C{dict} of id -> stream instances.
     @ivar _deletedStreamIds: A collection of stream ids that been deleted and
         can be reused.
     """
 
+    CONTROL_STREAM_ID = 0
 
     def __init__(self):
         """
@@ -95,14 +96,15 @@ class StreamManager(object):
         @param nc: The NetConnection stream.
         """
         self._deletedStreamIds = collections.deque()
-        self._streams = {
-            0: self.getControlStream()
+        self.streams = {
+            self.CONTROL_STREAM_ID: self.getControlStream()
         }
 
 
     def getControlStream(self):
         """
-        Get the control stream for this manager. The control stream equivalent to the C{NetConnection} in Flash lingo.
+        Get the control stream for this manager. The control stream equivalent
+        to the C{NetConnection} in Flash lingo.
 
         Must be implemented by subclasses.
         """
@@ -128,13 +130,22 @@ class StreamManager(object):
 
         @param streamId: The id of the stream to get.
         """
-        s = self._streams.get(streamId, None)
+        s = self.streams.get(streamId, None)
 
         if s is None:
             # the peer needs to call 'createStream' to make new streams.
             raise KeyError('Unknown stream %r' % (streamId,))
 
         return s
+
+    def getNextAvailableStreamId(self):
+        """
+        Return the next available stream id.
+        """
+        try:
+            return self._deletedStreamIds.popleft()
+        except IndexError:
+            return len(self.streams)
 
 
     @expose
@@ -145,11 +156,11 @@ class StreamManager(object):
         @param streamId: The id of the stream to delete.
         @type streamId: C{int}
         """
-        if streamId == 0:
-            # TODO: Think about going boom if this is attempted
-            return # can't delete the NetConnection
+        if streamId == self.CONTROL_STREAM_ID:
+            log.msg('Attempted to delete RTMP control stream')
+            return # can't delete the control stream
 
-        stream = self._streams.pop(streamId, None)
+        stream = self.streams.pop(streamId, None)
 
         if stream is None:
             log.msg('Attempted to delete non-existant RTMP stream %r', streamId)
@@ -167,12 +178,9 @@ class StreamManager(object):
 
         @see: L{buildStream}
         """
-        try:
-            streamId = self._deletedStreamIds.popleft()
-        except IndexError:
-            streamId = len(self._streams)
+        streamId = self.getNextAvailableStreamId()
 
-        self._streams[streamId] = self.buildStream(streamId)
+        self.streams[streamId] = self.buildStream(streamId)
 
         return streamId
 
@@ -181,13 +189,20 @@ class StreamManager(object):
         """
         Closes all active streams and deletes them from this manager.
         """
-        streams = self._streams.copy()
+        streams = self.streams.copy()
 
         # can't close the NetConnection stream.
-        streams.pop(0)
+        control_stream = streams.pop(self.CONTROL_STREAM_ID)
 
         for streamId, stream in streams.items():
-            self.deleteStream(streamId)
+            try:
+                self.deleteStream(streamId)
+            except:
+                log.err()
+
+        self.streams = {
+            self.CONTROL_STREAM_ID: control_stream
+        }
 
 
 
