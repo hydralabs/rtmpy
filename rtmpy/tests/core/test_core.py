@@ -35,12 +35,19 @@ class SimpleStream(object):
 
 
 
-class SimpleStreamManager(core.StreamManagerMixIn):
+class SimpleStreamManager(core.StreamManager):
     """
     L{core.BaseStreamManager} requires that subclasses implement L{buildStream}
     """
 
     builtStreams = 0
+
+    def getControlStream(self):
+        """
+        Gets the control stream for the manager
+        """
+        return self
+
 
     def buildStream(self, streamId):
         """
@@ -63,16 +70,16 @@ class StreamManagerTestCase(unittest.TestCase):
 
 
     def buildManager(self, cls=SimpleStreamManager):
-        return cls(self)
+        return cls()
 
 
     def test_get_stream_0(self):
         """
-        streamID of 0 is special. It should return the test instance.
+        streamID of 0 is special. It should return the manager.
         """
         m = self.buildManager()
 
-        self.assertIdentical(self, m.getStream(0))
+        self.assertIdentical(m, m.getStream(0))
 
 
     def test_get_unknown(self):
@@ -119,7 +126,7 @@ class StreamManagerTestCase(unittest.TestCase):
         m = self.buildManager()
 
         m.deleteStream(0)
-        self.assertIdentical(self, m.getStream(0))
+        self.assertIdentical(m, m.getStream(0))
 
 
     def test_delete_unknown(self):
