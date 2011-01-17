@@ -88,9 +88,14 @@ class StreamManagerMixIn(object):
     """
 
 
-    def __init__(self):
+    def __init__(self, nc):
+        """
+        Initialises a stream manager.
+
+        @param nc: The NetConnection stream.
+        """
         self._streams = {
-            0: self
+            0: nc
         }
 
         self._deletedStreamIds = collections.deque()
@@ -139,9 +144,11 @@ class StreamManagerMixIn(object):
 
         if not stream:
             log.msg('Attempted to delete non-existant RTMP stream %r', streamId)
-        else:
-            self._deletedStreamIds.append(streamId)
-            stream.closeStream()
+
+            return
+
+        self._deletedStreamIds.append(streamId)
+        stream.closeStream()
 
 
     @expose
@@ -163,10 +170,11 @@ class StreamManagerMixIn(object):
 
     def closeAllStreams(self):
         """
-        Closes all streams and deletes them from this manager.
+        Closes all active streams and deletes them from this manager.
         """
         streams = self._streams.copy()
 
+        # can't close the NetConnection stream.
         streams.pop(0, None)
 
         for streamId, stream in streams.items():
@@ -206,11 +214,11 @@ class BaseStream(object):
 
         return d
 
-    def sendStatus(self, code_or_status, command=None, **kwargs):
+    def sendStatus(self, status, command=None, **kwargs):
         """
         Informs the peer of a change of status.
 
-        @param code_or_status: A status message or L{status.Status} instance.
+        @param status: A status message or L{status.Status} instance.
             If a string is supplied it will be converted to an L{status.Status}.
         @param command: The command object part of the L{message.Invoke}
             message. Not quite sure what this achieves right now. Defaults to

@@ -97,6 +97,8 @@ class IMessage(Interface):
         rtmp#rtmp_datatypes>}
     """
 
+    type = Attribute('The int RTMP type for this message.')
+
 
     def encode(buffer):
         """
@@ -235,12 +237,7 @@ class Message(object):
     An abstract class that all message types extend.
     """
 
-
     implements(IMessage)
-
-
-    type = Attribute('The int RTMP type for this message.')
-
 
     def encode(self, buf):
         """
@@ -621,7 +618,7 @@ class Invoke(Message):
 
         self.name = decoder.next()
         self.id = decoder.next()
-        self.argv = [x for x in decoder]
+        self.argv = list(decoder)
 
 
     def encode(self, buf):
