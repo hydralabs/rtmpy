@@ -31,6 +31,7 @@ class RandomPayloadNegotiator(object):
     Generate a random payload for the syn/ack packets.
     """
 
+
     protocolVersion = version.RTMP
 
     def buildSynPayload(self, packet):
