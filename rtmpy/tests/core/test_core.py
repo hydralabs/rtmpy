@@ -63,16 +63,16 @@ class StreamManagerTestCase(unittest.TestCase):
 
 
     def buildManager(self, cls=SimpleStreamManager):
-        return cls()
+        return cls(self)
 
 
     def test_get_stream_0(self):
         """
-        streamID of 0 is special. It should return the manager it self.
+        streamID of 0 is special. It should return the test instance.
         """
         m = self.buildManager()
 
-        self.assertIdentical(m, m.getStream(0))
+        self.assertIdentical(self, m.getStream(0))
 
 
     def test_get_unknown(self):
@@ -119,7 +119,7 @@ class StreamManagerTestCase(unittest.TestCase):
         m = self.buildManager()
 
         m.deleteStream(0)
-        self.assertIdentical(m, m.getStream(0))
+        self.assertIdentical(self, m.getStream(0))
 
 
     def test_delete_unknown(self):
