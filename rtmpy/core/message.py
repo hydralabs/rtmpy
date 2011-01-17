@@ -740,7 +740,10 @@ for k, v in globals().items():
     except TypeError:
         continue
 
-    TYPE_MAP[v.type] = v
+    try:
+        TYPE_MAP[v.type] = v
+    except AttributeError:
+        continue
 
 del k, v
 
