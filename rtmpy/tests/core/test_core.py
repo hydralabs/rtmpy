@@ -17,7 +17,7 @@
 Tests for L{rtmpy.core}
 """
 
-import unittest
+from twisted.trial import unittest
 
 from rtmpy import core
 
@@ -41,6 +41,8 @@ class SimpleStreamManager(core.StreamManager):
     """
 
     builtStreams = 0
+    streamClass = SimpleStream
+
 
     def getControlStream(self):
         """
@@ -53,13 +55,30 @@ class SimpleStreamManager(core.StreamManager):
         """
         Build and return a L{SimpleStream} that has the streamId associated.
         """
-        s = SimpleStream()
+        s = self.streamClass()
 
         s.streamId = streamId
 
         self.builtStreams += 1
 
         return s
+
+
+
+class TestRuntimeError(RuntimeError):
+    """
+    An exception class specifically used for testing error handling.
+    """
+
+
+
+class ErrorClosingStream(object):
+    """
+    Throws an error if L{closeStream} is called.
+    """
+
+    def closeStream(self):
+        raise TestRuntimeError
 
 
 
@@ -192,3 +211,27 @@ class StreamManagerTestCase(unittest.TestCase):
         for stream in streams:
             self.assertTrue(stream.closed)
             self.assertRaises(KeyError, m.getStream, stream.streamId)
+
+        self.assertEqual(m.getNextAvailableStreamId(), 1)
+
+
+    def test_close_all_error(self):
+        """
+        Calling closeAllStreams should result in the correct state of the
+        manager, even if an exception is raised whilst closing an individual
+        stream.
+        """
+        m = self.buildManager()
+        m.streamClass = ErrorClosingStream
+
+        n = 10
+
+        # create a bunch of streams
+        [m.createStream() for i in xrange(n)]
+
+        m.closeAllStreams()
+
+        self.flushLoggedErrors(TestRuntimeError)
+
+        self.assertEqual(m.streams, {0: m})
+        self.assertEqual(m.getNextAvailableStreamId(), 1)
