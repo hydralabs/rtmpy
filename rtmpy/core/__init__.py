@@ -23,7 +23,7 @@ from twisted.python import failure, log
 from twisted.internet import defer
 
 from rtmpy import exc
-from rtmpy.core import message, status
+from rtmpy.core import message
 
 
 #: A dictionary of
@@ -76,7 +76,7 @@ class ExtraResult(object):
 
 
 
-class StreamManagerMixIn(object):
+class StreamManager(object):
     """
     Handles all stream based operations.
 
@@ -88,17 +88,25 @@ class StreamManagerMixIn(object):
     """
 
 
-    def __init__(self, nc):
+    def __init__(self):
         """
         Initialises a stream manager.
 
         @param nc: The NetConnection stream.
         """
+        self._deletedStreamIds = collections.deque()
         self._streams = {
-            0: nc
+            0: self.getControlStream()
         }
 
-        self._deletedStreamIds = collections.deque()
+
+    def getControlStream(self):
+        """
+        Get the control stream for this manager. The control stream equivalent to the C{NetConnection} in Flash lingo.
+
+        Must be implemented by subclasses.
+        """
+        raise NotImplementedError
 
 
     def buildStream(self, streamId):
@@ -135,6 +143,7 @@ class StreamManagerMixIn(object):
         Deletes an existing stream.
 
         @param streamId: The id of the stream to delete.
+        @type streamId: C{int}
         """
         if streamId == 0:
             # TODO: Think about going boom if this is attempted
@@ -142,7 +151,7 @@ class StreamManagerMixIn(object):
 
         stream = self._streams.pop(streamId, None)
 
-        if not stream:
+        if stream is None:
             log.msg('Attempted to delete non-existant RTMP stream %r', streamId)
 
             return
@@ -175,7 +184,7 @@ class StreamManagerMixIn(object):
         streams = self._streams.copy()
 
         # can't close the NetConnection stream.
-        streams.pop(0, None)
+        streams.pop(0)
 
         for streamId, stream in streams.items():
             stream.closeStream()
