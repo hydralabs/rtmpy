@@ -128,3 +128,89 @@ class StatusTestCase(unittest.TestCase):
 
         self.assertEqual(s, ref_dict)
 
+
+class AMFEncodingTestCase(unittest.TestCase):
+    """
+    Tests to ensure that AMF encoding works smoothly.
+    """
+
+
+    def setUp(self):
+        import pyamf
+
+        try:
+            pyamf.get_class_alias(status.Status)
+        except pyamf.UnknownClassAlias:
+            self._old_alias = None
+        else:
+            raise RuntimeError(
+                'Unexpected status.Status class registered in PyAMF')
+
+        self.alias = pyamf.register_class(status.Status)
+
+
+    def tearDown(self):
+        import pyamf
+
+        pyamf.unregister_class(status.Status)
+
+        if self._old_alias:
+            pyamf.register_class(self._old_alias)
+
+
+    def test_static_attributes(self):
+        """
+        Ensure that the core attributes will be encoded in order correctly.
+        """
+        self.alias.compile()
+
+        self.assertEqual(
+            self.alias.static_attrs, ['level', 'code', 'description'])
+
+
+    def test_amf0(self):
+        """
+        Test encoding in AMF0.
+        """
+        import pyamf
+
+        ref_dict = {
+            'level': 'alevel',
+            'code': 'Some.Code.Here',
+            'description': 'Look mom, no hands!'
+        }
+
+        s = status.Status(
+            ref_dict['level'],
+            ref_dict['code'],
+            ref_dict['description'])
+
+        blob = pyamf.encode(s, encoding=pyamf.AMF0)
+
+        decoded_status = pyamf.decode(blob, encoding=pyamf.AMF0).next()
+
+        self.assertEqual(decoded_status, s)
+
+
+    def test_amf3(self):
+        """
+        Test encoding in AMF3.
+        """
+        import pyamf
+
+        ref_dict = {
+            'level': 'alevel',
+            'code': 'Some.Code.Here',
+            'description': 'Look mom, no hands!'
+        }
+
+        s = status.Status(
+            ref_dict['level'],
+            ref_dict['code'],
+            ref_dict['description'])
+
+        blob = pyamf.encode(s, encoding=pyamf.AMF3)
+
+        decoded_status = pyamf.decode(blob, encoding=pyamf.AMF3).next()
+
+        self.assertEqual(decoded_status, s)
