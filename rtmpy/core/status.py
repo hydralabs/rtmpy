@@ -21,7 +21,7 @@ Flash Player throws a fit.
 from zope.interface import Interface, Attribute, implements
 
 
-__all__ = ['IStatus', 'status', 'error']
+__all__ = ['IStatus', 'status', 'error', 'fromFailure']
 
 
 STATUS_STATUS = 'status'
@@ -41,6 +41,7 @@ class IStatus(Interface):
 
     All attributes are of type C{unicode} unless explicitly specified.
     """
+
 
     level = Attribute('The level of the notification. Valid values appear to be'
         ' C{status} and C{error}.')
@@ -67,6 +68,7 @@ def status(code, description, **kwargs):
     return Status(STATUS_STATUS, code, description, **kwargs)
 
 
+
 def error(code, description, **kwargs):
     """
     Returns a L{IStatus} in an error state.
@@ -80,6 +82,20 @@ def error(code, description, **kwargs):
         and will be dispatched to the receiving endpoint.
     """
     return Status(STATUS_ERROR, code, description, **kwargs)
+
+
+
+def fromFailure(fail, defaultCode=None):
+    """
+    Returns an error status notification based on the supplied
+    L{twisted.python.failure.Failure} object.
+
+    @return: L{IStatus} in an error state based apon the supplied failure object.
+    """
+    code = getattr(fail.value, 'code', defaultCode)
+    description = fail.getErrorMessage()
+
+    return error(code, description)
 
 
 

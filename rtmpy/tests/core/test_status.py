@@ -214,3 +214,61 @@ class AMFEncodingTestCase(unittest.TestCase):
         decoded_status = pyamf.decode(blob, encoding=pyamf.AMF3).next()
 
         self.assertEqual(decoded_status, s)
+
+
+
+class TestRuntimeError(RuntimeError):
+    """
+    """
+
+    code = 'Test.RuntimeError'
+
+
+
+class FromFailureTestCase(unittest.TestCase):
+    """
+    Tests for L{status.fromFailure}
+    """
+
+
+    def buildFailure(self, exc_type, msg):
+        try:
+            raise exc_type(msg)
+        except exc_type:
+            from twisted.python import failure
+
+            return failure.Failure()
+
+        self.fail('Did not build failure instance correctly')
+
+
+    def test_status(self):
+        """
+        Ensure that L{statust.fromFailure} works as expected
+        """
+        f = self.buildFailure(TestRuntimeError, 'foo bar')
+
+        s = status.fromFailure(f)
+
+        self.assertTrue(status.IStatus.providedBy(s))
+        self.assertEqual(s.level, 'error')
+        self.assertEqual(s.code, 'Test.RuntimeError')
+        self.assertEqual(s.description, 'foo bar')
+
+
+    def test_default_code(self):
+        """
+        L{status.fromFailure} looks for a C{code} attribute on the exception
+        instance contained in the failure. If one is not present, supplying a
+        default code is allowed.
+        """
+        f = self.buildFailure(RuntimeError, 'spam eggs')
+
+        self.assertFalse(hasattr(f.value, 'code'))
+
+        s = status.fromFailure(f, 'default code')
+
+        self.assertTrue(status.IStatus.providedBy(s))
+        self.assertEqual(s.level, 'error')
+        self.assertEqual(s.code, 'default code')
+        self.assertEqual(s.description, 'spam eggs')
