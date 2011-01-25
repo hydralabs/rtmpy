@@ -564,7 +564,7 @@ class ServerProtocol(rtmp.RTMPProtocol):
         self.application = self.factory.getApplication(appName)
 
         if self.application is None:
-            raise exc.InvalidApplication(util.safestr("Unknown application '%s'") % (appName,))
+            raise exc.InvalidApplication("Unknown application '%s'" % (appName,))
 
         self.client = self.application.buildClient(self, params, *args)
 
