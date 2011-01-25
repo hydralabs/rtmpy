@@ -1,3 +1,5 @@
+# -*- coding: utf-8 -*-
+#
 # Copyright the RTMPy Project
 #
 # RTMPy is free software: you can redistribute it and/or modify it under the
@@ -101,6 +103,25 @@ class ApplicationRegisteringTestCase(unittest.TestCase):
 
         def cb(res):
             self.assertEqual(self.factory.applications, {'foo': self.app})
+
+        reactor.callLater(0, d.callback, None)
+        
+    def test_create_unicode(self):
+        """
+        Test initial args for L{server.ServerFactory}
+        """
+        self.factory = server.ServerFactory({'дак': self.app})
+
+        self.assertEqual(self.factory.applications, {'дак': self.app})
+
+        d = self.app.ret = defer.Deferred()
+
+        self.factory = server.ServerFactory({'дак': self.app})
+
+        self.assertEqual(self.factory.applications, {})
+
+        def cb(res):
+            self.assertEqual(self.factory.applications, {'дак': self.app})
 
         reactor.callLater(0, d.callback, None)
 
@@ -472,16 +493,57 @@ class ConnectingTestCase(unittest.TestCase):
         d.addCallback(cb)
 
         return d
+    
+    def test_random_failure_unicode(self):
+        """
+        If something random goes wrong, make sure the status is correctly set.
+        """
+        def bork(*args):
+            raise EnvironmentError('щоот')
+
+        self.patch(self.protocol, '_onConnect', bork)
+
+        d = self.connect({})
+
+        def cb(res):
+            self.assertEqual(res, {
+                'code': 'NetConnection.Connect.Failed',
+                'description': 'щоот',
+                'level': 'error',
+                'objectEncoding': 0
+            })
+
+
+        d.addCallback(cb)
+
+        return d
 
     def test_unknown_application(self):
         self.assertEqual(self.factory.getApplication('what'), None)
 
-        d = self.connect({'app': util.safestr('what')})
+        d = self.connect({'app': 'what'})
 
         def cb(res):
             self.assertEqual(res, {
                 'code': 'NetConnection.Connect.InvalidApp',
                 'description': "Unknown application 'what'",
+                'level': 'error',
+                'objectEncoding': 0
+            })
+
+        d.addCallback(cb)
+
+        return d
+    
+    def test_unknown_application_unicode(self):
+        self.assertEqual(self.factory.getApplication('what'), None)
+
+        d = self.connect({'app': 'щнат'})
+
+        def cb(res):
+            self.assertEqual(res, {
+                'code': 'NetConnection.Connect.InvalidApp',
+                'description': "Unknown application 'щнат'",
                 'level': 'error',
                 'objectEncoding': 0
             })
@@ -756,7 +818,8 @@ class PublishingTestCase(ServerFactoryTestCase):
 
 
         return d.addCallback(cb)
-
+        
+        
 
     def test_not_connected(self):
         """

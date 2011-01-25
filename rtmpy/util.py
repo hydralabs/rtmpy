@@ -32,11 +32,6 @@ try:
 except ImportError:
     # support for Python2.4
     from cgi import parse_qs
-    
-try:
-    unicode
-except NameError:
-    unicode = str
 
 from pyamf.util import BufferedByteStream
 
@@ -269,7 +264,6 @@ def generateBytes(length, readable=False):
     return bytes
 
 
-
 def get_callable_target(obj, name):
     """
     Returns a callable object based on the attribute of C{obj}.
@@ -315,13 +309,6 @@ def add_to_class(f, depth=1):
 
     return wrap
 
-
-def safestr(str):
-    """
-    Returns the safe unicode string given any string-compatible input
-    """
-    
-    return unicode(str)
     
 
 def getFailureMessage(failure):

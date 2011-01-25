@@ -21,11 +21,6 @@ try:
     from cStringIO import StringIO
 except ImportError:
     from StringIO import StringIO
-    
-try:
-    unicode
-except NameError:
-    unicode = str
 
 from twisted.internet import error
 
