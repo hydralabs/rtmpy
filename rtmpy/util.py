@@ -326,7 +326,10 @@ def safestr(str):
 
 def getFailureMessage(failure):
     """
-    Takes a twisted.python.failure.Failure and returns the error message
+    Takes a {twisted.python.failure.Failure} and returns the error message
+    
+    Replaces {Failure.getErrorMessage} since it currently cannot handle
+    unicode properly.
     """
     
     value = getattr(failure.value, "value", None)
