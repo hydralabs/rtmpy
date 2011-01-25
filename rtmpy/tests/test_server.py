@@ -21,7 +21,8 @@ from twisted.internet import defer, reactor, protocol
 from twisted.test.proto_helpers import StringTransportWithDisconnection, StringIOWithoutClosing
 
 from rtmpy import server, exc, rpc
-from rtmpy.protocol.rtmp import message
+from rtmpy.protocol.rtmp import message, ExtraResult
+from rtmpy.tests.util import safestr
 
 
 
@@ -476,7 +477,7 @@ class ConnectingTestCase(unittest.TestCase):
     def test_unknown_application(self):
         self.assertEqual(self.factory.getApplication('what'), None)
 
-        d = self.connect({'app': 'what'})
+        d = self.connect({'app': safestr('what')})
 
         def cb(res):
             self.assertEqual(res, {

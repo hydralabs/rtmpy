@@ -32,6 +32,11 @@ try:
 except ImportError:
     # support for Python2.4
     from cgi import parse_qs
+    
+try:
+    unicode
+except NameError:
+    unicode = str
 
 from pyamf.util import BufferedByteStream
 
@@ -309,3 +314,11 @@ def add_to_class(f, depth=1):
     wrap.__doc__ = f.__doc__
 
     return wrap
+
+
+def safestr(str):
+    """
+    Returns the safe unicode string given any string-compatible input
+    """
+    
+    return unicode(str)

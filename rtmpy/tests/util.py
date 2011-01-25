@@ -21,6 +21,11 @@ try:
     from cStringIO import StringIO
 except ImportError:
     from StringIO import StringIO
+    
+try:
+    unicode
+except NameError:
+    unicode = str
 
 from twisted.internet import error
 
@@ -79,3 +84,11 @@ class DummyDelayedCall:
 
     def cancel(self):
         self.cancelled = True
+
+
+def safestr(str):
+    """
+    Returns the safe unicode string given any string-compatible input
+    """
+    
+    return unicode(str)

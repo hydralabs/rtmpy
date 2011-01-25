@@ -164,6 +164,24 @@ class GetCallableTargetTestCase(unittest.TestCase):
 
         self.assertNotIdentical(None, c)
         self.assertTrue(c, '__call__')
+        
+        
+class SafeStrTestCase(unittest.TestCase):
+    """
+    Tests for L{util.safestr}
+    """
+
+    def test_unicode(self):
+        """
+        String returned from safestr should be unicode
+        """
+        
+        try:
+            unicode
+        except NameError:
+            unicode = str
+        
+        self.assertEqual(unicode('foo'), util.safestr('foo'))
 
 
 
