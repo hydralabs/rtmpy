@@ -258,7 +258,7 @@ class NetStream(core.NetStream):
 
             if isinstance(result, failure.Failure):
                 code = getattr(result.value, 'code', 'NetConnection.Call.Failed')
-                description = result.getErrorMessage() or 'Internal Server Error'
+                description = util.getFailureMessage(result) or 'Internal Server Error'
 
                 s = status.error(code, description)
             else:
@@ -386,7 +386,7 @@ class NetStream(core.NetStream):
 
         def eb(fail):
             code = getattr(fail.value, 'code', 'NetStream.Play.Failed')
-            description = fail.getErrorMessage() or 'Internal Server Error'
+            description = util.getFailureMessage(fail) or 'Internal Server Error'
 
             self.sendStatus(status.error(code, description))
 
@@ -564,7 +564,7 @@ class ServerProtocol(rtmp.RTMPProtocol):
         self.application = self.factory.getApplication(appName)
 
         if self.application is None:
-            raise exc.InvalidApplication('Unknown application %r' % (appName,))
+            raise exc.InvalidApplication(util.safestr("Unknown application '%s'") % (appName,))
 
         self.client = self.application.buildClient(self, params, *args)
 

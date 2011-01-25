@@ -35,7 +35,7 @@ from zope.interface import Interface, Attribute
 import pyamf
 from pyamf.util import BufferedByteStream
 
-from rtmpy import core
+from rtmpy import core, util
 from rtmpy import message
 from rtmpy.protocol.rtmp import codec
 

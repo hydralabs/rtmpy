@@ -84,11 +84,4 @@ class DummyDelayedCall:
 
     def cancel(self):
         self.cancelled = True
-
-
-def safestr(str):
-    """
-    Returns the safe unicode string given any string-compatible input
-    """
     
-    return unicode(str)

@@ -322,3 +322,19 @@ def safestr(str):
     """
     
     return unicode(str)
+    
+
+def getFailureMessage(failure):
+    """
+    Takes a twisted.python.failure.Failure and returns the error message
+    """
+    
+    value = getattr(failure.value, "value", None)
+    
+    if not value:
+        try:
+            value = failure.value.args[0]
+        except IndexError:
+            value = ""
+            
+    return value

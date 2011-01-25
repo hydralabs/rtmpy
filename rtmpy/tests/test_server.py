@@ -20,9 +20,8 @@ from twisted.trial import unittest
 from twisted.internet import defer, reactor, protocol
 from twisted.test.proto_helpers import StringTransportWithDisconnection, StringIOWithoutClosing
 
-from rtmpy import server, exc, rpc
+from rtmpy import server, exc, rpc, util
 from rtmpy.protocol.rtmp import message, ExtraResult
-from rtmpy.tests.util import safestr
 
 
 
@@ -477,7 +476,7 @@ class ConnectingTestCase(unittest.TestCase):
     def test_unknown_application(self):
         self.assertEqual(self.factory.getApplication('what'), None)
 
-        d = self.connect({'app': safestr('what')})
+        d = self.connect({'app': util.safestr('what')})
 
         def cb(res):
             self.assertEqual(res, {
@@ -772,7 +771,8 @@ class PublishingTestCase(ServerFactoryTestCase):
         def eb(f):
             f.trap(exc.ConnectError)
 
-            self.assertEqual(f.getErrorMessage(), 'Cannot publish stream - not connected')
+            self.assertEqual(util.getFailureMessage(f),
+                'Cannot publish stream - not connected')
 
             self.assertStatus(s, {
                 'code': 'NetConnection.Call.Failed',

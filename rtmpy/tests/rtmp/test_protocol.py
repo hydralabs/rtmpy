@@ -22,7 +22,7 @@ from twisted.internet import error, defer, reactor
 from twisted.test.proto_helpers import StringTransportWithDisconnection
 
 from rtmpy.protocol import rtmp
-from rtmpy import message, core, exc
+from rtmpy import message, core, exc, util
 
 
 class MockHandshakeNegotiator(object):
@@ -389,7 +389,8 @@ class InvokingTestCase(ProtocolTestCase):
         def eb(fail):
             fail.trap(exc.CallFailed)
 
-            self.assertEqual(fail.getErrorMessage(), "Unknown method 'foo'")
+            self.assertEqual(util.getFailureMessage(fail),
+                "Unknown method 'foo'")
 
         def check_messages(res):
             self.assertEqual(self.messages, [])
@@ -414,7 +415,8 @@ class InvokingTestCase(ProtocolTestCase):
         def eb(fail):
             fail.trap(exc.CallFailed)
 
-            self.assertEqual(fail.getErrorMessage(), "Unknown method 'foo'")
+            self.assertEqual(util.getFailureMessage(fail),
+                "Unknown method 'foo'")
 
         def check_messages(res):
             msg, stream = self.messages.pop(0)
