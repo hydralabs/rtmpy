@@ -1,3 +1,5 @@
+# -*- coding: utf-8 -*-
+#
 # Copyright the RTMPy Project
 #
 # RTMPy is free software: you can redistribute it and/or modify it under the
@@ -398,6 +400,32 @@ class InvokingTestCase(ProtocolTestCase):
         d.addCallbacks(cb, eb).addCallback(check_messages)
 
         return d
+    
+    def test_missing_target_unicode(self):
+        """
+        Invoke a method that does not exist with no response expected.
+        """
+        self.assertEqual(self.stream.getInvokableTarget('дак'), None)
+
+        d = self.stream.onInvoke('дак', 0, [], 0)
+
+        self.assertIsInstance(d, defer.Deferred)
+
+        def cb(res):
+            self.fail('errback should be called')
+
+        def eb(fail):
+            fail.trap(exc.CallFailed)
+
+            self.assertEqual(util.getFailureMessage(fail),
+                "Unknown method 'дак'")
+
+        def check_messages(res):
+            self.assertEqual(self.messages, [])
+
+        d.addCallbacks(cb, eb).addCallback(check_messages)
+
+        return d
 
     def test_missing_target_response(self):
         """
@@ -436,6 +464,45 @@ class InvokingTestCase(ProtocolTestCase):
         d.addCallbacks(cb, eb).addCallback(check_messages)
 
         return d
+    
+    def test_missing_target_response_unicode(self):
+        """
+        Invoke a method that does not exist with a response expected.
+        """
+        self.assertEqual(self.stream.getInvokableTarget('дак'), None)
+
+        d = self.stream.onInvoke('дак', 1, [], 0)
+
+        self.assertIsInstance(d, defer.Deferred)
+
+        def cb(res):
+            self.fail('errback should be called')
+
+        def eb(fail):
+            fail.trap(exc.CallFailed)
+
+            self.assertEqual(util.getFailureMessage(fail),
+                "Unknown method 'дак'")
+
+        def check_messages(res):
+            msg, whenDone, stream = self.messages.pop(0)
+
+            self.assertEqual(self.messages, [])
+
+            self.assertEqual(whenDone, None)
+            self.assertIdentical(stream, self.stream)
+
+            self.assertIsInstance(msg, message.Invoke)
+            self.assertEqual(msg.id, 1)
+            self.assertEqual(msg.name, '_error')
+            self.assertEqual(msg.argv, [None, {
+                'code': 'NetConnection.Call.Failed',
+                'description': "Unknown method 'дак'",
+                'level': 'error'}])
+
+        d.addCallbacks(cb, eb).addCallback(check_messages)
+
+        return d
 
     def test_success_response(self):
         """
@@ -460,6 +527,37 @@ class InvokingTestCase(ProtocolTestCase):
             self.assertEqual(msg.id, 1)
             self.assertEqual(msg.name, '_result')
             self.assertEqual(msg.argv, [None, 'bar'])
+
+        d.addCallback(check_messages)
+
+        return d
+    
+    def test_success_response_unicode(self):
+        """
+        Test a successful invocation with a response.
+        """
+        def func():
+            return 'вая'
+
+        self.targets['дак'] = func
+
+        self.assertEqual(self.stream.getInvokableTarget('дак'), func)
+
+        d = self.stream.onInvoke('дак', 1, [], 0)
+        self.assertIsInstance(d, defer.Deferred)
+
+        def check_messages(res):
+            msg, whenDone, stream = self.messages.pop(0)
+
+            self.assertEqual(self.messages, [])
+
+            self.assertEqual(whenDone, None)
+            self.assertIdentical(stream, self.stream)
+
+            self.assertIsInstance(msg, message.Invoke)
+            self.assertEqual(msg.id, 1)
+            self.assertEqual(msg.name, '_result')
+            self.assertEqual(msg.argv, [None, 'вая'])
 
         d.addCallback(check_messages)
 
@@ -493,6 +591,43 @@ class InvokingTestCase(ProtocolTestCase):
             self.assertEqual(msg.argv, [None, {
                 'code': 'NetConnection.Call.Failed',
                 'description': 'spam and eggs please',
+                'level': 'error'}])
+
+        d.addErrback(eb).addCallback(check_messages)
+
+        return d
+    
+    def test_failure_response_unicode(self):
+        """
+        Test a successful invocation but that raises an error.
+        """
+        def func():
+            raise RuntimeError('нам алд васоп')
+
+        self.targets['дак'] = func
+
+        self.assertEqual(self.stream.getInvokableTarget('дак'), func)
+
+        d = self.stream.onInvoke('дак', 1, [], 0)
+        self.assertIsInstance(d, defer.Deferred)
+
+        def eb(fail):
+            fail.trap(RuntimeError)
+
+        def check_messages(res):
+            msg, whenDone, stream = self.messages.pop(0)
+
+            self.assertEqual(self.messages, [])
+
+            self.assertEqual(whenDone, None)
+            self.assertIdentical(stream, self.stream)
+
+            self.assertIsInstance(msg, message.Invoke)
+            self.assertEqual(msg.id, 1)
+            self.assertEqual(msg.name, '_error')
+            self.assertEqual(msg.argv, [None, {
+                'code': 'NetConnection.Call.Failed',
+                'description': 'нам алд васоп',
                 'level': 'error'}])
 
         d.addErrback(eb).addCallback(check_messages)
