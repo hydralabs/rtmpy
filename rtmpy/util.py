@@ -313,18 +313,17 @@ def add_to_class(f, depth=1):
 
 def getFailureMessage(failure):
     """
-    Takes a {twisted.python.failure.Failure} and returns the error message
-    
-    Replaces {Failure.getErrorMessage} since it currently cannot handle
+    Takes a L{twisted.python.failure.Failure} and returns the error message
+
+    Replaces L{Failure.getErrorMessage} since it currently cannot handle
     unicode properly.
     """
-    
     value = getattr(failure.value, "value", None)
-    
+
     if not value:
         try:
             value = failure.value.args[0]
         except IndexError:
             value = ""
-            
+
     return value
