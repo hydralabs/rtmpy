@@ -20,6 +20,7 @@ RTMPy exception types.
 import sys
 
 from rtmpy.status import codes
+from rtmpy.util import add_to_class
 
 
 __all__ = ['codeByClass', 'classByCode']
@@ -28,23 +29,6 @@ __all__ = ['codeByClass', 'classByCode']
 #: A collection of known exception classes and their related status codes
 CLASS_CODES = {}
 
-
-def add_to_class(f, depth=1):
-    def wrap(*args, **kwargs):
-        # ripped from zope.interface
-        frame = sys._getframe(depth)
-        locals = frame.f_locals
-
-        # Try to make sure we were called from a class def.
-        if locals is frame.f_globals or '__module__' not in locals:
-            raise TypeError(code + " can be used only from a class definition.")
-
-        f(locals, *args)
-
-    wrap.func_name = f.func_name
-    wrap.__doc__ = f.__doc__
-
-    return wrap
 
 
 @add_to_class
