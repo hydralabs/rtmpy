@@ -65,6 +65,9 @@ def status(code, description, **kwargs):
     @param kwargs: A C{dict} of values that will be added to the status object
         and will be dispatched to the receiving endpoint.
     """
+    if hasattr(code, 'code'):
+        code = code.code
+
     return Status(STATUS_STATUS, code, description, **kwargs)
 
 
@@ -81,6 +84,9 @@ def error(code, description, **kwargs):
     @param kwargs: A C{dict} of values that will be added to the status object
         and will be dispatched to the receiving endpoint.
     """
+    if hasattr(code, 'code'):
+        code = code.code
+
     return Status(STATUS_ERROR, code, description, **kwargs)
 
 
@@ -90,7 +96,7 @@ def fromFailure(fail, defaultCode=None):
     Returns an error status notification based on the supplied
     L{twisted.python.failure.Failure} object.
 
-    @return: L{IStatus} in an error state based apon the supplied failure object.
+    @return: L{IStatus} in an error state based upon the supplied failure object.
     """
     code = getattr(fail.value, 'code', defaultCode)
     description = fail.getErrorMessage()
@@ -106,6 +112,7 @@ class Status(object):
     @see: L{IStatus} for a more in-depth description.
     """
 
+
     implements(IStatus)
 
     class __amf__:
@@ -113,12 +120,14 @@ class Status(object):
         # any others, it doesn't seem to care about
         static = ('level', 'code', 'description')
 
+
     def __init__(self, level, code, description, **kwargs):
         self.level = level
         self.code = code
         self.description = description
 
         self.__dict__.update(kwargs)
+
 
     def __repr__(self):
         return '<%s: %s %r at 0x%x>' % (
@@ -128,8 +137,26 @@ class Status(object):
             id(self)
         )
 
+
     def __unicode__(self):
         return '%s: %s' % (self.code, self.description)
 
+
     def __eq__(self, other):
         return self.__dict__ == other
+
+
+    def getExtraContext(self):
+        """
+        Returns a dict of any extra context that was supplied with the status.
+
+        `extra` means any attributes on this instance excluding the L{IStatus}
+        attributes.
+        """
+        d = self.__dict__.copy()
+
+        d.pop('level', None)
+        d.pop('code', None)
+        d.pop('description', None)
+
+        return d
