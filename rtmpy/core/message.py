@@ -92,9 +92,9 @@ class EncodeError(BaseError):
 
 
 
-class UnknownEventType(BaseError):
+class UnknownType(BaseError):
     """
-    Raised if an unknown event type is found.
+    Raised if an unknown message type is found.
     """
 
 
@@ -775,4 +775,4 @@ def get_type_class(datatype):
     try:
         return TYPE_MAP[datatype]
     except KeyError:
-        raise UnknownEventType('Unknown event type %r' % (datatype,))
+        raise UnknownType('Unknown event type %r' % (datatype,))
