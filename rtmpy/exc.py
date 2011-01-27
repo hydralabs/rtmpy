@@ -17,8 +17,6 @@
 RTMPy exception types.
 """
 
-import sys
-
 from rtmpy.status import codes
 from rtmpy.util import add_to_class
 
