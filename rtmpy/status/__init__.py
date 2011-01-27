@@ -65,8 +65,10 @@ def status(code, description, **kwargs):
     @param kwargs: A C{dict} of values that will be added to the status object
         and will be dispatched to the receiving endpoint.
     """
-    if hasattr(code, 'code'):
-        code = code.code
+    # prevent circular import
+    from rtmpy import exc
+
+    code = exc.codeByClass(code) or code
 
     return Status(STATUS_STATUS, code, description, **kwargs)
 
@@ -78,14 +80,16 @@ def error(code, description, **kwargs):
 
     Use this if you want to return a failure notification for a given operation.
 
-    @param code: The code of the status. See L{rtmpy.core.status.codes} for a
+    @param code: The code of the status. See L{rtmpy.status.codes} for a
         list of valid values.
     @param description: A humanised description of the successful operation.
     @param kwargs: A C{dict} of values that will be added to the status object
         and will be dispatched to the receiving endpoint.
     """
-    if hasattr(code, 'code'):
-        code = code.code
+    # prevent circular import
+    from rtmpy import exc
+
+    code = exc.codeByClass(code) or code
 
     return Status(STATUS_ERROR, code, description, **kwargs)
 
@@ -98,7 +102,12 @@ def fromFailure(fail, defaultCode=None):
 
     @return: L{IStatus} in an error state based upon the supplied failure object.
     """
-    code = getattr(fail.value, 'code', defaultCode)
+    # prevent circular import
+    from rtmpy import exc
+
+    cls = type(fail.value)
+
+    code = exc.codeByClass(cls) or defaultCode
     description = fail.getErrorMessage()
 
     return error(code, description)
@@ -114,6 +123,7 @@ class Status(object):
 
 
     implements(IStatus)
+
 
     class __amf__:
         # RTMP is very picky about the order of the required attributes.
