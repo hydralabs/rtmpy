@@ -722,10 +722,10 @@ class ChannelMuxer(Codec):
         else:
             channel = self.acquireChannel()
 
-        if not channel:
-            self.pending.append((data, datatype, streamId, timestamp))
+            if not channel:
+                self.pending.append((data, datatype, streamId, timestamp))
 
-            return
+                return
 
         h = header.Header(
             channel.channelId,
