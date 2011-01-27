@@ -290,7 +290,7 @@ def add_to_class(f, depth=1):
         if locals is frame.f_globals or '__module__' not in locals:
             raise TypeError(code + " can be used only from a class definition.")
 
-        f(locals, *args)
+        f(locals, *args, **kwargs)
 
     wrap.func_name = f.func_name
     wrap.__doc__ = f.__doc__
