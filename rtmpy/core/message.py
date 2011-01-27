@@ -20,6 +20,8 @@ RTMP message implementations.
 from zope.interface import Interface, implements, Attribute
 import pyamf
 
+from rtmpy.util import add_to_class
+
 
 #: Changes the frame size for the RTMP stream
 FRAME_SIZE = 0x01
@@ -51,6 +53,14 @@ INVOKE = 0x14
 # 0x15 anyone?
 #: FLV data
 FLV_DATA = 0x16
+
+
+@add_to_class
+def set_type(locals, type):
+    """
+    Assigns the message type to the locals of the defined class.
+    """
+    locals['__data_type__'] = type
 
 
 
@@ -96,8 +106,6 @@ class IMessage(Interface):
     @see: U{RTMP datatypes on OSFlash<http://osflash.org/documentation/
         rtmp#rtmp_datatypes>}
     """
-
-    type = Attribute('The int RTMP type for this message.')
 
 
     def encode(buffer):
@@ -239,6 +247,7 @@ class Message(object):
 
     implements(IMessage)
 
+
     def encode(self, buf):
         """
         Called to encode the event to C{buf}.
@@ -291,8 +300,7 @@ class FrameSize(Message):
     @type size: C{int}
     """
 
-
-    type = FRAME_SIZE
+    set_type(FRAME_SIZE)
 
 
     def __init__(self, size=None):
@@ -336,7 +344,7 @@ class BytesRead(Message):
     @type bytes: C{int}
     """
 
-    type = BYTES_READ
+    set_type(BYTES_READ)
 
     FOUR_GB_THRESHOLD = 0xee800000
 
@@ -379,7 +387,7 @@ class ControlMessage(Message):
     A control message. Akin to Red5's Ping event.
     """
 
-    type = CONTROL
+    set_type(CONTROL)
 
     UNDEFINED = -1
     PING = 6
@@ -454,7 +462,7 @@ class DownstreamBandwidth(Message):
     A downstream bandwidth message.
     """
 
-    type = DOWNSTREAM_BANDWIDTH
+    set_type(DOWNSTREAM_BANDWIDTH)
 
 
     def __init__(self, bandwidth=None):
@@ -499,7 +507,7 @@ class UpstreamBandwidth(Message):
     @param extra: Not sure what this is supposed to represent at the moment.
     """
 
-    type = UPSTREAM_BANDWIDTH
+    set_type(UPSTREAM_BANDWIDTH)
 
 
     def __init__(self, bandwidth=None, extra=None):
@@ -556,7 +564,7 @@ class Notify(Message):
     @param args: A list of method arguments.
     """
 
-    type = NOTIFY
+    set_type(NOTIFY)
 
 
     def __init__(self, name=None, *args):
@@ -599,7 +607,7 @@ class Invoke(Message):
     Similar to L{Notify} but a reply is expected.
     """
 
-    type = INVOKE
+    set_type(INVOKE)
 
     encoding = pyamf.AMF0
 
@@ -647,7 +655,7 @@ class FlexMessage(Invoke):
     encoding/decoding.
     """
 
-    type = FLEX_MESSAGE
+    set_type(FLEX_MESSAGE)
 
     encoding = pyamf.AMF3
 
@@ -703,7 +711,7 @@ class AudioData(StreamingMessage):
     A message containing audio data.
     """
 
-    type = AUDIO_DATA
+    set_type(AUDIO_DATA)
 
 
     def dispatch(self, listener, timestamp):
@@ -719,7 +727,7 @@ class VideoData(StreamingMessage):
     A message containing video data.
     """
 
-    type = VIDEO_DATA
+    set_type(VIDEO_DATA)
 
 
     def dispatch(self, listener, timestamp):
@@ -740,10 +748,13 @@ for k, v in globals().items():
     except TypeError:
         continue
 
-    try:
-        TYPE_MAP[v.type] = v
-    except AttributeError:
+    t = getattr(v, '__data_type__', None)
+
+    if not t:
         continue
+
+    TYPE_MAP[t] = v
+    TYPE_MAP[v] = t
 
 del k, v
 
