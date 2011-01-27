@@ -273,3 +273,26 @@ def get_callable_target(obj, name):
 
     if target and hasattr(target, '__call__'):
         return target
+
+
+
+def add_to_class(f, depth=1):
+    """
+    A decorator that allows you to access the class locals at parse time.
+
+    This code is mostly ripped from zope.interface.
+    """
+    def wrap(*args, **kwargs):
+        frame = sys._getframe(depth)
+        locals = frame.f_locals
+
+        # Try to make sure we were called from a class def.
+        if locals is frame.f_globals or '__module__' not in locals:
+            raise TypeError(code + " can be used only from a class definition.")
+
+        f(locals, *args)
+
+    wrap.func_name = f.func_name
+    wrap.__doc__ = f.__doc__
+
+    return wrap
