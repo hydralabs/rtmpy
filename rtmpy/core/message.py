@@ -760,7 +760,7 @@ del k, v
 
 
 
-def get_type_class(datatype):
+def classByType(datatype):
     """
     A helper method that returns the mapped event class to the supplied
     datatype.

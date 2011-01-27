@@ -238,7 +238,7 @@ class StreamFactory(object):
 
         self.observer.messageStart(p)
 
-        e = message.get_type_class(datatype)()
+        e = message.classByType(datatype)()
 
         e.decode(BufferedByteStream(data))
 

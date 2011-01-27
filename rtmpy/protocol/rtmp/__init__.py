@@ -75,7 +75,7 @@ class DecodingDispatcher(object):
         @param data: The raw data for the message.
         """
         try:
-            m = message.get_type_class(datatype)()
+            m = message.classByType(datatype)()
 
             m.decode(BufferedByteStream(data))
             m.dispatch(stream, timestamp)
