@@ -31,9 +31,9 @@ into fixed size body chunks.
 
 from twisted.python import log, failure
 from twisted.internet import protocol, task
+from zope.interface import Interface, Attribute
 import pyamf
 from pyamf.util import BufferedByteStream
-from zope.interface import Interface, Attribute
 
 from rtmpy import core
 from rtmpy.core import message
@@ -260,7 +260,7 @@ class RTMPProtocol(protocol.Protocol, core.BaseStream):
         self.decoder_task = None
         self.encoder_task = None
 
-    def sendMessage(self, msg, whenDone=None, stream=None):
+    def sendMessage(self, msg, stream=None):
         """
         Sends an RTMP message to the peer. Not part of a public api, use
         C{stream.sendMessage} instead.
