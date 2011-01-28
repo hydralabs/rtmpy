@@ -98,3 +98,19 @@ class BaseCallHandler(object):
             active call could be found.
         """
         return self._activeCalls.pop(callId, None)
+
+
+    def discardCall(self, callId):
+        """
+        Called to discard an active RPC call. The RPC call was not completed
+        successfully.
+
+        The semantics of this method is different to L{finishCall}, it is useful
+        for clearing up any active calls that failed for some arbitrary reason.
+
+        @param callId: The call id returned by the corresponding call to
+            L{initiateCall} that uniquely identifies the call.
+        @return: The context with which this call was initiated or C{None} if no
+            active call could be found.
+        """
+        return self._activeCalls.pop(callId, None)
