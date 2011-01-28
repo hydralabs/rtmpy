@@ -245,13 +245,13 @@ class CallWithResultTestCase(unittest.TestCase):
 
     def test_call(self):
         """
-        Check the context of the message sent when L{callRemoteWithResult} is
+        Check the context of the message sent when L{callWithResult} is
         executed.
         """
         i = self.invoker
         m = self.messages
 
-        d = i.callRemoteWithResult('remote_method', 1, 2, 3, 'foo')
+        d = i.callWithResult('remote_method', 1, 2, 3, 'foo')
 
         self.assertTrue(isinstance(d, defer.Deferred))
         self.assertEqual(len(m), 1)
@@ -270,13 +270,13 @@ class CallWithResultTestCase(unittest.TestCase):
 
     def test_command(self):
         """
-        Ensure L{callRemoteWithResult} accepts a C{command} kwarg and that it
+        Ensure L{callWithResult} accepts a C{command} kwarg and that it
         is set on the sent message appropriately.
         """
         cmd = {'foo': 'bar'}
         i, m = self.invoker, self.messages
 
-        d = i.callRemoteWithResult('remote_method', command=cmd)
+        d = i.callWithResult('remote_method', command=cmd)
 
         self.assertTrue(isinstance(d, defer.Deferred))
         self.assertEqual(len(m), 1)
@@ -310,7 +310,7 @@ class CallWithResultTestCase(unittest.TestCase):
 
         self.patch(i, 'sendMessage', sendBadMessage)
 
-        self.assertRaises(TestRuntimeError, i.callRemoteWithResult,
+        self.assertRaises(TestRuntimeError, i.callWithResult,
             'remote_method')
 
         self.assertFalse(i.isCallActive(self.msg.id))
