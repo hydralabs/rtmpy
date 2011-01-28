@@ -65,3 +65,31 @@ class CallHandlerTestCase(unittest.TestCase):
         callId = h.initiateCall()
 
         self.assertTrue(h.isCallActive(callId))
+
+
+    def test_finish_non_active(self):
+        """
+        Finishing a call that is not active should result in no state change
+        and C{None} should be returned.
+        """
+        h = self.handler
+        hsh = hash(h)
+
+        self.assertFalse(h.isCallActive(1))
+
+        self.assertEqual(h.finishCall(1), None)
+        self.assertEqual(hsh, hash(h))
+
+
+    def test_finish_active_call(self):
+        """
+        Finishing an active call should return the original context supplied to
+        C{initiateCall} and the call should no longer be active.
+        """
+        h = self.handler
+        c = ('foo', ['bar', 'baz'], {})
+
+        callId = h.initiateCall(*c)
+
+        self.assertEqual(h.finishCall(callId), c)
+        self.assertFalse(h.isCallActive(callId))

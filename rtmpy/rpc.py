@@ -85,3 +85,16 @@ class BaseCallHandler(object):
         self._activeCalls[callId] = args
 
         return callId
+
+
+    def finishCall(self, callId):
+        """
+        Called to finish an active RPC call. The RPC call completed successfully
+        (with some sort of response).
+
+        @param callId: The call id returned by the corresponding call to
+            L{initiateCall} that uniquely identifies the call.
+        @return: The context with which this call was initiated or C{None} if no
+            active call could be found.
+        """
+        return self._activeCalls.pop(callId, None)
