@@ -17,6 +17,9 @@
 API for handling RTMP RPC calls.
 """
 
+from zope.interface import implements
+
+from rtmpy import message
 
 
 class BaseCallHandler(object):
@@ -114,3 +117,22 @@ class BaseCallHandler(object):
             active call could be found.
         """
         return self._activeCalls.pop(callId, None)
+
+
+
+class AbstractRemoteInvoker(BaseCallHandler):
+    """
+    Provides an API to make RPC calls and handle the response.
+    """
+
+    implements(message.IMessageSender)
+
+
+    # IMessageSender
+    def sendMessage(self, msg):
+        """
+        Sends a message. Must be implemented by subclasses.
+
+        @param msg: L{message.IMessage}
+        """
+        raise NotImplementedError
