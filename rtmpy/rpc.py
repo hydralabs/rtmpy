@@ -140,7 +140,7 @@ class BaseCallHandler(object):
 
 
 
-class AbstractRemoteInvoker(BaseCallHandler):
+class AbstractCallInitiator(BaseCallHandler):
     """
     Provides an API to make RPC calls and handle the response.
     """

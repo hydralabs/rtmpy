@@ -126,9 +126,9 @@ class CallHandlerTestCase(unittest.TestCase):
 
 
 
-class AbstractRemoteInvokerTestCase(unittest.TestCase):
+class AbstractCallInitiatorTestCase(unittest.TestCase):
     """
-    Tests for L{rpc.AbstractRemoteInvoker}
+    Tests for L{rpc.AbstractCallInitiator}
     """
 
 
@@ -137,29 +137,29 @@ class AbstractRemoteInvokerTestCase(unittest.TestCase):
         Check defined interfaces.
         """
         self.assertTrue(
-            message.IMessageSender.implementedBy(rpc.AbstractRemoteInvoker))
+            message.IMessageSender.implementedBy(rpc.AbstractCallInitiator))
 
 
     def test_send_message(self):
         """
         Abstract methods should raise C{NotImplementedError}.
         """
-        a = rpc.AbstractRemoteInvoker()
+        a = rpc.AbstractCallInitiator()
 
         self.assertRaises(NotImplementedError, a.sendMessage, None)
 
 
 
-class SimpleInvoker(rpc.AbstractRemoteInvoker):
+class SimpleInvoker(rpc.AbstractCallInitiator):
     """
-    An implementation of L{rpc.AbstractRemoteInvoker} that stores any messages
+    An implementation of L{rpc.AbstractCallInitiator} that stores any messages
     were sent for later inspection.
 
     @messages
     """
 
     def __init__(self):
-        super(rpc.AbstractRemoteInvoker, self).__init__()
+        super(rpc.AbstractCallInitiator, self).__init__()
 
         self.messages = []
 
@@ -174,7 +174,7 @@ class SimpleInvoker(rpc.AbstractRemoteInvoker):
 
 class CallRemoteTestCase(unittest.TestCase):
     """
-    Tests for L{rpc.AbstractRemoteInvoker.callRemote}
+    Tests for L{rpc.AbstractCallInitiator.callRemote}
     """
 
 
@@ -234,7 +234,7 @@ class CallRemoteTestCase(unittest.TestCase):
 
 class CallRemoteWithResultTestCase(unittest.TestCase):
     """
-    Tests for L{rpc.AbstractRemoteInvoker.callRemoteWithResult}
+    Tests for L{rpc.AbstractCallInitiator.callRemoteWithResult}
     """
 
 
