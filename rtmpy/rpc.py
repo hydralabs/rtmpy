@@ -16,3 +16,64 @@
 """
 API for handling RTMP RPC calls.
 """
+
+
+
+class BaseCallHandler(object):
+    """
+    Provides the ability to initiate, track and finish RPC calls. Each RPC call
+    is given a unique id.
+
+    Once a call is I{finished}, it is forgotten about. Call ids cannot be
+    reused.
+
+    @ivar _lastCallId: The value of the last initiated RPC call.
+    @type _lastCallId: C{int}
+    @ivar _activeCalls: A C{dict} of callId -> context. An active call has been
+        I{initiated} but not yet I{finished}.
+    """
+
+
+    def __init__(self):
+        self._lastCallId = 0
+        self._activeCalls = {}
+
+
+    def getNextCallId(self):
+        """
+        Returns the next call id that will be returned by L{initiateCall}.
+
+        This method is useful for unit testing.
+        """
+        return self._lastCallId + 1
+
+
+    def getCallContext(self, callId):
+        """
+        Returns the context stored when L{initiateCall} was executed.
+
+        If no active call is found, C{None} will be returned in its place.
+
+        @param callId: The call id returned by the corresponding call to
+            L{initiateCall}.
+        @rtype: C{tuple} or C{None} if the call is not active.
+        @note: Useful for unit testing.
+        """
+        return self._activeCalls.get(callId, None)
+
+
+    def initiateCall(self, *args):
+        """
+        Starts an RPC call and stores any context for the call for later
+        retrieval. The call will remain I{active} until L{finishCall} is called
+        with the same C{callId}.
+
+        @param args: The context to be stored whilst the call is active.
+        @return: A id that uniquely identifies this call.
+        @rtype: C{int}
+        """
+        callId = self._lastCallId = self.getNextCallId()
+
+        self._activeCalls[callId] = args
+
+        return callId
