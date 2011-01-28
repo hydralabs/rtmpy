@@ -18,6 +18,7 @@ API for handling RTMP RPC calls.
 """
 
 from zope.interface import implements
+from twisted.python import failure, log
 from twisted.internet import defer
 
 from rtmpy import message
@@ -26,6 +27,21 @@ from rtmpy import message
 
 #: The id for an RPC call that does not require or expect a response.
 NO_RESULT = 0
+
+#: The name of the response for a successful RPC call
+RESPONSE_RESULT = '_result'
+#: The name of the response for an RPC call that did not succeed.
+RESPONSE_ERROR = '_error'
+
+
+
+class RemoteCallFailed(failure.Failure):
+    """
+    A specific failure type when an RPC returns an error response.
+    """
+
+
+
 class BaseCallHandler(object):
     """
     Provides the ability to initiate, track and finish RPC calls. Each RPC call
@@ -191,3 +207,45 @@ class AbstractRemoteInvoker(BaseCallHandler):
             raise
 
         return d
+
+
+    def handleRemoteResponse(self, name, callId, result, **kwargs):
+        """
+        Handles the response to a previously initiated RPC call.
+
+        @param name: The name of the response.
+        @type name: C{str}
+        @param callId: The tracking identifier for the called method.
+        @type callId: C{int}
+        @param args: The arguments supplied with the response.
+        @return: C{None}
+        """
+        command = kwargs.get('command', None)
+        callContext = self.finishCall(callId)
+
+        if callContext is None:
+            if callId == NO_RESULT:
+                log.msg('Attempted to handle an RPC response when one was not '
+                    'expected.')
+                log.msg('Response context was %r%r' % (name, result))
+            else:
+                log.msg('Unknown RPC callId %r for %r with result %r' % (callId, name, result))
+
+            return
+
+        d, originalName, originalArgs, originalCommand = callContext
+
+        if command is not None:
+            log.msg('Received command of %r with result %r' % (command, result))
+            log.msg('In response to %r%r' % (originalName, originalArgs))
+
+        # handle the response
+        if name == RESPONSE_RESULT:
+            d.callback(result)
+        elif name == RESPONSE_ERROR:
+            d.errback(RemoteCallFailed(result))
+        else:
+            log.msg('Unknown response type %r' % (name,))
+            log.msg('Result = %r' % (result,))
+            log.msg('Original call was %r%r with command %r' % (
+                originalName, originalArgs, originalCommand))
