@@ -18,6 +18,7 @@ API for handling RTMP RPC calls.
 """
 
 from zope.interface import implements
+from twisted.internet import defer
 
 from rtmpy import message
 
@@ -161,3 +162,32 @@ class AbstractRemoteInvoker(BaseCallHandler):
         msg = message.Invoke(name, NO_RESULT, command, *args)
 
         self.sendMessage(msg)
+
+
+    def callRemoteWithResult(self, name, *args, **kwargs):
+        """
+        Builds and sends an RPC call to the receiving endpoint and returns a
+        L{defer.Deferred} that waits for a result. If an error notification is
+        received then the C{errback} will be fired.
+
+        @param name: The name of the method to invoke on the receiving endpoint.
+        @type name: C{str}
+        @param args: The list of arguments to be invoked.
+        @param kwargs['command']: The command arg to be sent as part of the RPC
+            call. This should only be used in advanced cases and should
+            generally be left alone unless you know what you're doing.
+        """
+        command = kwargs.get('command', None)
+
+        d = defer.Deferred()
+        callId = self.initiateCall(d, name, args, command)
+        m = message.Invoke(name, callId, command, *args)
+
+        try:
+            self.sendMessage(m)
+        except:
+            self.discardCall(callId)
+
+            raise
+
+        return d
