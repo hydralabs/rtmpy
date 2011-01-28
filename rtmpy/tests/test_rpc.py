@@ -172,9 +172,9 @@ class SimpleInvoker(rpc.AbstractCallInitiator):
 
 
 
-class CallRemoteTestCase(unittest.TestCase):
+class CallTestCase(unittest.TestCase):
     """
-    Tests for L{rpc.AbstractCallInitiator.callRemote}
+    Tests for L{rpc.AbstractCallInitiator.call}
     """
 
 
@@ -185,12 +185,12 @@ class CallRemoteTestCase(unittest.TestCase):
 
     def test_call_message(self):
         """
-        Check the context of the message sent when L{callRemote} is executed.
+        Check the context of the message sent when L{call} is executed.
         """
         i = self.invoker
         m = self.messages
 
-        i.callRemote('remote_method', 1, 2, 3, 'foo')
+        i.call('remote_method', 1, 2, 3, 'foo')
 
         self.assertEqual(len(m), 1)
         msg = m.pop()
@@ -203,13 +203,13 @@ class CallRemoteTestCase(unittest.TestCase):
 
     def test_call_command(self):
         """
-        Ensure L{callRemote} accepts a C{command} kwarg and that it is set on
+        Ensure L{call} accepts a C{command} kwarg and that it is set on
         the message appropriately.
         """
         cmd = {'foo': 'bar'}
         i, m = self.invoker, self.messages
 
-        i.callRemote('remote_method', command=cmd)
+        i.call('remote_method', command=cmd)
 
         self.assertEqual(len(m), 1)
         msg = m.pop()
@@ -222,19 +222,19 @@ class CallRemoteTestCase(unittest.TestCase):
 
     def test_call_tracking(self):
         """
-        Any call to L{callRemote} should not be considered 'active'.
+        Any call to L{call} should not be considered 'active'.
         """
         i = self.invoker
 
-        i.callRemote('foo')
+        i.call('foo')
 
         self.assertFalse(i.isCallActive(0))
 
 
 
-class CallRemoteWithResultTestCase(unittest.TestCase):
+class CallWithResultTestCase(unittest.TestCase):
     """
-    Tests for L{rpc.AbstractCallInitiator.callRemoteWithResult}
+    Tests for L{rpc.AbstractCallInitiator.callWithResult}
     """
 
 

@@ -158,7 +158,7 @@ class AbstractCallInitiator(BaseCallHandler):
         raise NotImplementedError
 
 
-    def callRemote(self, name, *args, **kwargs):
+    def call(self, name, *args, **kwargs):
         """
         Builds and sends an RPC call to the receiving endpoint.
 
