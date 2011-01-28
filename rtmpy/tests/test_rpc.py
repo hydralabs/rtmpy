@@ -336,13 +336,13 @@ class CallResponseTestCase(unittest.TestCase):
         @param callId: The id of the response.
         @param args: The args to supply as part of the response.
         """
-        self.invoker.handleRemoteResponse(responseType, callId, args, **kwargs)
+        self.invoker.handleResponse(responseType, callId, args, **kwargs)
 
 
     def makeCall(self, name, *args, **kwargs):
         """
         """
-        return self.invoker.callRemoteWithResult(name, *args, **kwargs)
+        return self.invoker.callWithResult(name, *args, **kwargs)
 
 
     def test_unknown_call_id(self):
@@ -360,7 +360,7 @@ class CallResponseTestCase(unittest.TestCase):
 
     def test_success_result(self):
         """
-        Ensure that the deferred handed back in L{callRemoteWithResult} has its
+        Ensure that the deferred handed back in L{callWithResult} has its
         callback called if a success response is received for the corresponding
         call id.
 
@@ -384,7 +384,7 @@ class CallResponseTestCase(unittest.TestCase):
 
     def test_error_result(self):
         """
-        Ensure that the deferred handed back in L{callRemoteWithResult} has its
+        Ensure that the deferred handed back in L{callWithResult} has its
         errback called if an error response is received for the corresponding
         call id.
 
@@ -410,7 +410,7 @@ class CallResponseTestCase(unittest.TestCase):
 
     def test_command(self):
         """
-        Ensure that a command kwarg is acceptable by L{handleRemoteResponse}.
+        Ensure that a command kwarg is acceptable by L{handleResponse}.
         """
         d = self.makeCall('some_remote_method')
         self.executed = False

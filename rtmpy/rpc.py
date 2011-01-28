@@ -209,7 +209,7 @@ class AbstractCallInitiator(BaseCallHandler):
         return d
 
 
-    def handleRemoteResponse(self, name, callId, result, **kwargs):
+    def handleResponse(self, name, callId, result, **kwargs):
         """
         Handles the response to a previously initiated RPC call.
 
