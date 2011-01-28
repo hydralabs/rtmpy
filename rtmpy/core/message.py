@@ -240,6 +240,23 @@ class IMessageListener(Interface):
 
 
 
+class IMessageSender(Interface):
+    """
+    Indicates the ability to send a message.
+    """
+
+
+    def sendMessage(msg):
+        """
+        Sends a message to the receiving endpoint.
+
+        @param msg: The message to send.
+        @type msg: L{IMessage}
+        @return: C{None}
+        """
+
+
+
 class Message(object):
     """
     An abstract class that all message types extend.
