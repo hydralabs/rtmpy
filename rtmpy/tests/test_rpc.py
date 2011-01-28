@@ -20,6 +20,7 @@ Tests for L{rtmpy.rpc}.
 
 from zope.interface import implementedBy
 from twisted.trial import unittest
+from twisted.internet import defer
 
 from rtmpy import rpc, message
 
@@ -233,7 +234,86 @@ class CallRemoteTestCase(unittest.TestCase):
 
 class CallRemoteWithResultTestCase(unittest.TestCase):
     """
-    Tests for L{rpc.AbstractRemoteInvoker.callRemote}
+    Tests for L{rpc.AbstractRemoteInvoker.callRemoteWithResult}
+    """
+
+
+    def setUp(self):
+        self.invoker = SimpleInvoker()
+        self.messages = self.invoker.messages
+
+
+    def test_call(self):
+        """
+        Check the context of the message sent when L{callRemoteWithResult} is
+        executed.
+        """
+        i = self.invoker
+        m = self.messages
+
+        d = i.callRemoteWithResult('remote_method', 1, 2, 3, 'foo')
+
+        self.assertTrue(isinstance(d, defer.Deferred))
+        self.assertEqual(len(m), 1)
+        msg = m.pop()
+
+        self.assertEqual(message.typeByClass(msg), message.INVOKE)
+        self.assertEqual(msg.id, 1)
+        self.assertEqual(msg.name, 'remote_method')
+        self.assertEqual(msg.argv, [None, 1, 2, 3, 'foo'])
+
+        callContext = i.getCallContext(msg.id)
+
+        self.assertEqual(callContext,
+            (d, 'remote_method', (1, 2, 3, 'foo'), None))
+
+
+    def test_command(self):
+        """
+        Ensure L{callRemoteWithResult} accepts a C{command} kwarg and that it
+        is set on the sent message appropriately.
+        """
+        cmd = {'foo': 'bar'}
+        i, m = self.invoker, self.messages
+
+        d = i.callRemoteWithResult('remote_method', command=cmd)
+
+        self.assertTrue(isinstance(d, defer.Deferred))
+        self.assertEqual(len(m), 1)
+        msg = m.pop()
+
+        self.assertEqual(message.typeByClass(msg), message.INVOKE)
+        self.assertEqual(msg.id, 1)
+        self.assertEqual(msg.name, 'remote_method')
+        self.assertEqual(msg.argv, [cmd])
+
+        callContext = i.getCallContext(msg.id)
+
+        self.assertEqual(callContext,
+            (d, 'remote_method', (), cmd))
+
+
+    def test_send_failure(self):
+        """
+        Ensure correct state when sending a message blows up.
+        """
+        class TestRuntimeError(RuntimeError):
+            """
+            """
+
+        def sendBadMessage(msg):
+            self.msg = msg
+
+            raise TestRuntimeError(msg)
+
+        i = self.invoker
+
+        self.patch(i, 'sendMessage', sendBadMessage)
+
+        self.assertRaises(TestRuntimeError, i.callRemoteWithResult,
+            'remote_method')
+
+        self.assertFalse(i.isCallActive(self.msg.id))
     """
 
 
