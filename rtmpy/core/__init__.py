@@ -22,8 +22,7 @@ import collections
 from twisted.python import failure, log
 from twisted.internet import defer
 
-from rtmpy import exc
-from rtmpy.core import message
+from rtmpy import exc, message, status
 
 
 #: A dictionary of

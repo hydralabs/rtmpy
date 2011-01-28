@@ -22,7 +22,7 @@ from twisted.internet import protocol, defer
 from twisted.python import failure, log
 
 from rtmpy import util, exc, versions
-from rtmpy.core import message, expose, status
+from rtmpy import message, expose, status
 from rtmpy.protocol import rtmp, handshake, version
 
 
