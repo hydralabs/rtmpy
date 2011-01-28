@@ -314,9 +314,120 @@ class CallRemoteWithResultTestCase(unittest.TestCase):
             'remote_method')
 
         self.assertFalse(i.isCallActive(self.msg.id))
+
+
+
+class CallResponseTestCase(unittest.TestCase):
+    """
+    Tests the response to an RPC call.
     """
 
 
     def setUp(self):
         self.invoker = SimpleInvoker()
         self.messages = self.invoker.messages
+
+
+    def sendResponse(self, responseType, callId, *args, **kwargs):
+        """
+        Build an RPC response.
+
+        @param responseType: Either C{_result} or C{_error}.
+        @param callId: The id of the response.
+        @param args: The args to supply as part of the response.
+        """
+        self.invoker.handleRemoteResponse(responseType, callId, args, **kwargs)
+
+
+    def makeCall(self, name, *args, **kwargs):
+        """
+        """
+        return self.invoker.callRemoteWithResult(name, *args, **kwargs)
+
+
+    def test_unknown_call_id(self):
+        """
+        Send a response to a non existant RPC call.
+        """
+        i = self.invoker
+
+        self.assertFalse(i.isCallActive(0))
+        self.sendResponse(None, 0)
+
+        self.assertFalse(i.isCallActive(1))
+        self.sendResponse(None, 1)
+
+
+    def test_success_result(self):
+        """
+        Ensure that the deferred handed back in L{callRemoteWithResult} has its
+        callback called if a success response is received for the corresponding
+        call id.
+
+        The callback should contain the args of the response
+        """
+        d = self.makeCall('some_remote_method')
+        self.executed = False
+
+        def cb(args):
+            self.executed = True
+
+            self.assertEqual(args, ('foo', 'bar'))
+
+        d.addCallback(cb)
+
+        self.sendResponse('_result', 1, 'foo', 'bar')
+
+        self.assertTrue(self.executed)
+        self.assertFalse(self.invoker.isCallActive(1))
+
+
+    def test_error_result(self):
+        """
+        Ensure that the deferred handed back in L{callRemoteWithResult} has its
+        errback called if an error response is received for the corresponding
+        call id.
+
+        """
+        d = self.makeCall('some_remote_method')
+        self.executed = False
+
+        def eb(fail):
+            self.executed = True
+
+            self.assertIsInstance(fail, rpc.RemoteCallFailed)
+            self.assertEqual(fail.value, ('foo', 'bar'))
+
+
+        d.addCallback(lambda _: self.fail('Callback called'))
+        d.addErrback(eb)
+
+        self.sendResponse('_error', 1, 'foo', 'bar')
+
+        self.assertTrue(self.executed)
+        self.assertFalse(self.invoker.isCallActive(1))
+
+
+    def test_command(self):
+        """
+        Ensure that a command kwarg is acceptable by L{handleRemoteResponse}.
+        """
+        d = self.makeCall('some_remote_method')
+        self.executed = False
+
+        def cb(res):
+            self.executed = True
+
+
+        d.addCallback(cb)
+
+        self.sendResponse('_result', 1, 'foo', 'bar', command={'foo': 'bar'})
+
+        self.assertTrue(self.executed)
+        self.assertFalse(self.invoker.isCallActive(1))
+
+
+    def test_unknown_response(self):
+        """
+        
+        """
