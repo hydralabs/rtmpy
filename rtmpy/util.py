@@ -278,9 +278,22 @@ def get_callable_target(obj, name):
 
 def add_to_class(f, depth=1):
     """
-    A decorator that allows you to access the class locals at parse time.
+    A decorator that allows you to access the class locals at parse time. Simple
+    syntactic sugar, adds declarative style meta data to a class.
 
     This code is mostly ripped from zope.interface.
+
+    Example usage::
+
+        >>> @add_to_class
+        >>> def is_awesome(locals, b):
+        ...     locals['__is_awesome__'] = b
+        ...
+        >>> class MyClass:
+        ...     is_awesome(True)
+        ...
+        >>> print MyClass.__is_awesome__
+        True
     """
     def wrap(*args, **kwargs):
         frame = sys._getframe(depth)
