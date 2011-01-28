@@ -429,5 +429,13 @@ class CallResponseTestCase(unittest.TestCase):
 
     def test_unknown_response(self):
         """
-        
+        Ensure that the deferred is not called if the response name is not
+        recognised.
         """
+        d = self.makeCall('some_remote_method')
+
+        d.addBoth(lambda: self.fail('deferred executed!'))
+
+        self.sendResponse('foo', 1, 'some result')
+
+        self.assertFalse(self.invoker.isCallActive(1))
