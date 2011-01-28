@@ -180,7 +180,7 @@ class AbstractCallInitiator(BaseCallHandler):
         self.sendMessage(msg)
 
 
-    def callRemoteWithResult(self, name, *args, **kwargs):
+    def callWithResult(self, name, *args, **kwargs):
         """
         Builds and sends an RPC call to the receiving endpoint and returns a
         L{defer.Deferred} that waits for a result. If an error notification is
