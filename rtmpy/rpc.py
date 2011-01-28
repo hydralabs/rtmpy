@@ -22,6 +22,9 @@ from zope.interface import implements
 from rtmpy import message
 
 
+
+#: The id for an RPC call that does not require or expect a response.
+NO_RESULT = 0
 class BaseCallHandler(object):
     """
     Provides the ability to initiate, track and finish RPC calls. Each RPC call
@@ -136,3 +139,25 @@ class AbstractRemoteInvoker(BaseCallHandler):
         @param msg: L{message.IMessage}
         """
         raise NotImplementedError
+
+
+    def callRemote(self, name, *args, **kwargs):
+        """
+        Builds and sends an RPC call to the receiving endpoint.
+
+        This is a B{fire-and-forget} method, no result is expected or will be
+        returned. If you expect a result from the receiving endpoint, use
+        L{callRemoteWithResult}.
+
+        @param name: The name of the method to invoke on the receiving endpoint.
+        @type name: C{str}
+        @param args: The list of arguments to be invoked on the remote method.
+        @param kwargs['command']: The command arg to be sent as part of the RPC
+            call. This should only be used in advanced cases and should
+            generally be left alone unless you know what you're doing.
+        @return: C{None}
+        """
+        command = kwargs.get('command', None)
+        msg = message.Invoke(name, NO_RESULT, command, *args)
+
+        self.sendMessage(msg)

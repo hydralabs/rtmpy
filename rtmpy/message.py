@@ -793,3 +793,29 @@ def classByType(datatype):
         return TYPE_MAP[datatype]
     except KeyError:
         raise UnknownType('Unknown event type %r' % (datatype,))
+
+
+
+def typeByClass(obj):
+    """
+    Returns the message type based on C{obj}. C{obj} can be an instance of a
+    class or a class object.
+
+    If no message type is linked to C{obj}, B{-1} is returned.
+    """
+    try:
+        return TYPE_MAP[obj]
+    except KeyError:
+        pass
+
+    cls = getattr(obj, '__class__', None)
+
+    if cls is None:
+        return -1
+
+    try:
+        return TYPE_MAP[cls]
+    except KeyError:
+        pass
+
+    return -1

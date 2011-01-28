@@ -125,7 +125,7 @@ class CallHandlerTestCase(unittest.TestCase):
 
 
 
-class RemoteInvokerTestCase(unittest.TestCase):
+class AbstractRemoteInvokerTestCase(unittest.TestCase):
     """
     Tests for L{rpc.AbstractRemoteInvoker}
     """
@@ -146,3 +146,97 @@ class RemoteInvokerTestCase(unittest.TestCase):
         a = rpc.AbstractRemoteInvoker()
 
         self.assertRaises(NotImplementedError, a.sendMessage, None)
+
+
+
+class SimpleInvoker(rpc.AbstractRemoteInvoker):
+    """
+    An implementation of L{rpc.AbstractRemoteInvoker} that stores any messages
+    were sent for later inspection.
+
+    @messages
+    """
+
+    def __init__(self):
+        super(rpc.AbstractRemoteInvoker, self).__init__()
+
+        self.messages = []
+
+
+    def sendMessage(self, msg):
+        """
+        Keeps track of any messages that were 'sent'.
+        """
+        self.messages.append(msg)
+
+
+
+class CallRemoteTestCase(unittest.TestCase):
+    """
+    Tests for L{rpc.AbstractRemoteInvoker.callRemote}
+    """
+
+
+    def setUp(self):
+        self.invoker = SimpleInvoker()
+        self.messages = self.invoker.messages
+
+
+    def test_call_message(self):
+        """
+        Check the context of the message sent when L{callRemote} is executed.
+        """
+        i = self.invoker
+        m = self.messages
+
+        i.callRemote('remote_method', 1, 2, 3, 'foo')
+
+        self.assertEqual(len(m), 1)
+        msg = m.pop()
+
+        self.assertEqual(message.typeByClass(msg), message.INVOKE)
+        self.assertEqual(msg.id, 0)
+        self.assertEqual(msg.name, 'remote_method')
+        self.assertEqual(msg.argv, [None, 1, 2, 3, 'foo'])
+
+
+    def test_call_command(self):
+        """
+        Ensure L{callRemote} accepts a C{command} kwarg and that it is set on
+        the message appropriately.
+        """
+        cmd = {'foo': 'bar'}
+        i, m = self.invoker, self.messages
+
+        i.callRemote('remote_method', command=cmd)
+
+        self.assertEqual(len(m), 1)
+        msg = m.pop()
+
+        self.assertEqual(message.typeByClass(msg), message.INVOKE)
+        self.assertEqual(msg.id, 0)
+        self.assertEqual(msg.name, 'remote_method')
+        self.assertEqual(msg.argv, [cmd])
+
+
+    def test_call_tracking(self):
+        """
+        Any call to L{callRemote} should not be considered 'active'.
+        """
+        i = self.invoker
+
+        i.callRemote('foo')
+
+        self.assertFalse(i.isCallActive(0))
+
+
+
+class CallRemoteWithResultTestCase(unittest.TestCase):
+    """
+    Tests for L{rpc.AbstractRemoteInvoker.callRemote}
+    """
+
+
+    def setUp(self):
+        self.invoker = SimpleInvoker()
+        self.messages = self.invoker.messages
