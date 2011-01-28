@@ -21,7 +21,8 @@ import unittest
 
 from pyamf.util import BufferedByteStream
 
-from rtmpy.protocol.rtmp import codec, message
+from rtmpy.protocol.rtmp import codec
+from rtmpy import message
 
 
 class BaseTestCase(unittest.TestCase):

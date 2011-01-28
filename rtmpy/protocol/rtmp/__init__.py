@@ -36,7 +36,7 @@ import pyamf
 from pyamf.util import BufferedByteStream
 
 from rtmpy import core
-from rtmpy.core import message
+from rtmpy import message
 from rtmpy.protocol.rtmp import codec
 
 

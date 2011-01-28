@@ -21,7 +21,7 @@ Parses RTMP dumps from Wireshark - converted to c array format.
 
 from pyamf.util import BufferedByteStream
 from rtmpy.protocol.rtmp import codec
-from rtmpy.core import message
+from rtmpy import message
 
 
 __all__ = ['parse_dump', 'XMLObserver']

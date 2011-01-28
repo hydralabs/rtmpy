@@ -22,7 +22,7 @@ from twisted.internet import error, defer, reactor
 from twisted.test.proto_helpers import StringTransportWithDisconnection
 
 from rtmpy.protocol import rtmp
-from rtmpy.core import message, status
+from rtmpy import message, status
 from rtmpy import exc
 
 
