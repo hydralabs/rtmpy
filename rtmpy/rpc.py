@@ -39,6 +39,14 @@ class BaseCallHandler(object):
         self._activeCalls = {}
 
 
+    def isCallActive(self, callId):
+        """
+        Whether the C{callId} is a valid identifier for a call awaiting a
+        result.
+        """
+        return callId in self._activeCalls
+
+
     def getNextCallId(self):
         """
         Returns the next call id that will be returned by L{initiateCall}.

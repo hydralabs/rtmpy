@@ -49,3 +49,19 @@ class CallHandlerTestCase(unittest.TestCase):
 
         self.assertEqual(h.getNextCallId(), 2)
         self.assertEqual(h.getCallContext(2), None)
+
+
+    def test_active(self):
+        """
+        Ensure that L{rpc.BaseCallHandler.isCallActive} returns some sane
+        results.
+        """
+        h = self.handler
+
+        self.assertEqual(h.getNextCallId(), 1)
+
+        self.assertFalse(h.isCallActive(1))
+
+        callId = h.initiateCall()
+
+        self.assertTrue(h.isCallActive(callId))
