@@ -18,9 +18,10 @@ Tests for L{rtmpy.rpc}.
 """
 
 
+from zope.interface import implementedBy
 from twisted.trial import unittest
 
-from rtmpy import rpc
+from rtmpy import rpc, message
 
 
 
@@ -121,3 +122,27 @@ class CallHandlerTestCase(unittest.TestCase):
 
         self.assertEqual(h.discardCall(callId), c)
         self.assertFalse(h.isCallActive(callId))
+
+
+
+class RemoteInvokerTestCase(unittest.TestCase):
+    """
+    Tests for L{rpc.AbstractRemoteInvoker}
+    """
+
+
+    def test_interface(self):
+        """
+        Check defined interfaces.
+        """
+        self.assertTrue(
+            message.IMessageSender.implementedBy(rpc.AbstractRemoteInvoker))
+
+
+    def test_send_message(self):
+        """
+        Abstract methods should raise C{NotImplementedError}.
+        """
+        a = rpc.AbstractRemoteInvoker()
+
+        self.assertRaises(NotImplementedError, a.sendMessage, None)
