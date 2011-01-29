@@ -580,6 +580,8 @@ class CallingExposedMethodTestCase(unittest.TestCase):
     """
 
     class Foo(object):
+        expectedArgs = None
+        expectedReturn = None
 
         def __init__(self, test):
             self.test = test
