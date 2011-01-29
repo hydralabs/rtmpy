@@ -141,11 +141,16 @@ def codeByClass(cls):
     """
     global CLASS_CODES
 
-    return CLASS_CODES.get(cls, None)
+    return CLASS_CODES.get(getattr(cls, '__name__', None), None)
 
 
 
-classByCode = codeByClass
+def classByCode(code):
+    """
+    """
+    global CLASS_CODES
+
+    return CLASS_CODES.get(code, None)
 
 
 
@@ -164,6 +169,6 @@ for k, v in globals().items():
     code = v.__status_code__
 
     CLASS_CODES[code] = v
-    CLASS_CODES[v] = code
+    CLASS_CODES[v.__name__] = code
 
 del k, v

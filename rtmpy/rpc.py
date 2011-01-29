@@ -21,7 +21,7 @@ from zope.interface import implements
 from twisted.python import failure, log
 from twisted.internet import defer
 
-from rtmpy import message, exc
+from rtmpy import message, exc, status
 
 
 
@@ -376,5 +376,48 @@ class AbstractCallFacilitator(BaseCallHandler):
     def callReceived(self, name, callId, *args, **kwargs):
         """
         """
-        if self.isCallActive(callId):
-            raise exc.CallFailed('callId %r is already active' % (callId,))
+        def cb(result):
+            self.finishCall(callId)
+
+            msg = message.Invoke(RESPONSE_RESULT, callId, None, result)
+
+            self.sendMessage(msg)
+
+            return result
+
+
+        def eb(fail):
+            self.finishCall(callId)
+
+            error = status.fromFailure(fail, exc.CallFailed)
+            msg = message.Invoke(RESPONSE_ERROR, callId, None, error)
+
+            self.sendMessage(msg)
+
+            return fail
+
+
+        try:
+            self.initiateCall(name, *args, callId=callId)
+        except:
+            return defer.fail().addErrback(eb)
+
+        d = self.callExposedMethod(name, *args)
+
+        d.addCallbacks(cb, eb)
+
+        return d
+
+
+
+    def callExposedMethod(self, name, *args):
+        """
+        Returns a L{defer.Deferred} that will hold the result of the called
+        method.
+
+        This api allows subclasses to hook into the calling process.
+
+        @param name: The name of the method to call
+        @param args: The supplied args from the invoke/notify call.
+        """
+        return defer.maybeDeferred(callExposedMethod, self, name, *args)

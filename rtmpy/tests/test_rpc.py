@@ -650,17 +650,24 @@ class CallingExposedMethodTestCase(unittest.TestCase):
 
 
 
+class TestRuntimeError(RuntimeError):
+    """
+    A RuntimeError specific to this test suite.
+    """
+
+
 class SimpleFacilitator(rpc.AbstractCallFacilitator):
     """
     An implementation of L{rpc.AbstractCallFacilitator} that stores any messages
     were sent for later inspection.
 
-    @messages
+    Exposes a number of simple methods.
     """
 
-    def __init__(self):
+    def __init__(self, test):
         super(rpc.AbstractCallFacilitator, self).__init__()
 
+        self.test = test
         self.messages = []
 
 
@@ -671,6 +678,36 @@ class SimpleFacilitator(rpc.AbstractCallFacilitator):
         self.messages.append(msg)
 
 
+    @rpc.expose
+    def exposed(self, *args):
+        assert args, (1, 2, 3)
+        self.test.executed = True
+
+
+    @rpc.expose('named')
+    def exposed_named(self, *args):
+        assert args, (1, 2, 3)
+        self.test.executed = True
+
+
+    def not_exposed(self):
+        pass
+
+
+    @rpc.expose
+    def known_return(self):
+        self.test.executed = True
+
+        return 'foo'
+
+
+    @rpc.expose
+    def known_failure(self):
+        self.test.executed = True
+
+        raise TestRuntimeError('This is my BOOOM stick!!')
+
+
 
 class CallReceiverTestCase(unittest.TestCase):
     """
@@ -679,17 +716,19 @@ class CallReceiverTestCase(unittest.TestCase):
 
 
     def setUp(self):
-        self.receiver = SimpleFacilitator()
+        self.receiver = SimpleFacilitator(self)
         self.messages = self.receiver.messages
+        self.executed = False
 
-
-    def makeCall(self, name, callId, *args, **kwargs):
+    def makeCall(self, name, *args, **kwargs):
         """
         Makes an RPC call on L{self.receiver}
         """
-        return self.receiver.callReceived(name, callId, *args, **kwargs)
+        return self.receiver.callReceived(
+            name, self.receiver.getNextCallId(), *args, **kwargs)
 
 
+    @defer.inlineCallbacks
     def test_already_active(self):
         """
         If an RPC request with the same callId is made whilst the first request
@@ -699,6 +738,104 @@ class CallReceiverTestCase(unittest.TestCase):
 
         self.receiver.initiateCall(callId=callId)
 
-        e = self.assertRaises(exc.CallFailed, self.makeCall, 'foo', callId)
+        try:
+            yield self.makeCall('foo', callId)
+        except exc.CallFailed, e:
+            pass
+        else:
+            self.fail('exc.CallFailed not raised')
 
-        self.assertEqual(str(e), 'callId 1 is already active')
+        self.assertEqual(str(e), 'Unable to initiate an already active call 1')
+        m = self.messages
+        self.assertEqual(len(m), 1)
+
+        msg = self.messages.pop()
+
+        self.assertTrue(message.typeByClass(msg), message.Invoke)
+        self.assertEqual(msg.name, '_error')
+        self.assertEqual(msg.argv, [None, {
+            'code': 'NetConnection.Call.Failed',
+            'description': 'Unable to initiate an already active call 1',
+            'level': 'error'
+        }])
+        self.assertEqual(msg.id, callId)
+
+
+    @defer.inlineCallbacks
+    def test_call_exposed(self):
+        """
+        Call an exposed method on the faciliator.
+        """
+        ret = yield self.receiver.callExposedMethod('exposed', 1, 2, 3)
+
+        self.assertEqual(ret, None)
+        self.assertTrue(self.executed)
+
+
+    @defer.inlineCallbacks
+    def test_call_exposed_named(self):
+        """
+        Call a named exposed method on the faciliator.
+        """
+        ret = yield self.receiver.callExposedMethod('named', 1, 2, 3)
+
+        self.assertEqual(ret, None)
+        self.assertTrue(self.executed)
+
+
+    @defer.inlineCallbacks
+    def test_call_known_result(self):
+        """
+        Call an exposed method with a known result
+        """
+        ret = yield self.receiver.callExposedMethod('known_return')
+
+        self.assertEqual(ret, 'foo')
+        self.assertTrue(self.executed)
+
+
+    @defer.inlineCallbacks
+    def test_successful_call(self):
+        """
+        Test a successful RPC call.
+        """
+        ret = yield self.makeCall('known_return')
+
+        self.assertEqual(ret, 'foo')
+
+        m = self.messages
+        self.assertEqual(len(m), 1)
+
+        msg = self.messages.pop()
+
+        self.assertTrue(message.typeByClass(msg), message.Invoke)
+        self.assertEqual(msg.name, '_result')
+        self.assertEqual(msg.argv, [None, 'foo'])
+        self.assertEqual(msg.id, 1)
+
+
+    @defer.inlineCallbacks
+    def test_failure_call(self):
+        """
+        Test an RPC call that raises an exception.
+        """
+        try:
+            ret = yield self.makeCall('known_failure')
+        except TestRuntimeError, e:
+            self.assertEqual(str(e), 'This is my BOOOM stick!!')
+        else:
+            self.fail('TestRuntimeError not raised.')
+
+        m = self.messages
+        self.assertEqual(len(m), 1)
+
+        msg = self.messages.pop()
+
+        self.assertTrue(message.typeByClass(msg), message.Invoke)
+        self.assertEqual(msg.name, '_error')
+        self.assertEqual(msg.argv, [None, {
+            'code': 'NetConnection.Call.Failed',
+            'description': 'This is my BOOOM stick!!',
+            'level': 'error'
+        }])
+        self.assertEqual(msg.id, 1)

@@ -107,7 +107,7 @@ def fromFailure(fail, defaultCode=None):
 
     cls = type(fail.value)
 
-    code = exc.codeByClass(cls) or defaultCode
+    code = exc.codeByClass(cls) or exc.codeByClass(defaultCode) or defaultCode
     description = fail.getErrorMessage()
 
     return error(code, description)
