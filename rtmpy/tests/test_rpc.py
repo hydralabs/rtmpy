@@ -36,7 +36,7 @@ class ExposingTestCase(unittest.TestCase):
         cls = class_func.im_class
         name = class_func.__name__
 
-        exposed_methods = getattr(cls, '__exposed__', {})
+        exposed_methods = rpc.getExposedMethods(cls)
 
         assert name in exposed_methods, \
             msg or '%r is not an exposed method on %r' % (name, cls)
@@ -46,7 +46,7 @@ class ExposingTestCase(unittest.TestCase):
         cls = class_func.im_class
         name = class_func.__name__
 
-        exposed_methods = getattr(cls, '__exposed__', {})
+        exposed_methods = rpc.getExposedMethods(cls)
 
         assert exposed_methods.get(as_, None) == name, \
             msg or '%r is not an exposed method on %r' % (name, cls)
@@ -65,7 +65,11 @@ class ExposingTestCase(unittest.TestCase):
                 msg or '%r IS an exposed method on %r' % (name, cls))
 
 
-    def test_exposed(self):
+    def test_simple(self):
+        """
+        Exposing methods on classes should return sane values for
+        L{rpc.getExposedMethods}
+        """
         class SomeClass(object):
             @rpc.expose
             def foo(self):
@@ -80,11 +84,42 @@ class ExposingTestCase(unittest.TestCase):
             def not_exposed(self):
                 pass
 
+        self.assertEqual(rpc.getExposedMethods(SomeClass),
+            {'me': 'bar', 'foo': 'foo'})
 
         self.assertExposed(SomeClass.foo)
         self.assertNotExposed(SomeClass.not_exposed)
         self.assertExposedAs(SomeClass.bar, 'me')
+        self.assertExposedAs(SomeClass.foo, 'foo')
 
+
+    def test_deep(self):
+        """
+        As with L{test_simple} but a complex class hierarchy.
+        """
+        class A(object):
+            @rpc.expose
+            def anon(self):
+                pass
+
+            def nope(self):
+                pass
+
+        class B(A):
+            @rpc.expose('bar')
+            def named(self):
+                pass
+
+
+        self.assertEqual(rpc.getExposedMethods(A), {'anon': 'anon'})
+        self.assertEqual(rpc.getExposedMethods(B),
+            {'anon': 'anon', 'bar': 'named'})
+
+        self.assertExposedAs(A.anon, 'anon')
+        self.assertExposedAs(B.anon, 'anon')
+        self.assertNotExposed(A.nope)
+        self.assertNotExposed(B.nope)
+        self.assertExposedAs(B.named, 'bar')
 
 
 class CallHandlerTestCase(unittest.TestCase):
