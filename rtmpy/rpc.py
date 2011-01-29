@@ -371,3 +371,10 @@ class AbstractCallFacilitator(BaseCallHandler):
         @param msg: L{message.IMessage}
         """
         raise NotImplementedError
+
+
+    def callReceived(self, name, callId, *args, **kwargs):
+        """
+        """
+        if self.isCallActive(callId):
+            raise exc.CallFailed('callId %r is already active' % (callId,))
