@@ -21,7 +21,7 @@ from zope.interface import implements
 from twisted.python import failure, log
 from twisted.internet import defer
 
-from rtmpy import message
+from rtmpy import message, exc
 
 
 
@@ -113,6 +113,31 @@ def getExposedMethods(cls):
     cls.__exposed_mro__ = ret
 
     return ret
+
+
+
+def callExposedMethod(obj, name, *args, **kwargs):
+    """
+    Calls an exposed methood on C{obj}. If the method is not exposed,
+    L{exc.CallFailed} will be raised.
+
+    @return: The result of the called method.
+    """
+    cls = obj.__class__
+
+    methods = getExposedMethods(cls)
+
+    try:
+        methodName = methods[name]
+        method = getattr(obj, methodName)
+    except Exception, e:
+        if isinstance(e, AttributeError):
+            log.err("'%s' is exposed but %r does not exist on %r " % (
+                name, methodName, obj))
+
+        raise exc.CallFailed("Unknown method '%s'" % (name,))
+
+    return method(*args, **kwargs)
 class BaseCallHandler(object):
     """
     Provides the ability to initiate, track and finish RPC calls. Each RPC call

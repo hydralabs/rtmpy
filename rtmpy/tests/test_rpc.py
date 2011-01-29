@@ -22,7 +22,7 @@ from zope.interface import implementedBy
 from twisted.trial import unittest
 from twisted.internet import defer
 
-from rtmpy import rpc, message
+from rtmpy import rpc, message, exc
 
 
 
@@ -535,3 +535,77 @@ class CallResponseTestCase(unittest.TestCase):
         self.sendResponse('foo', 1, 'some result')
 
         self.assertFalse(self.invoker.isCallActive(1))
+
+
+
+class CallingExposedMethodTestCase(unittest.TestCase):
+    """
+    Tests for L{rpc.callExposedMethod}
+    """
+
+    class Foo(object):
+
+        def __init__(self, test):
+            self.test = test
+
+
+        @rpc.expose
+        def exposed(self, *args):
+            self.test.assertEqual(args, self.expectedArgs)
+
+            return self.expectedReturn
+
+
+        @rpc.expose('named')
+        def exposed_named(self, *args):
+            self.test.assertEqual(args, self.expectedArgs)
+
+            return self.expectedReturn
+
+
+        def not_exposed(self, *args):
+            self.test.assertEqual(args, self.expectedArgs)
+
+            return self.expectedReturn
+
+
+
+    def setUp(self):
+        self.instance = self.Foo(self)
+
+
+    def call(self, name, expectedArgs, expectedReturn):
+        self.instance.expectedArgs = expectedArgs
+        self.instance.expectedReturn = expectedReturn
+
+        self.assertEqual(rpc.callExposedMethod(
+            self.instance, name, *expectedArgs), expectedReturn)
+
+
+    def test_exposed_unnamed(self):
+        """
+        Test unnamed.
+        """
+        self.call('exposed', (1, 2, 3), 'foo')
+
+
+    def test_exposed_named(self):
+        """
+        Test named exposed function for args and return.
+        """
+        self.call('named', (1, 2, 3), 'foo')
+        e = self.assertRaises(exc.CallFailed,
+            self.call, 'exposed_named', (1, 2, 3), 'foo')
+
+        self.assertEqual(str(e), "Unknown method 'exposed_named'")
+
+
+    def test_not_exposed(self):
+        """
+        Ensure that calling an unexposed method results in a L{exc.CallFailed}
+        exception.
+        """
+        e = self.assertRaises(exc.CallFailed,
+            self.call, 'not_exposed', (), None)
+
+        self.assertEqual(str(e), "Unknown method 'not_exposed'")
