@@ -396,8 +396,21 @@ class AbstractCallFacilitator(BaseCallHandler):
         raise NotImplementedError
 
 
-    def callReceived(self, name, callId, *args, **kwargs):
+    def callReceived(self, name, callId, *args):
         """
+        Called when an RPC request as been made. Determines which locally
+        exposed method to call and then returns a L{defer.Deferred} which
+        handles the result.
+
+        RPC methods can return a L{CommandResult} which will supply the command
+        arg to the message.
+
+        @param name: The name of the exposed method to be called.
+        @type name: C{str}
+        @param callId: The callId for the RPC request.
+        @type callId: C{int}
+        @param args: The args to be called on the exposed method.
+        @return: A L{defer.Deferred} containing the result of the call.
         """
         def cb(result):
             self.finishCall(callId)
