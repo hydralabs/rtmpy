@@ -708,6 +708,11 @@ class SimpleFacilitator(rpc.AbstractCallFacilitator):
         raise TestRuntimeError('This is my BOOOM stick!!')
 
 
+    @rpc.expose
+    def command_result(self):
+        return rpc.CommandResult('foo', {'one': 'two'})
+
+
 
 class CallReceiverTestCase(unittest.TestCase):
     """
@@ -838,4 +843,24 @@ class CallReceiverTestCase(unittest.TestCase):
             'description': 'This is my BOOOM stick!!',
             'level': 'error'
         }])
+        self.assertEqual(msg.id, 1)
+
+
+    @defer.inlineCallbacks
+    def test_command_callback(self):
+        """
+        Test a command result and the message that is generated.
+        """
+        ret = yield self.makeCall('command_result')
+
+        self.assertEqual(ret, 'foo')
+
+        m = self.messages
+        self.assertEqual(len(m), 1)
+
+        msg = self.messages.pop()
+
+        self.assertTrue(message.typeByClass(msg), message.Invoke)
+        self.assertEqual(msg.name, '_result')
+        self.assertEqual(msg.argv, [{'one': 'two'}, 'foo'])
         self.assertEqual(msg.id, 1)
