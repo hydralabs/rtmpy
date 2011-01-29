@@ -550,9 +550,9 @@ class CallResponseTestCase(unittest.TestCase):
 
 
 
-class AbstractRemoteHandlerTestCase(unittest.TestCase):
+class AbstractCallFacilitatorTestCase(unittest.TestCase):
     """
-    Tests for L{rpc.AbstractRemoteHandler}
+    Tests for L{rpc.AbstractCallFacilitator}
     """
 
 
@@ -647,3 +647,58 @@ class CallingExposedMethodTestCase(unittest.TestCase):
             self.call, 'not_exposed', (), None)
 
         self.assertEqual(str(e), "Unknown method 'not_exposed'")
+
+
+
+class SimpleFacilitator(rpc.AbstractCallFacilitator):
+    """
+    An implementation of L{rpc.AbstractCallFacilitator} that stores any messages
+    were sent for later inspection.
+
+    @messages
+    """
+
+    def __init__(self):
+        super(rpc.AbstractCallFacilitator, self).__init__()
+
+        self.messages = []
+
+
+    def sendMessage(self, msg):
+        """
+        Keeps track of any messages that were 'sent'.
+        """
+        self.messages.append(msg)
+
+
+
+class CallReceiverTestCase(unittest.TestCase):
+    """
+    Tests receiving an RPC call.
+    """
+
+
+    def setUp(self):
+        self.receiver = SimpleFacilitator()
+        self.messages = self.receiver.messages
+
+
+    def makeCall(self, name, callId, *args, **kwargs):
+        """
+        Makes an RPC call on L{self.receiver}
+        """
+        return self.receiver.callReceived(name, callId, *args, **kwargs)
+
+
+    def test_already_active(self):
+        """
+        If an RPC request with the same callId is made whilst the first request
+        is still 'active', an error should be thrown.
+        """
+        callId = self.receiver.getNextCallId()
+
+        self.receiver.initiateCall(callId=callId)
+
+        e = self.assertRaises(exc.CallFailed, self.makeCall, 'foo', callId)
+
+        self.assertEqual(str(e), 'callId 1 is already active')
