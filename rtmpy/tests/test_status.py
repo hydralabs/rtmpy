@@ -129,6 +129,19 @@ class StatusTestCase(unittest.TestCase):
         self.assertEqual(s, ref_dict)
 
 
+    def test_extra(self):
+        """
+        Test L{Status.getExtraContext}.
+        """
+        s = status.Status('foo', 'bar', 'baz', spam='eggs', extra='context')
+
+        self.assertEqual(s.getExtraContext(), {
+            'spam': 'eggs',
+            'extra': 'context'
+        })
+
+
+
 class AMFEncodingTestCase(unittest.TestCase):
     """
     Tests to ensure that AMF encoding works smoothly.
