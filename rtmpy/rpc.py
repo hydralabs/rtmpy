@@ -269,7 +269,8 @@ class AbstractCallInitiator(BaseCallHandler):
                     'expected.')
                 log.msg('Response context was %r%r' % (name, result))
             else:
-                log.msg('Unknown RPC callId %r for %r with result %r' % (callId, name, result))
+                log.msg('Unknown RPC callId %r for %r with result %r' % (
+                    callId, name, result))
 
             return
 
