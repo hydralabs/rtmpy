@@ -42,6 +42,46 @@ class RemoteCallFailed(failure.Failure):
 
 
 
+def expose(func):
+    """
+    A decorator that provides an easy way to expose methods that the peer can
+    'call' via RTMP C{invoke} or C{notify} messages.
+
+    Example usage::
+
+        class SomeClass:
+            @expose
+            def someRemoteMethod(self, foo, bar):
+                pass
+
+            @expose('foo-bar')
+            def anotherExposedMethod(self, *args):
+                pass
+
+    If expose is called with no args, the function name is used.
+    """
+    import sys
+
+    def add_meta(locals, exposed_name, func_name=None):
+        methods = locals.setdefault('__exposed__', {})
+
+        methods[exposed_name] = func_name or exposed_name
+
+
+    if callable(func):
+        frame = sys._getframe(1)
+        add_meta(frame.f_locals, func.__name__)
+
+        return func
+
+
+    def decorator(f):
+        frame = sys._getframe(1)
+        add_meta(frame.f_locals, func, f.__name__)
+
+        return f
+
+    return decorator
 class BaseCallHandler(object):
     """
     Provides the ability to initiate, track and finish RPC calls. Each RPC call

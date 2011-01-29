@@ -26,6 +26,67 @@ from rtmpy import rpc, message
 
 
 
+class ExposingTestCase(unittest.TestCase):
+    """
+    Tests for L{rpc.expose}.
+    """
+
+
+    def assertExposed(self, class_func, msg=None):
+        cls = class_func.im_class
+        name = class_func.__name__
+
+        exposed_methods = getattr(cls, '__exposed__', {})
+
+        assert name in exposed_methods, \
+            msg or '%r is not an exposed method on %r' % (name, cls)
+
+
+    def assertExposedAs(self, class_func, as_, msg=None):
+        cls = class_func.im_class
+        name = class_func.__name__
+
+        exposed_methods = getattr(cls, '__exposed__', {})
+
+        assert exposed_methods.get(as_, None) == name, \
+            msg or '%r is not an exposed method on %r' % (name, cls)
+
+
+    def assertNotExposed(self, class_func, msg=None):
+        try:
+            self.assertExposed(class_func)
+        except AssertionError:
+            pass
+        else:
+            cls = class_func.im_class
+            name = class_func.__name__
+
+            raise AssertionError(
+                msg or '%r IS an exposed method on %r' % (name, cls))
+
+
+    def test_exposed(self):
+        class SomeClass(object):
+            @rpc.expose
+            def foo(self):
+                pass
+
+
+            @rpc.expose('me')
+            def bar(self):
+                pass
+
+
+            def not_exposed(self):
+                pass
+
+
+        self.assertExposed(SomeClass.foo)
+        self.assertNotExposed(SomeClass.not_exposed)
+        self.assertExposedAs(SomeClass.bar, 'me')
+
+
+
 class CallHandlerTestCase(unittest.TestCase):
     """
     Tests for L{rpc.BaseCallHandler}.
