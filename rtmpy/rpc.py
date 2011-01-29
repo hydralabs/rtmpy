@@ -346,3 +346,22 @@ class AbstractCallInitiator(BaseCallHandler):
             log.msg('Result = %r' % (result,))
             log.msg('Original call was %r%r with command %r' % (
                 originalName, originalArgs, originalCommand))
+
+
+
+class AbstractCallFacilitator(BaseCallHandler):
+    """
+    Provides an API to allow RPC calls to be made by the receiving endpoint.
+    """
+
+    implements(message.IMessageSender)
+
+
+    # IMessageSender
+    def sendMessage(self, msg):
+        """
+        Sends a message. Must be implemented by subclasses.
+
+        @param msg: L{message.IMessage}
+        """
+        raise NotImplementedError
