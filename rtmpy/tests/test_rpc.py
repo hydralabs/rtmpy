@@ -221,6 +221,18 @@ class CallHandlerTestCase(unittest.TestCase):
         self.assertFalse(h.isCallActive(callId))
 
 
+    def test_initiate_already_active(self):
+        """
+        Initiating a call with an already active callId should raise an
+        L{exc.CallFailed} error.
+        """
+        h = self.handler
+
+        callId = h.initiateCall()
+
+        self.assertRaises(exc.CallFailed, h.initiateCall, callId=callId)
+
+
 
 class AbstractCallInitiatorTestCase(unittest.TestCase):
     """
