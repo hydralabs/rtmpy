@@ -189,7 +189,7 @@ class BaseCallHandler(object):
         return self._activeCalls.get(callId, None)
 
 
-    def initiateCall(self, *args):
+    def initiateCall(self, *args, **kwargs):
         """
         Starts an RPC call and stores any context for the call for later
         retrieval. The call will remain I{active} until L{finishCall} is called
@@ -199,7 +199,13 @@ class BaseCallHandler(object):
         @return: A id that uniquely identifies this call.
         @rtype: C{int}
         """
-        callId = self._lastCallId = self.getNextCallId()
+        callId = kwargs.get('callId', None)
+
+        if callId is None:
+            callId = self._lastCallId = self.getNextCallId()
+        elif self.isCallActive(callId):
+            raise exc.CallFailed(
+                'Unable to initiate an already active call %r' % (callId,))
 
         self._activeCalls[callId] = args
 
