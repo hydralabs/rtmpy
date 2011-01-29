@@ -605,7 +605,6 @@ class CallingExposedMethodTestCase(unittest.TestCase):
             return self.expectedReturn
 
 
-
     def setUp(self):
         self.instance = self.Foo(self)
 
