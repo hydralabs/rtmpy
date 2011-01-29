@@ -258,7 +258,7 @@ class AbstractCallInitiatorTestCase(unittest.TestCase):
 
 
 
-class SimpleInvoker(rpc.AbstractCallInitiator):
+class SimpleInitiator(rpc.AbstractCallInitiator):
     """
     An implementation of L{rpc.AbstractCallInitiator} that stores any messages
     were sent for later inspection.
@@ -287,7 +287,7 @@ class CallTestCase(unittest.TestCase):
 
 
     def setUp(self):
-        self.invoker = SimpleInvoker()
+        self.invoker = SimpleInitiator()
         self.messages = self.invoker.messages
 
 
@@ -347,7 +347,7 @@ class CallWithResultTestCase(unittest.TestCase):
 
 
     def setUp(self):
-        self.invoker = SimpleInvoker()
+        self.invoker = SimpleInitiator()
         self.messages = self.invoker.messages
 
 
@@ -432,7 +432,7 @@ class CallResponseTestCase(unittest.TestCase):
 
 
     def setUp(self):
-        self.invoker = SimpleInvoker()
+        self.invoker = SimpleInitiator()
         self.messages = self.invoker.messages
 
 
@@ -571,6 +571,7 @@ class AbstractRemoteHandlerTestCase(unittest.TestCase):
         a = rpc.AbstractCallFacilitator()
 
         self.assertRaises(NotImplementedError, a.sendMessage, None)
+
 
 
 
