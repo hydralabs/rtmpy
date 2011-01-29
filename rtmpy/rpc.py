@@ -25,6 +25,14 @@ from rtmpy import message, exc, status
 
 
 
+__all__ = [
+    'expose',
+    'CommandResult',
+    'AbstractCallInitiator',
+    'AbstractCallFacilitator'
+]
+
+
 #: The id for an RPC call that does not require or expect a response.
 NO_RESULT = 0
 
