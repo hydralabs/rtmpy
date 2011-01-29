@@ -82,6 +82,37 @@ def expose(func):
         return f
 
     return decorator
+
+
+
+def getExposedMethods(cls):
+    """
+    Returns a C{dict} of C{exposed name} to C{class method name} for the given
+    class object.
+
+    The results of this function are stored on the class in the
+    C{__exposed_mro__} slot.
+
+    The class mro is used to descend into the class hierarchy.
+    """
+    methods = cls.__dict__.get('__exposed_mro__', None)
+
+    if methods is not None:
+        return methods
+
+    import inspect
+
+    ret = {}
+
+    for i in inspect.getmro(cls):
+        methods = i.__dict__.get('__exposed__', None)
+
+        if methods is not None:
+            ret.update(methods)
+
+    cls.__exposed_mro__ = ret
+
+    return ret
 class BaseCallHandler(object):
     """
     Provides the ability to initiate, track and finish RPC calls. Each RPC call
