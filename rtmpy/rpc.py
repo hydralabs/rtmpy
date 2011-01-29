@@ -52,7 +52,7 @@ class RemoteCallFailed(failure.Failure):
 
 class CommandResult(object):
     """
-    This is an RPC result object that contains the actual repsonse to the RPC
+    This is an RPC result object that contains the actual response to the RPC
     call and a command object that gets encoded as part of the RTMP message.
     """
 
