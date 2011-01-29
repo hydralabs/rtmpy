@@ -538,6 +538,30 @@ class CallResponseTestCase(unittest.TestCase):
 
 
 
+class AbstractRemoteHandlerTestCase(unittest.TestCase):
+    """
+    Tests for L{rpc.AbstractRemoteHandler}
+    """
+
+
+    def test_interface(self):
+        """
+        Check defined interfaces.
+        """
+        self.assertTrue(
+            message.IMessageSender.implementedBy(rpc.AbstractCallFacilitator))
+
+
+    def test_send_message(self):
+        """
+        Abstract methods should raise C{NotImplementedError}.
+        """
+        a = rpc.AbstractCallFacilitator()
+
+        self.assertRaises(NotImplementedError, a.sendMessage, None)
+
+
+
 class CallingExposedMethodTestCase(unittest.TestCase):
     """
     Tests for L{rpc.callExposedMethod}
