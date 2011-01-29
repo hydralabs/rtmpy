@@ -29,7 +29,7 @@ __all__ = [
     'expose',
     'CommandResult',
     'AbstractCallInitiator',
-    'AbstractCallFacilitator'
+    'AbstractCallFacilitator',
 ]
 
 
@@ -47,6 +47,18 @@ class RemoteCallFailed(failure.Failure):
     """
     A specific failure type when an RPC returns an error response.
     """
+
+
+
+class CommandResult(object):
+    """
+    This is an RPC result object that contains the actual repsonse to the RPC
+    call and a command object that gets encoded as part of the RTMP message.
+    """
+
+    def __init__(self, result, command):
+        self.result = result
+        self.command = command
 
 
 
@@ -146,6 +158,9 @@ def callExposedMethod(obj, name, *args, **kwargs):
         raise exc.CallFailed("Unknown method '%s'" % (name,))
 
     return method(*args, **kwargs)
+
+
+
 class BaseCallHandler(object):
     """
     Provides the ability to initiate, track and finish RPC calls. Each RPC call
@@ -386,8 +401,13 @@ class AbstractCallFacilitator(BaseCallHandler):
         """
         def cb(result):
             self.finishCall(callId)
+            command = None
 
-            msg = message.Invoke(RESPONSE_RESULT, callId, None, result)
+            if isinstance(result, CommandResult):
+                command = result.command
+                result = result.result
+
+            msg = message.Invoke(RESPONSE_RESULT, callId, command, result)
 
             self.sendMessage(msg)
 
