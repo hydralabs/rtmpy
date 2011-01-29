@@ -608,6 +608,14 @@ class CallingExposedMethodTestCase(unittest.TestCase):
             return self.expectedReturn
 
 
+        @rpc.expose
+        def deleted_func(self):
+            pass
+
+
+    del Foo.deleted_func
+
+
     def setUp(self):
         self.instance = self.Foo(self)
 
@@ -649,11 +657,23 @@ class CallingExposedMethodTestCase(unittest.TestCase):
         self.assertEqual(str(e), "Unknown method 'not_exposed'")
 
 
+    def test_deleted_func(self):
+        """
+        Deleting a pre-exposed function should raise an error when calling
+        that exposed method.
+        """
+        e = self.assertRaises(exc.CallFailed,
+            self.call, 'deleted_func', (), None)
+
+        self.assertEqual(str(e), "Unknown method 'deleted_func'")
+
+
 
 class TestRuntimeError(RuntimeError):
     """
     A RuntimeError specific to this test suite.
     """
+
 
 
 class SimpleFacilitator(rpc.AbstractCallFacilitator):
@@ -711,7 +731,6 @@ class SimpleFacilitator(rpc.AbstractCallFacilitator):
     @rpc.expose
     def command_result(self):
         return rpc.CommandResult('foo', {'one': 'two'})
-
 
 
 class CallReceiverTestCase(unittest.TestCase):
