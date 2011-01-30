@@ -247,18 +247,15 @@ class NetStream(BaseStream):
         return self.nc.client
 
 
-    def sendMessage(self, msg, whenDone=None):
+    def sendMessage(self, msg):
         """
         Sends an RTMP message to the peer. This a low level method and is not
         part of any public api. If its use is necessary then this is a bug.
 
         @param msg: The RTMP message to be sent by this stream.
         @type: L{message.Message}
-        @param whenDone: An optional callback that is fired once the complete
-            encoded RTMP message has been sent to the peer. This is not the same
-            as a U{defer.Deferred} instance. When called it receives no params.
         """
-        self.nc.sendMessage(msg, whenDone, stream=self)
+        self.nc.sendMessage(msg, stream=self)
 
 
     @expose
