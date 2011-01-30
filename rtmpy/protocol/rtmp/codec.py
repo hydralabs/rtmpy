@@ -430,7 +430,7 @@ class FrameReader(Codec):
             except IOError:
                 self.stream.seek(pos, 0)
 
-                raise StopIteration
+                raise
 
             new_pos = self.stream.tell()
             self.bytes += new_pos - pos
@@ -445,7 +445,7 @@ class FrameReader(Codec):
         except IOError:
             self.stream.seek(pos, 0)
 
-            raise StopIteration
+            raise
         else:
             self._currentChannel = None
 
@@ -564,10 +564,10 @@ class Decoder(ChannelDemuxer):
         """
         try:
             data, meta = ChannelDemuxer.readFrame(self)
-        except StopIteration:
+        except IOError:
             self.stream.consume()
 
-            raise
+            raise StopIteration
 
         if self.bytesInterval and self.bytes >= self._nextInterval:
             self.dispatcher.bytesInterval(self.bytes)

@@ -60,7 +60,7 @@ class MockFrameReader(object):
         self._nextInterval = bytesInterval
 
     @classmethod
-    def next(cls, self):
+    def readFrame(cls, self):
         return self.events.pop(0)
 
 
@@ -141,7 +141,7 @@ class FrameReaderTestCase(unittest.TestCase):
 
         self.stream.seek(0)
 
-        self.reader.next()
+        self.reader.readFrame()
         channel = self.channels[3]
 
         self.assertEqual(channel.bytes, 0)
@@ -155,14 +155,14 @@ class FrameReaderTestCase(unittest.TestCase):
 
     def test_eof(self):
         self.assertTrue(self.stream.at_eof())
-        self.assertRaises(StopIteration, self.reader.next)
+        self.assertRaises(IOError, self.reader.readFrame)
 
     def test_ioerror_seek(self):
         self.stream.append('foo')
         self.stream.seek(1)
 
         self.assertEqual(self.stream.tell(), 1)
-        self.assertRaises(StopIteration, self.reader.next)
+        self.assertRaises(IOError, self.reader.readFrame)
 
         self.assertEqual(self.stream.tell(), 1)
 
@@ -194,42 +194,32 @@ class FrameReaderTestCase(unittest.TestCase):
         self.stream.write('d' * (size - 12))
 
         self.stream.seek(0)
-        bytes, complete, meta = self.reader.next()
+        bytes, complete, meta = self.reader.readFrame()
 
         self.assertEqual(bytes, 'a' * self.reader.frameSize)
         self.assertFalse(complete)
         check_meta(meta)
 
-        bytes, complete, meta = self.reader.next()
+        bytes, complete, meta = self.reader.readFrame()
 
         self.assertEqual(bytes, 'b' * self.reader.frameSize)
         self.assertFalse(complete)
         check_meta(meta, 10)
 
-        bytes, complete, meta = self.reader.next()
+        bytes, complete, meta = self.reader.readFrame()
 
         self.assertEqual(bytes, 'c' * self.reader.frameSize)
         self.assertFalse(complete)
         check_meta(meta, 10)
 
-        bytes, complete, meta = self.reader.next()
+        bytes, complete, meta = self.reader.readFrame()
 
         self.assertEqual(bytes, 'd' * (size - 12))
         self.assertTrue(complete)
         check_meta(meta, 10)
 
-        self.assertRaises(StopIteration, self.reader.next)
+        self.assertRaises(IOError, self.reader.readFrame)
 
-    def test_iter(self):
-        self.assertIdentical(iter(self.reader), self.reader)
-
-        h = header.Header(2, bodyLength=0, datatype=0, timestamp=0, streamId=0)
-        header.encode(self.stream, h)
-
-        self.stream.seek(0)
-
-        self.assertNotEqual([x for x in self.reader], [])
-        self.assertTrue(self.stream.at_eof)
 
     def test_reassign(self):
         """
@@ -250,13 +240,13 @@ class FrameReaderTestCase(unittest.TestCase):
 
         self.stream.seek(0)
 
-        bytes, complete, meta = self.reader.next()
+        bytes, complete, meta = self.reader.readFrame()
 
         self.assertEqual(bytes, 'a' * 128)
         self.assertFalse(complete)
         self.assertEqual(meta.timestamp, 55)
 
-        bytes, complete, meta = self.reader.next()
+        bytes, complete, meta = self.reader.readFrame()
 
         self.assertEqual(bytes, 'b' * 128)
         self.assertTrue(complete)
@@ -288,19 +278,17 @@ class DeMuxerTestCase(unittest.TestCase):
         self.add_events(
             ('foo', False, meta), ('bar', False, meta), ('baz', True, meta))
 
-        self.assertEqual(self.demuxer.next(), (None, None))
+        self.assertEqual(self.demuxer.readFrame(), (None, None))
         self.assertEqual(self.demuxer.bucket, {1: 'foo'})
 
-        self.assertEqual(self.demuxer.next(), (None, None))
+        self.assertEqual(self.demuxer.readFrame(), (None, None))
         self.assertEqual(self.demuxer.bucket, {1: 'foobar'})
 
-        self.assertEqual(self.demuxer.next(), ('foobarbaz', meta))
+        self.assertEqual(self.demuxer.readFrame(), ('foobarbaz', meta))
         self.assertEqual(self.demuxer.bucket, {})
 
-    def test_iter(self):
-        self.assertIdentical(iter(self.demuxer), self.demuxer)
 
-
+        
 class DecoderTestCase(unittest.TestCase):
     """
     Tests for L{codec.Decoder}
