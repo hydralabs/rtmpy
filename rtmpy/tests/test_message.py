@@ -86,7 +86,7 @@ class MessageTestCase(unittest.TestCase):
         x.foo = 'bar'
 
         self.assertEqual(repr(x),
-            "<rtmpy.core.message.Message foo='bar' at 0x%x>" % id(x))
+            "<rtmpy.message.Message foo='bar' at 0x%x>" % id(x))
 
 
 class FrameSizeTestCase(BaseTestCase):
@@ -645,7 +645,7 @@ class VideoDataTestCase(BaseTestCase):
 class HelperTestCase(unittest.TestCase):
     def test_type_class(self):
         for k, v in message.TYPE_MAP.iteritems():
-            self.assertEquals(message.get_type_class(k), v)
+            self.assertEquals(message.classByType(k), v)
 
         self.assertFalse('foo' in message.TYPE_MAP.keys())
-        self.assertRaises(message.UnknownEventType, message.get_type_class, 'foo')
+        self.assertRaises(message.UnknownType, message.classByType, 'foo')
