@@ -151,8 +151,8 @@ class Packet(object):
     """
 
     def __init__(self, uptime=0, version=0):
-        self.uptime = 0
-        self.version = 0
+        self.uptime = uptime
+        self.version = version
 
         self.payload = None
 
@@ -219,7 +219,7 @@ class BaseNegotiator(object):
 
         self.peer_version = None
 
-        self.my_syn = Packet(first=uptime, second=version)
+        self.my_syn = Packet(uptime, version)
         self.my_ack = None
 
         self.peer_syn = None
@@ -397,17 +397,16 @@ class ClientNegotiator(BaseNegotiator):
 
         If validation succeeds then the ack is sent.
         """
-        if self.buffer.remaining() != 0:
+        if self.buffer.remaining():
             raise HandshakeError('Unexpected trailing data after peer ack')
 
-        if self.peer_ack.first != self.my_syn.first:
+        if self.peer_ack.uptime != self.my_syn.uptime:
             raise VerificationError('Received uptime is not the same')
 
         if self.peer_ack.payload != self.my_syn.payload:
             raise VerificationError('Received payload is not the same')
 
-        self.my_ack = Packet(first=self.peer_syn.first,
-            second=self.my_syn.timestamp)
+        self.my_ack = Packet(self.peer_syn.uptime, self.my_syn.version)
 
         self.buildAckPayload(self.my_ack)
 
@@ -443,10 +442,7 @@ class ServerNegotiator(BaseNegotiator):
         """
         x = BufferedByteStream(self.peer_syn.payload)
 
-        print (sum([x.read_uchar() for i in xrange(4)]) % 728) + 12
-
-        self.my_ack = Packet(first=self.peer_syn.timestamp,
-            second=self.my_syn.timestamp)
+        self.my_ack = Packet(self.peer_syn.uptime, self.my_syn.uptime)
 
         self.buildAckPayload(self.my_ack)
         self.writeAck()
@@ -456,7 +452,7 @@ class ServerNegotiator(BaseNegotiator):
         """
         Called when the clients ack packet has been received.
         """
-        if self.my_syn.first != self.peer_ack.first:
+        if self.my_syn.uptime != self.peer_ack.uptime:
             raise VerificationError('Received uptime is not the same')
 
         if self.my_syn.payload != self.peer_ack.payload:
