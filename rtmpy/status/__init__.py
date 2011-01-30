@@ -140,10 +140,13 @@ class Status(object):
 
 
     def __repr__(self):
-        return '<%s: %s %r at 0x%x>' % (
+        return '<%s.%s level=%r, code=%r, description=%r, extra=%r at 0x%x>' % (
             self.__class__.__module__,
             self.__class__.__name__,
-            self.__dict__,
+            self.level,
+            self.code,
+            self.description,
+            self.getExtraContext(),
             id(self)
         )
 
