@@ -141,6 +141,17 @@ class StatusTestCase(unittest.TestCase):
         })
 
 
+    def test_repr(self):
+        """
+        Test for C{repr(status.Status)}.
+        """
+        s = status.Status('foo', 'bar', 'baz', spam='eggs', extra='context')
+
+        self.assertEqual(repr(s), ("<rtmpy.status.Status level='foo', "
+            "code='bar', description='baz', extra={'spam': 'eggs', 'extra': "
+            "'context'} at 0x%x>" % (id(s),)))
+
+
 
 class AMFEncodingTestCase(unittest.TestCase):
     """
@@ -234,8 +245,6 @@ class TestRuntimeError(RuntimeError):
     """
     """
 
-    code = 'Test.RuntimeError'
-
 
 
 class FromFailureTestCase(unittest.TestCase):
@@ -252,8 +261,6 @@ class FromFailureTestCase(unittest.TestCase):
 
             return failure.Failure()
 
-        self.fail('Did not build failure instance correctly')
-
 
     def test_status(self):
         """
@@ -265,7 +272,7 @@ class FromFailureTestCase(unittest.TestCase):
 
         self.assertTrue(status.IStatus.providedBy(s))
         self.assertEqual(s.level, 'error')
-        self.assertEqual(s.code, 'Test.RuntimeError')
+        self.assertEqual(s.code, None)
         self.assertEqual(s.description, 'foo bar')
 
 
