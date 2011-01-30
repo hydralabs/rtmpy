@@ -245,7 +245,7 @@ class ClientPeerSynTestCase(ClientNegotiatorTestCase):
         self.buffer.seek(0)
 
         self.assertEqual(self.buffer.read(4), '\xff' * 4)
-        self.assertEqual(self.buffer.read_ulong(), ack.timestamp)
+        self.assertEqual(self.buffer.read_ulong(), ack.version)
 
         self.assertEquals(self.buffer.read(), ack.payload)
 
@@ -350,9 +350,9 @@ class ServerSynTestCase(ServerNegotiatorTestCase):
         self.buffer.seek(0)
 
         self.assertEqual(
-            self.buffer.read_ulong(), self.negotiator.peer_syn.timestamp)
+            self.buffer.read_ulong(), self.negotiator.peer_syn.uptime)
         self.assertEqual(
-            self.buffer.read_ulong(), self.negotiator.my_ack.timestamp)
+            self.buffer.read_ulong(), self.negotiator.my_ack.version)
 
         self.assertEqual(self.buffer.read(), self.negotiator.my_ack.payload)
         self.assertFalse(self.succeeded)
@@ -393,7 +393,7 @@ class ServerClientAckTestCase(ServerNegotiatorTestCase):
         self.receive_client_syn()
         self.buffer.truncate()
 
-        self.buffer.write_ulong(self.syn.first)
+        self.buffer.write_ulong(self.syn.uptime)
         self.buffer.write('\xff' * (1536 - 4))
 
         bad_payload = self.buffer.getvalue()
