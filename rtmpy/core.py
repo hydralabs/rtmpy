@@ -22,7 +22,7 @@ import collections
 from twisted.python import log
 from zope.interface import Interface, implements
 
-from rtmpy import message, status
+from rtmpy import message, rpc, status
 from rtmpy.rpc import expose
 
 
@@ -157,7 +157,7 @@ class StreamManager(object):
 
 
 
-class BaseStream(object):
+class BaseStream(rpc.AbstractCallHandler):
     """
     """
 
@@ -165,49 +165,21 @@ class BaseStream(object):
         self.streamId = streamId
 
         self.timestamp = 0
-        self.lastInvokeId = -1
-        self.activeInvokes = {}
 
-
-    def call(self, name, *args, **kwargs):
-        whenDone = kwargs.get('whenDone', None)
-
-        if not whenDone:
-            self.sendMessage(message.Invoke(name, 0, None, *args))
-
-            return
-
-        self.lastInvokeId += 1
-        invokeId = self.lastInvokeId
-
-        d = defer.Deferred()
-        m = message.Invoke(name, invokeId, None, *args)
-        self.activeInvokes[invokeId] = d
-
-        self.sendMessage(m, whenDone=whenDone)
-
-        return d
 
     def sendStatus(self, status, command=None, **kwargs):
         """
         Informs the peer of a change of status.
 
-        @param status: A status message or L{status.Status} instance.
-            If a string is supplied it will be converted to an L{status.Status}.
+        @param status: A L{status.IStatus} instance.
         @param command: The command object part of the L{message.Invoke}
             message. Not quite sure what this achieves right now. Defaults to
             L{None}.
         @param kwargs: If a string status message is supplied then any extra
             kwargs will form part of the generated L{status.Status} message.
         """
-        if isinstance(code_or_status, status.Status):
-            status_obj = code_or_status
-        else:
-            status_obj = status.status(code_or_status, **kwargs)
+        self.execute('onStatus', command, status)
 
-        msg = message.Invoke('onStatus', 0, *[command, status_obj])
-
-        self.sendMessage(msg)
 
     def setTimestamp(self, timestamp, relative=True):
         """
