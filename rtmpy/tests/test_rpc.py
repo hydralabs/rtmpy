@@ -280,9 +280,9 @@ class SimpleInitiator(rpc.AbstractCallInitiator):
 
 
 
-class CallTestCase(unittest.TestCase):
+class ExecuteTestCase(unittest.TestCase):
     """
-    Tests for L{rpc.AbstractCallInitiator.call}
+    Tests for L{rpc.AbstractCallInitiator.execute}
     """
 
 
@@ -293,12 +293,14 @@ class CallTestCase(unittest.TestCase):
 
     def test_call_message(self):
         """
-        Check the context of the message sent when L{call} is executed.
+        Check the context of the message sent when L{callWithoutResult} is
+        executed.
         """
         i = self.invoker
         m = self.messages
 
-        i.call('remote_method', 1, 2, 3, 'foo')
+        ret = i.execute('remote_method', 1, 2, 3, 'foo')
+        self.assertEqual(ret, None)
 
         self.assertEqual(len(m), 1)
         msg = m.pop()
@@ -311,13 +313,14 @@ class CallTestCase(unittest.TestCase):
 
     def test_call_command(self):
         """
-        Ensure L{call} accepts a C{command} kwarg and that it is set on
-        the message appropriately.
+        Ensure L{execute} accepts a C{command} kwarg and that it is
+        set on the message appropriately.
         """
         cmd = {'foo': 'bar'}
         i, m = self.invoker, self.messages
 
-        i.call('remote_method', command=cmd)
+        ret = i.execute('remote_method', command=cmd)
+        self.assertEqual(ret, None)
 
         self.assertEqual(len(m), 1)
         msg = m.pop()
@@ -330,19 +333,19 @@ class CallTestCase(unittest.TestCase):
 
     def test_call_tracking(self):
         """
-        Any call to L{call} should not be considered 'active'.
+        Any call to L{execute} should not be considered 'active'.
         """
         i = self.invoker
 
-        i.call('foo')
+        i.execute('foo')
 
         self.assertFalse(i.isCallActive(0))
 
 
 
-class CallWithResultTestCase(unittest.TestCase):
+class CallTestCase(unittest.TestCase):
     """
-    Tests for L{rpc.AbstractCallInitiator.callWithResult}
+    Tests for L{rpc.AbstractCallInitiator.call}
     """
 
 
@@ -353,13 +356,13 @@ class CallWithResultTestCase(unittest.TestCase):
 
     def test_call(self):
         """
-        Check the context of the message sent when L{callWithResult} is
+        Check the context of the message sent when L{call} is
         executed.
         """
         i = self.invoker
         m = self.messages
 
-        d = i.callWithResult('remote_method', 1, 2, 3, 'foo')
+        d = i.call('remote_method', 1, 2, 3, 'foo')
 
         self.assertTrue(isinstance(d, defer.Deferred))
         self.assertEqual(len(m), 1)
@@ -378,13 +381,13 @@ class CallWithResultTestCase(unittest.TestCase):
 
     def test_command(self):
         """
-        Ensure L{callWithResult} accepts a C{command} kwarg and that it
+        Ensure L{call} accepts a C{command} kwarg and that it
         is set on the sent message appropriately.
         """
         cmd = {'foo': 'bar'}
         i, m = self.invoker, self.messages
 
-        d = i.callWithResult('remote_method', command=cmd)
+        d = i.call('remote_method', command=cmd)
 
         self.assertTrue(isinstance(d, defer.Deferred))
         self.assertEqual(len(m), 1)
@@ -418,7 +421,7 @@ class CallWithResultTestCase(unittest.TestCase):
 
         self.patch(i, 'sendMessage', sendBadMessage)
 
-        self.assertRaises(TestRuntimeError, i.callWithResult,
+        self.assertRaises(TestRuntimeError, i.call,
             'remote_method')
 
         self.assertFalse(i.isCallActive(self.msg.id))
@@ -450,7 +453,7 @@ class CallResponseTestCase(unittest.TestCase):
     def makeCall(self, name, *args, **kwargs):
         """
         """
-        return self.invoker.callWithResult(name, *args, **kwargs)
+        return self.invoker.call(name, *args, **kwargs)
 
 
     def test_unknown_call_id(self):
@@ -468,7 +471,7 @@ class CallResponseTestCase(unittest.TestCase):
 
     def test_success_result(self):
         """
-        Ensure that the deferred handed back in L{callWithResult} has its
+        Ensure that the deferred handed back in L{call} has its
         callback called if a success response is received for the corresponding
         call id.
 
@@ -492,7 +495,7 @@ class CallResponseTestCase(unittest.TestCase):
 
     def test_error_result(self):
         """
-        Ensure that the deferred handed back in L{callWithResult} has its
+        Ensure that the deferred handed back in L{call} has its
         errback called if an error response is received for the corresponding
         call id.
 
