@@ -234,9 +234,9 @@ class CallHandlerTestCase(unittest.TestCase):
 
 
 
-class AbstractCallInitiatorTestCase(unittest.TestCase):
+class AbstractCallHandlerTestCase(unittest.TestCase):
     """
-    Tests for L{rpc.AbstractCallInitiator}
+    Tests for L{rpc.AbstractCallHandler}
     """
 
 
@@ -245,20 +245,20 @@ class AbstractCallInitiatorTestCase(unittest.TestCase):
         Check defined interfaces.
         """
         self.assertTrue(
-            message.IMessageSender.implementedBy(rpc.AbstractCallInitiator))
+            message.IMessageSender.implementedBy(rpc.AbstractCallHandler))
 
 
     def test_send_message(self):
         """
         Abstract methods should raise C{NotImplementedError}.
         """
-        a = rpc.AbstractCallInitiator()
+        a = rpc.AbstractCallHandler()
 
         self.assertRaises(NotImplementedError, a.sendMessage, None)
 
 
 
-class SimpleInitiator(rpc.AbstractCallInitiator):
+class SimpleInitiator(rpc.AbstractCallHandler):
     """
     An implementation of L{rpc.AbstractCallInitiator} that stores any messages
     were sent for later inspection.
@@ -267,7 +267,7 @@ class SimpleInitiator(rpc.AbstractCallInitiator):
     """
 
     def __init__(self):
-        super(rpc.AbstractCallInitiator, self).__init__()
+        super(rpc.AbstractCallHandler, self).__init__()
 
         self.messages = []
 
@@ -345,7 +345,7 @@ class ExecuteTestCase(unittest.TestCase):
 
 class CallTestCase(unittest.TestCase):
     """
-    Tests for L{rpc.AbstractCallInitiator.call}
+    Tests for L{rpc.AbstractCallHandler.call}
     """
 
 
@@ -553,31 +553,6 @@ class CallResponseTestCase(unittest.TestCase):
 
 
 
-class AbstractCallFacilitatorTestCase(unittest.TestCase):
-    """
-    Tests for L{rpc.AbstractCallHandler}
-    """
-
-
-    def test_interface(self):
-        """
-        Check defined interfaces.
-        """
-        self.assertTrue(
-            message.IMessageSender.implementedBy(rpc.AbstractCallHandler))
-
-
-    def test_send_message(self):
-        """
-        Abstract methods should raise C{NotImplementedError}.
-        """
-        a = rpc.AbstractCallHandler()
-
-        self.assertRaises(NotImplementedError, a.sendMessage, None)
-
-
-
-
 class CallingExposedMethodTestCase(unittest.TestCase):
     """
     Tests for L{rpc.callExposedMethod}
@@ -734,6 +709,7 @@ class SimpleFacilitator(rpc.AbstractCallHandler):
     @rpc.expose
     def command_result(self):
         return rpc.CommandResult('foo', {'one': 'two'})
+
 
 
 class CallReceiverTestCase(unittest.TestCase):
