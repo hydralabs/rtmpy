@@ -283,13 +283,13 @@ class AbstractCallInitiator(BaseCallHandler):
         raise NotImplementedError
 
 
-    def call(self, name, *args, **kwargs):
+    def execute(self, name, *args, **kwargs):
         """
         Builds and sends an RPC call to the receiving endpoint.
 
         This is a B{fire-and-forget} method, no result is expected or will be
         returned. If you expect a result from the receiving endpoint, use
-        L{callRemoteWithResult}.
+        L{call}.
 
         @param name: The name of the method to invoke on the receiving endpoint.
         @type name: C{str}
@@ -305,7 +305,7 @@ class AbstractCallInitiator(BaseCallHandler):
         self.sendMessage(msg)
 
 
-    def callWithResult(self, name, *args, **kwargs):
+    def call(self, name, *args, **kwargs):
         """
         Builds and sends an RPC call to the receiving endpoint and returns a
         L{defer.Deferred} that waits for a result. If an error notification is
