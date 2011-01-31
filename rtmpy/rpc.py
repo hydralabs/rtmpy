@@ -29,7 +29,7 @@ __all__ = [
     'expose',
     'CommandResult',
     'AbstractCallInitiator',
-    'AbstractCallFacilitator',
+    'AbstractCallHandler',
 ]
 
 
@@ -378,7 +378,7 @@ class AbstractCallInitiator(BaseCallHandler):
 
 
 
-class AbstractCallFacilitator(BaseCallHandler):
+class AbstractCallHandler(BaseCallHandler):
     """
     Provides an API to allow RPC calls to be made by the receiving endpoint.
     """
