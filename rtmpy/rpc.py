@@ -28,7 +28,6 @@ from rtmpy import message, exc, status
 __all__ = [
     'expose',
     'CommandResult',
-    'AbstractCallInitiator',
     'AbstractCallHandler',
 ]
 
@@ -265,7 +264,7 @@ class BaseCallHandler(object):
 
 
 
-class AbstractCallInitiator(BaseCallHandler):
+class AbstractCallHandler(BaseCallHandler):
     """
     Provides an API to make RPC calls and handle the response.
     """
@@ -377,25 +376,6 @@ class AbstractCallInitiator(BaseCallHandler):
                 originalName, originalArgs, originalCommand))
 
 
-
-class AbstractCallHandler(BaseCallHandler):
-    """
-    Provides an API to allow RPC calls to be made by the receiving endpoint.
-    """
-
-    implements(message.IMessageSender)
-
-
-    # IMessageSender
-    def sendMessage(self, msg):
-        """
-        Sends a message. Must be implemented by subclasses.
-
-        @param msg: L{message.IMessage}
-        """
-        raise NotImplementedError
-
-
     def callReceived(self, name, callId, *args):
         """
         Called when an RPC request as been made. Determines which locally
@@ -448,7 +428,6 @@ class AbstractCallHandler(BaseCallHandler):
         d.addCallbacks(cb, eb)
 
         return d
-
 
 
     def callExposedMethod(self, name, *args):
