@@ -555,7 +555,7 @@ class CallResponseTestCase(unittest.TestCase):
 
 class AbstractCallFacilitatorTestCase(unittest.TestCase):
     """
-    Tests for L{rpc.AbstractCallFacilitator}
+    Tests for L{rpc.AbstractCallHandler}
     """
 
 
@@ -564,14 +564,14 @@ class AbstractCallFacilitatorTestCase(unittest.TestCase):
         Check defined interfaces.
         """
         self.assertTrue(
-            message.IMessageSender.implementedBy(rpc.AbstractCallFacilitator))
+            message.IMessageSender.implementedBy(rpc.AbstractCallHandler))
 
 
     def test_send_message(self):
         """
         Abstract methods should raise C{NotImplementedError}.
         """
-        a = rpc.AbstractCallFacilitator()
+        a = rpc.AbstractCallHandler()
 
         self.assertRaises(NotImplementedError, a.sendMessage, None)
 
@@ -679,16 +679,16 @@ class TestRuntimeError(RuntimeError):
 
 
 
-class SimpleFacilitator(rpc.AbstractCallFacilitator):
+class SimpleFacilitator(rpc.AbstractCallHandler):
     """
-    An implementation of L{rpc.AbstractCallFacilitator} that stores any messages
+    An implementation of L{rpc.AbstractCallHandler} that stores any messages
     were sent for later inspection.
 
     Exposes a number of simple methods.
     """
 
     def __init__(self, test):
-        super(rpc.AbstractCallFacilitator, self).__init__()
+        super(rpc.AbstractCallHandler, self).__init__()
 
         self.test = test
         self.messages = []
