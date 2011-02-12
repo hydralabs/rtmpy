@@ -1,3 +1,5 @@
+#!/usr/bin/env python
+
 # Copyright the RTMPy Project
 #
 # RTMPy is free software: you can redistribute it and/or modify it under the
@@ -13,55 +15,74 @@
 # You should have received a copy of the GNU Lesser General Public License along
 # with RTMPy.  If not, see <http://www.gnu.org/licenses/>.
 
-import sys
-import os.path
-
-
-try:
-    import Cython
-    # may need to work around setuptools bug by providing a fake Pyrex
-    sys.path.insert(0, os.path.join(os.path.dirname(__file__), "fake_pyrex"))
-except ImportError:
-    pass
-
-
 from distribute_setup import use_setuptools
+
+# 15 seconds is far too long ....
 use_setuptools(download_delay=3)
 
+# import ordering is important
+import setupinfo
 from setuptools import setup, find_packages
 
-import setupinfo
+
+version = (0, 2, 'dev')
+
+name = "RTMPy"
+description = "Twisted protocol for RTMP"
+long_description = setupinfo.read('README.txt')
+url = "http://rtmpy.org"
+author = "The RTMPy Project"
+author_email = "rtmpy-dev@rtmpy.org"
+license = "LGPL 2.1 License"
+
+classifiers = """
+Framework :: Twisted
+Natural Language :: English
+Intended Audience :: Developers
+Intended Audience :: Information Technology"
+License :: OSI Approved :: GNU Library or Lesser General Public License (LGPL)
+Operating System :: OS Independent
+Programming Language :: Python
+Programming Language :: Python :: 2.4
+Programming Language :: Python :: 2.5
+Programming Language :: Python :: 2.6
+Programming Language :: Python :: 2.7
+Topic :: Software Development :: Libraries :: Python Modules
+"""
+
+keywords = """
+rtmp flv rtmps rtmpe rtmpt rtmpte amf amf0 amf3 flex flash http https
+streaming video audio sharedobject webcam record playback pyamf client
+flashplayer air actionscript decoder encoder gateway server
+"""
 
 
-setup(
-    name = "RTMPy",
-    url = "http://rtmpy.org",
-    version = setupinfo.get_version(),
-    author = "The RTMPy Project",
-    author_email = "rtmpy-dev@rtmpy.org",
-    description = "Twisted protocol for RTMP",
-    long_description = open('README.txt', 'rt').read(),
-    keywords = setupinfo.keywords,
-    packages = find_packages(exclude=["*.tests"]),
-    install_requires = setupinfo.get_install_requirements(),
-    tests_require = setupinfo.get_test_requirements(),
-    test_suite = "rtmpy.tests.get_suite",
-    ext_modules = setupinfo.get_extensions(),
-    zip_safe = True,
-    license = "LGPL 2.1 License",
-    platforms = ["any"],
-    classifiers = [
-        "Framework :: Twisted",
-        "Natural Language :: English",
-        "Intended Audience :: Developers",
-        "Intended Audience :: Information Technology",
-        "License :: OSI Approved :: GNU Library or Lesser General Public License (LGPL)",
-        "Operating System :: OS Independent",
-        "Programming Language :: Python",
-        "Programming Language :: Python :: 2.4",
-        "Programming Language :: Python :: 2.5",
-        "Programming Language :: Python :: 2.6",
-        "Programming Language :: Python :: 2.7",
-        "Topic :: Software Development :: Libraries :: Python Modules",
-    ] + setupinfo.get_trove_classifiers(),
-    **setupinfo.extra_setup_args())
+def setup_package():
+    setupinfo.set_version(version)
+
+    setupinfo.write_version_py()
+
+    setup(
+        name=name,
+        version=setupinfo.get_version(),
+        description=description,
+        long_description=long_description,
+        url=url,
+        author=author,
+        author_email=author_email,
+        keywords=keywords.strip(),
+        license=license,
+        packages=find_packages(),
+        ext_modules=setupinfo.get_extensions(),
+        install_requires=setupinfo.get_install_requirements(),
+        tests_require=setupinfo.get_test_requirements(),
+        test_suite="rtmpy",
+        zip_safe=True,
+        extras_require=setupinfo.get_extras_require(),
+        classifiers=(filter(None, classifiers.split('\n')) +
+            setupinfo.get_trove_classifiers()),
+        **setupinfo.extra_setup_args())
+
+
+if __name__ == '__main__':
+    setup_package()
