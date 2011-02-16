@@ -22,8 +22,7 @@ import collections
 from twisted.python import log
 from zope.interface import Interface, implements
 
-from rtmpy import message, rpc, status
-from rtmpy.rpc import expose
+from rtmpy import rpc, status
 
 
 
@@ -99,7 +98,7 @@ class StreamManager(object):
             return len(self.streams)
 
 
-    @expose
+    @rpc.expose
     def deleteStream(self, streamId):
         """
         Deletes an existing stream.
@@ -109,12 +108,13 @@ class StreamManager(object):
         """
         if streamId == self.CONTROL_STREAM_ID:
             log.msg('Attempted to delete RTMP control stream')
-            return # can't delete the control stream
+
+            return
 
         stream = self.streams.pop(streamId, None)
 
         if stream is None:
-            log.msg('Attempted to delete non-existant RTMP stream %r', streamId)
+            log.msg('Attempted to delete non-existant RTMP stream %r' % (streamId,))
 
             return
 
@@ -122,7 +122,7 @@ class StreamManager(object):
         stream.closeStream()
 
 
-    @expose
+    @rpc.expose
     def createStream(self):
         """
         Creates a new stream assigns it a free id.
@@ -161,24 +161,29 @@ class BaseStream(rpc.AbstractCallHandler):
     """
     """
 
-    def __init__(self, streamId):
-        self.streamId = streamId
 
+    def __init__(self, streamId):
+        super(rpc.AbstractCallHandler, self).__init__()
+
+        self.streamId = streamId
         self.timestamp = 0
 
 
-    def sendStatus(self, status, command=None, **kwargs):
+    def sendStatus(self, code, description='', command=None, **kwargs):
         """
         Informs the peer of a change of status.
 
-        @param status: A L{status.IStatus} instance.
+        @param code: A L{status.IStatus} instance.
         @param command: The command object part of the L{message.Invoke}
             message. Not quite sure what this achieves right now. Defaults to
             L{None}.
-        @param kwargs: If a string status message is supplied then any extra
-            kwargs will form part of the generated L{status.Status} message.
         """
-        self.execute('onStatus', command, status)
+        if status.IStatus.providedBy(code):
+            s = code
+        else:
+            s = status.status(code, description, **kwargs)
+
+        self.execute('onStatus', s, command=command)
 
 
     def setTimestamp(self, timestamp, relative=True):
@@ -192,11 +197,10 @@ class BaseStream(rpc.AbstractCallHandler):
         """
         if relative:
             self.timestamp += timestamp
-        else:
-            if timestamp < self.timestamp:
-                raise ValueError('Cannot set a negative timestamp')
 
-            self.timestamp = timestamp
+            return
+
+        self.timestamp = timestamp
 
 
 
@@ -230,7 +234,7 @@ class NetStream(BaseStream):
         self.nc.sendMessage(msg, stream=self)
 
 
-    @expose
+    @rpc.expose
     def closeStream(self):
         """
         """

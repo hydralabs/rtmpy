@@ -19,7 +19,7 @@ Tests for L{rtmpy.core}
 
 from twisted.trial import unittest
 
-from rtmpy import core
+from rtmpy import core, message, status
 
 
 
@@ -235,3 +235,173 @@ class StreamManagerTestCase(unittest.TestCase):
 
         self.assertEqual(m.streams, {0: m})
         self.assertEqual(m.getNextAvailableStreamId(), 1)
+
+
+
+class StreamTimestampTestCase(unittest.TestCase):
+    """
+    Test stream timestamp operations.
+    """
+
+
+    def setUp(self):
+        self.stream = core.BaseStream(None)
+
+
+    def test_default(self):
+        """
+        Test simple construction and initial values.
+        """
+        self.assertEqual(self.stream.timestamp, 0)
+
+
+    def test_absolute(self):
+        """
+        Set the timestamp in an absolute fashion.
+        """
+        s = self.stream
+        self.assertEqual(s.timestamp, 0)
+
+        s.setTimestamp(345678, False)
+        self.assertEqual(s.timestamp, 345678)
+
+        s.setTimestamp(2, False)
+        self.assertEqual(s.timestamp, 2)
+
+
+    def test_relative(self):
+        """
+        Set the timestamp in an relative fashion.
+        """
+        s = self.stream
+        self.assertEqual(s.timestamp, 0)
+
+        s.setTimestamp(123)
+        self.assertEqual(s.timestamp, 123)
+
+        s.setTimestamp(50, True)
+        self.assertEqual(s.timestamp, 173)
+
+        s.setTimestamp(-10, True)
+        self.assertEqual(s.timestamp, 163)
+
+        s.setTimestamp(5)
+        self.assertEqual(s.timestamp, 168)
+
+
+
+class MessageSendingStream(core.BaseStream):
+    """
+    A simple stream that stores the messages that that is sent through it
+    """
+
+    def __init__(self, streamId):
+        core.BaseStream.__init__(self, streamId)
+
+        self.messages = []
+
+
+    def sendMessage(self, msg):
+        self.messages.append(msg)
+
+
+
+class SendStatusTestCase(unittest.TestCase):
+    """
+    Tests for L{core.BaseStream.sendMessage}
+    """
+
+    def setUp(self):
+        self.stream = MessageSendingStream(None)
+        self.messages = self.stream.messages
+
+    def checkMessage(self, msg, **kwargs):
+        """
+        Ensures that the supplied msg is formatted as a onStatus invoke.
+
+        @param msg: The L{message.IMessage} to check.
+        @param kwargs: Optional parameters to check. Valid keys are 'command',
+            'level, 'code', 'description' and 'extra'.
+        """
+        sentinel = object()
+
+        def check(a, b):
+            c = kwargs.pop(b, sentinel)
+
+            if c is sentinel:
+                return
+
+            self.assertEqual(a, c)
+
+        self.assertTrue(message.typeByClass(msg), message.Invoke)
+
+        self.assertEqual(msg.name, 'onStatus')
+        self.assertEqual(msg.id, 0)
+
+        cmd, s = msg.argv
+
+        check(cmd, 'command')
+        check(s.level, 'level')
+        check(s.code, 'code')
+        check(s.description, 'description')
+        check(s.getExtraContext(), 'extra')
+
+        # sanity check
+        self.assertEqual(kwargs, {}, msg='improper use of checkMessage')
+
+
+    def test_simple_string(self):
+        """
+        Supplying only code as a string to L{sendStatus} should yield a status
+        message.
+        """
+        self.stream.sendStatus('foobar')
+
+        msg = self.messages.pop()
+
+        self.assertEqual(self.messages, [])
+
+        self.checkMessage(msg, code='foobar')
+
+
+    def test_status(self):
+        """
+        Sending a L{status.IStatus} should succeed.
+        """
+        s = status.error('AnErrorOccurred', 'This is a description', foo='bar')
+        self.stream.sendStatus(s)
+
+        msg = self.messages.pop()
+
+        self.assertEqual(self.messages, [])
+
+        self.checkMessage(msg, level='error', code='AnErrorOccurred',
+            description='This is a description', extra={'foo': 'bar'})
+
+
+    def test_command(self):
+        """
+        Sending a command arg with sendStatus should set the command var on the
+        invoke message.
+        """
+        self.stream.sendStatus(None, command='blarg')
+
+        msg = self.messages.pop()
+
+        self.assertEqual(self.messages, [])
+
+        self.checkMessage(msg, command='blarg')
+
+
+    def test_extra(self):
+        """
+        Sending a code and description should allow extra key/value pairs to be
+        set on the status object.
+        """
+        self.stream.sendStatus(None, None, spam='eggs', blarg='blaggity')
+
+        msg = self.messages.pop()
+
+        self.assertEqual(self.messages, [])
+
+        self.checkMessage(msg, extra={'blarg': 'blaggity', 'spam': 'eggs'})
