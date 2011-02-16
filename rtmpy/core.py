@@ -204,12 +204,43 @@ class BaseStream(rpc.AbstractCallHandler):
 
 
 
+class NetConnection(StreamManager, BaseStream):
+    """
+    This is the base class for all concrete NetConnection implementations (e.g.
+    one for server and another for client).
+
+    This class is akin to the Flash/FMS NetConnection class and provides the
+    same interface.
+
+    @ivar client: The client object that is linked to this NetConnection.
+    """
+
+    def __init__(self):
+        BaseStream.__init__(self, 0)
+        StreamManager.__init__(self)
+
+        self.client = None
+
+
+    def getControlStream(self):
+        """
+        Needed by L{StreamManager}.
+
+        @see: L{StreamManager.getControlStream}
+        """
+        return self
+
+
+
 class NetStream(BaseStream):
     """
     A stream within an RTMP connection. A stream can either send or receive
     video/audio, or in the Flash vernacular - publish or subscribe.
 
     Not sure about data just yet.
+
+    @ivar nc: The controlling L{NetConnection} instance. A stream cannot exist
+        without this.
     """
 
     def __init__(self, nc, streamId):
@@ -237,4 +268,5 @@ class NetStream(BaseStream):
     @rpc.expose
     def closeStream(self):
         """
+        Called to close this stream.
         """

@@ -315,6 +315,7 @@ class SendStatusTestCase(unittest.TestCase):
         self.stream = MessageSendingStream(None)
         self.messages = self.stream.messages
 
+
     def checkMessage(self, msg, **kwargs):
         """
         Ensures that the supplied msg is formatted as a onStatus invoke.
@@ -405,3 +406,72 @@ class SendStatusTestCase(unittest.TestCase):
         self.assertEqual(self.messages, [])
 
         self.checkMessage(msg, extra={'blarg': 'blaggity', 'spam': 'eggs'})
+
+
+
+class NetConnectionTestCase(unittest.TestCase):
+    """
+    Tests for L{core.NetConnection}
+    """
+
+    def test_create(self):
+        """
+        Ensure we can actually create L{core.NetConnection} objects and check
+        some defaults.
+        """
+        nc = core.NetConnection()
+
+        self.assertEqual(nc.streamId, 0)
+        self.assertEqual(nc.client, None)
+
+
+    def test_control_stream(self):
+        """
+        Ensure that the control stream for L{core.NetConnection} is itself.
+        """
+        nc = core.NetConnection()
+
+        self.assertIdentical(nc.getControlStream(), nc)
+
+
+
+class NetStreamTestCase(unittest.TestCase):
+    """
+    Tests for L{core.NetStream}
+    """
+
+    def setUp(self):
+        self.nc = core.NetConnection()
+
+
+    def test_create(self):
+        """
+        Ensure we can actually create L{core.NetStream} objects and check
+        some defaults.
+        """
+        s = core.NetStream(self.nc, 2)
+
+        self.assertEqual(s.streamId, 2)
+        self.assertEqual(s.timestamp, 0)
+
+
+    def test_client(self):
+        """
+        The client property on L{core.NetStream} should be identical to that of
+        its C{NetConnection}.
+        """
+        client = object()
+        self.nc.client = client
+
+        s = core.NetStream(self.nc, None)
+
+        self.assertIdentical(s.client, client)
+
+
+    def test_close(self):
+        """
+        Ensure that we can close the stream.
+        """
+        s = core.NetStream(self.nc, None)
+
+        s.closeStream()
