@@ -549,21 +549,15 @@ class ServerProtocol(rtmp.RTMPProtocol):
         @param params: The connection parameters sent from the client, this
             includes items such as the connection url, and user agent
         @type params: C{dict}
+
+        @param args: arguments from RTMP connect packet
         """
         if self.application:
             # This protocol has already successfully completed a connection
             # request.
             raise exc.ConnectFailed('Already connected.')
 
-        try:
-            appName = params['app']
-        except KeyError:
-            raise exc.ConnectFailed("Bad connect packet (missing 'app' key)")
-
-        self.application = self.factory.getApplication(appName)
-
-        if self.application is None:
-            raise exc.InvalidApplication('Unknown application %r' % (appName,))
+        self.application = self.factory.getApplicationWithDefault(params)
 
         self.client = self.application.buildClient(self, params, *args)
 
@@ -1083,12 +1077,36 @@ class ServerFactory(protocol.ServerFactory):
 
         return i.ServerNegotiator(protocol, protocol.transport)
 
-    def getApplication(self, name):
+    def getApplicationWithDefault(self, args):
         """
-        Returns the active L{IApplication} instance related to C{name}. If
+        Checks if an application exists within the static table. If an
+        application cannot be found there, getApplication is called.
+
+        @param args: arguments from RTMP connect packet
+        """
+        try:
+            appName = args['app']
+        except KeyError:
+            raise exc.ConnectFailed("Bad connect packet (missing 'app' key)")
+
+        if self.applications.has_key(appName):
+            return self.applications[appName]
+
+        app = self.getApplication(args)
+
+        if app == None:
+            raise exc.InvalidApplication('Unknown application %r' % (appName,))
+
+        return app
+
+    def getApplication(self, args):
+        """
+        Returns the active L{IApplication} instance related to C{args}. If
         there is no active application, C{None} is returned.
+
+        @param args: arguments from RTMP connect packet
         """
-        return self.applications.get(name, None)
+        return None
 
     def registerApplication(self, name, app):
         """
