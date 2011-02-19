@@ -1,6 +1,8 @@
 .DS_Store
 RTMPy.egg-info
 *.pyc
+*.so
+*.c
 _trial_temp
 build
 dist
@@ -8,3 +10,4 @@ doc/build
 doc/changelog.rst
 doc/themes
 doc/html/intro.html
+rtmpy/_version.py
