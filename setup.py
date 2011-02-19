@@ -75,7 +75,7 @@ def setup_package():
         packages=find_packages(),
         ext_modules=setupinfo.get_extensions(),
         install_requires=setupinfo.get_install_requirements(),
-        tests_require=setupinfo.get_test_requirements(),
+        tests_requires=setupinfo.get_test_requirements(),
         test_suite="rtmpy",
         zip_safe=True,
         extras_require=setupinfo.get_extras_require(),
