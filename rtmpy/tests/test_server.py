@@ -586,6 +586,51 @@ class ConnectingTestCase(unittest.TestCase):
 
         return d
 
+    def test_dynamic_app_success(self):
+        """
+        Ensure a successful connection
+        """
+        def getApplication(args):
+            return SimpleApplication()
+
+        self.patch(self.factory, "getApplication", getApplication)
+
+        d = self.connect({'app': 'what'})
+
+        def check_status(res):
+            self.assertIsInstance(res, ExtraResult)
+            self.assertEqual(res.extra, {
+                'capabilities': 31, 'fmsVer': 'FMS/3,5,1,516', 'mode': 1})
+            self.assertEqual(res.result, {
+                'code': 'NetConnection.Connect.Success',
+                'objectEncoding': 0,
+                'description': 'Connection succeeded.',
+                'level': 'status'
+            })
+
+            msg, = self.messages.pop(0)
+
+            self.assertMessage(msg, message.DOWNSTREAM_BANDWIDTH,
+                bandwidth=2500000L)
+
+            msg, = self.messages.pop(0)
+
+            self.assertMessage(msg, message.UPSTREAM_BANDWIDTH,
+                bandwidth=2500000L, extra=2)
+
+            msg, = self.messages.pop(0)
+
+            self.assertMessage(msg, message.CONTROL,
+                type=0, value1=0)
+
+            self.assertEqual(self.messages, [])
+
+        d.addCallback(check_status)
+
+        self.protocol.onDownstreamBandwidth(2000, 2)
+
+        return d
+
     def test_reject(self):
         """
         Test the connection being rejected
