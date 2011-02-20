@@ -587,6 +587,9 @@ class ConnectingTestCase(unittest.TestCase):
         return d
 
     def test_reject(self):
+        """
+        Test the connection being rejected
+        """
         a = self.factory.applications['what'] = SimpleApplication()
         a.reject = True
         a.client = object()
@@ -608,6 +611,33 @@ class ConnectingTestCase(unittest.TestCase):
             self.assertEqual(name, 'on-connect-reject')
             self.assertIdentical(args[0], a.client)
             self.assertEqual(len(args), 2)
+            self.assertEqual(kwargs, {})
+
+        d.addCallback(check_status)
+
+        return d
+
+    def test_reject_with_args(self):
+        """
+        Test that the arguments passed to NetConnection.connect() are passed
+        to onConnectReject
+        """
+        a = self.factory.applications['what'] = SimpleApplication()
+        a.reject = True
+        a.client = object()
+
+        client_params = {'app': 'what'} # Connect packet parameters
+        client_args = ("foo", "bar") # Arguments passed to NC.connect()
+
+        d = self.connect(client_params, *client_args)
+
+        def check_status(res):
+            name, args, kwargs = a.events.pop()
+
+            self.assertEqual(name, 'on-connect-reject')
+            self.assertIdentical(args[0], a.client)
+            self.assertEqual(args[2:], client_args)
+            self.assertEqual(len(args), 4)
             self.assertEqual(kwargs, {})
 
         d.addCallback(check_status)
