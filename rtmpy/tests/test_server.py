@@ -311,7 +311,7 @@ class ServerFactoryTestCase(unittest.TestCase):
 
 
     def connect(self, app, protocol):
-        client = app.buildClient(self.protocol)
+        client = app.buildClient(self.protocol, {'app': 'foo'})
 
         app.acceptConnection(client)
 
@@ -543,45 +543,23 @@ class ConnectingTestCase(unittest.TestCase):
 
         return d
 
-    def test_success_with_args(self):
+    def test_connect_args(self):
         """
         Ensure a successful connection to application with optional user
-        arguments being passed
+        arguments being passed.
+
+        The arguments should be available to various application methods
+        such as onConnect, buildClient, etc.
         """
         a = self.factory.applications['what'] = SimpleApplication()
         a.client = object()
 
-        client_args = ("foo", "bar")
-        d = self.connect({'app': 'what'}, *client_args)
+        client_params = {'app': 'what'} # Connect packet parameters
+        client_args = ("foo", "bar") # Arguments passed to NC.connect()
+
+        d = self.connect(client_params, *client_args)
 
         def check_status(res):
-            self.assertIsInstance(res, ExtraResult)
-            self.assertEqual(res.extra, {
-                'capabilities': 31, 'fmsVer': 'FMS/3,5,1,516', 'mode': 1})
-            self.assertEqual(res.result, {
-                'code': 'NetConnection.Connect.Success',
-                'objectEncoding': 0,
-                'description': 'Connection succeeded.',
-                'level': 'status'
-            })
-
-            msg, = self.messages.pop(0)
-
-            self.assertMessage(msg, message.DOWNSTREAM_BANDWIDTH,
-                bandwidth=2500000L)
-
-            msg, = self.messages.pop(0)
-
-            self.assertMessage(msg, message.UPSTREAM_BANDWIDTH,
-                bandwidth=2500000L, extra=2)
-
-            msg, = self.messages.pop(0)
-
-            self.assertMessage(msg, message.CONTROL,
-                type=0, value1=0)
-
-            self.assertEqual(self.messages, [])
-
             name, args, kwargs = a.events.pop()
             self.assertEqual(name, 'on-connect-accept')
 
@@ -597,6 +575,10 @@ class ConnectingTestCase(unittest.TestCase):
 
             name, args, kwargs = a.events.pop()
             self.assertEqual(name, 'build-client')
+            self.assertIdentical(args[0], self.protocol)
+            self.assertEqual(args[1], client_params)
+            self.assertEqual(args[2:], client_args)
+            self.assertEqual(len(args), 4)
 
         d.addCallback(check_status)
 
@@ -647,7 +629,7 @@ class ApplicationInterfaceTestCase(ServerFactoryTestCase):
         ServerFactoryTestCase.setUp(self)
 
         self.app = server.Application()
-        self.client = self.app.buildClient(self.protocol)
+        self.client = self.app.buildClient(self.protocol, {'app': 'foo'})
         self.app.acceptConnection(self.client)
 
         return self.factory.registerApplication('foo', self.app)

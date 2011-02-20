@@ -70,9 +70,14 @@ class IApplication(Interface):
         called when the disconnection was successful.
         """
 
-    def buildClient(protocol, **kwargs):
+    def buildClient(protocol, params, *args):
         """
         Returns a client object linked to the protocol object.
+
+        @param params: The connection parameters sent from the client, this
+            includes items such as the connection url, and user agent
+        @type: data: C{dict}
+        @param args: The client supplied arguments to NetConnection.connect()
         """
 
     # events
@@ -100,7 +105,7 @@ class IApplication(Interface):
         otherwise L{rejectConnection}.
 
         @param client: The client object built by L{buildClient}
-        @param args: The arguments passed to NetConnection.connect()
+        @param args: The client supplied arguments to NetConnection.connect()
         """
 
     def onConnectAccept(client, *args):
@@ -108,6 +113,7 @@ class IApplication(Interface):
         Called when the peer has been successfully connected to this application.
 
         @param client: The client object built by L{buildClient}
+        @param args: The client supplied arguments to NetConnection.connect()
         """
 
     def onConnectReject(client, reason):
@@ -466,8 +472,10 @@ class ServerProtocol(rtmp.RTMPProtocol):
         connection request. The return is paused until the peer has sent its
         bandwidth negotiation packets. See L{onDownstreamBandwidth}.
 
-        @param params: Connection parameters (i.e. tcUrl)
-        @param args: user supplied arguments to NetConnection.connect()
+        @param params: The connection parameters sent from the client, this
+            includes items such as the connection url, and user agent
+        @type: data: C{dict}
+        @param args: The client supplied arguments to NetConnection.connect()
         """
         if self.connected:
             # todo: error and disconnect here.
@@ -552,7 +560,7 @@ class ServerProtocol(rtmp.RTMPProtocol):
         if self.application is None:
             raise exc.InvalidApplication('Unknown application %r' % (appName,))
 
-        self.client = self.application.buildClient(self, **params)
+        self.client = self.application.buildClient(self, params, *args)
 
         def cb(res):
             """
@@ -856,13 +864,16 @@ class Application(object):
             log.err()
 
 
-    def buildClient(self, protocol, **kwargs):
+    def buildClient(self, protocol, params, *args):
         """
         Create an instance of a subclass of L{Client}. Override this method to
         alter how L{Client} instances are created.
 
         @param protocol: The L{rtmp.ServerProtocol} instance.
-        @param kwargs: A dict of arguments passed with the connect request.
+        @param params: The connection parameters sent from the client, this
+            includes items such as the connection url, and user agent
+        @type: data: C{dict}
+        @param args: The client supplied arguments to NetConnection.connect()
         """
         c = self.client(protocol)
 
