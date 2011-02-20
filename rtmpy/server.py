@@ -76,7 +76,7 @@ class IApplication(Interface):
 
         @param params: The connection parameters sent from the client, this
             includes items such as the connection url, and user agent
-        @type: data: C{dict}
+        @type params: C{dict}
         @param args: The client supplied arguments to NetConnection.connect()
         """
 
