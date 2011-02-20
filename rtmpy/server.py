@@ -88,7 +88,7 @@ class IApplication(Interface):
         @todo - implement this feature
         """
 
-    def onConnect(client):
+    def onConnect(client, *args):
         """
         Called when the peer connects to an application (NetConnection.connect).
 
@@ -100,9 +100,10 @@ class IApplication(Interface):
         otherwise L{rejectConnection}.
 
         @param client: The client object built by L{buildClient}
+        @param args: The arguments passed to NetConnection.connect()
         """
 
-    def onConnectAccept(client):
+    def onConnectAccept(client, *args):
         """
         Called when the peer has been successfully connected to this application.
 
@@ -456,7 +457,7 @@ class ServerProtocol(rtmp.RTMPProtocol):
 
 
     @expose('connect')
-    def onConnect(self, args):
+    def onConnect(self, params, *args):
         """
         Connects this protocol instance to an application. The application has
         the power to reject the connection (see L{Application.rejectConnection})
@@ -464,6 +465,9 @@ class ServerProtocol(rtmp.RTMPProtocol):
         Will return a L{defer.Deferred} that will contain the result of the
         connection request. The return is paused until the peer has sent its
         bandwidth negotiation packets. See L{onDownstreamBandwidth}.
+
+        @param params: Connection parameters (i.e. tcUrl)
+        @param args: user supplied arguments to NetConnection.connect()
         """
         if self.connected:
             # todo: error and disconnect here.
@@ -474,9 +478,9 @@ class ServerProtocol(rtmp.RTMPProtocol):
             Called when the application has accepted the connection
             (in principle)
             """
-            oE = args.pop('objectEncoding', self.objectEncoding)
+            oe = params.pop('objectEncoding', self.objectEncoding)
 
-            self.objectEncoding = oE
+            self.objectEncoding = oe
 
             f = self.factory
 
@@ -512,7 +516,7 @@ class ServerProtocol(rtmp.RTMPProtocol):
             description = fail.getErrorMessage() or 'Internal Server Error'
 
             return status.error(code, description,
-                objectEncoding=args.pop('objectEncoding', self.objectEncoding))
+                objectEncoding=params.pop('objectEncoding', self.objectEncoding))
 
         def chain_errback(f):
             self._pendingConnection.errback(f)
@@ -521,7 +525,7 @@ class ServerProtocol(rtmp.RTMPProtocol):
 
         self._pendingConnection.addCallbacks(return_success, eb)
 
-        d = defer.maybeDeferred(self._onConnect, *(args,))
+        d = defer.maybeDeferred(self._onConnect, params, *args)
 
         d.addCallback(connection_accepted)
         d.addErrback(chain_errback)
@@ -529,7 +533,7 @@ class ServerProtocol(rtmp.RTMPProtocol):
         # todo: timeout for connection
         return self._pendingConnection
 
-    def _onConnect(self, args):
+    def _onConnect(self, params, *args):
         """
         The business logic of connecting to the application.
         """
@@ -539,7 +543,7 @@ class ServerProtocol(rtmp.RTMPProtocol):
             raise exc.ConnectFailed('Already connected.')
 
         try:
-            appName = args['app']
+            appName = params['app']
         except KeyError:
             raise exc.ConnectFailed("Bad connect packet (missing 'app' key)")
 
@@ -548,7 +552,7 @@ class ServerProtocol(rtmp.RTMPProtocol):
         if self.application is None:
             raise exc.InvalidApplication('Unknown application %r' % (appName,))
 
-        self.client = self.application.buildClient(self, **args)
+        self.client = self.application.buildClient(self, **params)
 
         def cb(res):
             """
@@ -559,9 +563,9 @@ class ServerProtocol(rtmp.RTMPProtocol):
                 raise exc.ConnectRejected('Authorization is required')
 
             self.application.acceptConnection(self.client)
-            self.application.onConnectAccept(self.client)
+            self.application.onConnectAccept(self.client, *args)
 
-        d = defer.maybeDeferred(self.application.onConnect, self.client, **args)
+        d = defer.maybeDeferred(self.application.onConnect, self.client, *args)
 
         d.addCallback(cb)
 
@@ -975,7 +979,7 @@ class Application(object):
         Called when the application is ready to connect clients
         """
 
-    def onConnect(self, client, **args):
+    def onConnect(self, client, *args):
         """
         Called when a connection request is made to this application. Must
         return a C{bool} (or a L{defer.Deferred} returning a C{bool}) which
@@ -988,7 +992,7 @@ class Application(object):
         @type client: An instance of L{client_class}.
         """
 
-    def onConnectAccept(self, client, **kwargs):
+    def onConnectAccept(self, client, *args):
         """
         Called when the peer has successfully been connected to this
         application.

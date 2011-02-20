@@ -58,21 +58,21 @@ class SimpleApplication(object):
         return self.client
 
     def onConnect(self, *args, **kwargs):
-        self._add_event('connect', args, kwargs)
+        self._add_event('on-connect', args, kwargs)
 
         return not self.reject
 
     def onConnectAccept(self, *args, **kwargs):
-        self._add_event('connect-accept', args, kwargs)
+        self._add_event('on-connect-accept', args, kwargs)
 
     def onConnectReject(self, *args, **kwargs):
-        self._add_event('connect-reject', args, kwargs)
+        self._add_event('on-connect-reject', args, kwargs)
 
     def acceptConnection(self, *args, **kwargs):
         self._add_event('accept-connection', args, kwargs)
 
     def onAppStart(self, *args, **kwargs):
-        self._add_event('app-start', args, kwargs)
+        self._add_event('on-app-start', args, kwargs)
 
 
 class ApplicationRegisteringTestCase(unittest.TestCase):
@@ -418,8 +418,8 @@ class ConnectingTestCase(unittest.TestCase):
 
         self.assertEqual(state, {})
 
-    def connect(self, packet):
-        return self.control.onConnect(packet)
+    def connect(self, params, *args):
+        return self.control.onConnect(params, *args)
 
     def test_invokable_target(self):
         self.assertEqual(self.control.getInvokableTarget('connect'),
@@ -503,7 +503,7 @@ class ConnectingTestCase(unittest.TestCase):
 
     def test_success(self):
         """
-        Ensure a successful connection
+        Ensure a successful connection to application
         """
         a = self.factory.applications['what'] = SimpleApplication()
 
@@ -543,6 +543,67 @@ class ConnectingTestCase(unittest.TestCase):
 
         return d
 
+    def test_success_with_args(self):
+        """
+        Ensure a successful connection to application with optional user
+        arguments being passed
+        """
+        a = self.factory.applications['what'] = SimpleApplication()
+        a.client = object()
+
+        client_args = ("foo", "bar")
+        d = self.connect({'app': 'what'}, *client_args)
+
+        def check_status(res):
+            self.assertIsInstance(res, ExtraResult)
+            self.assertEqual(res.extra, {
+                'capabilities': 31, 'fmsVer': 'FMS/3,5,1,516', 'mode': 1})
+            self.assertEqual(res.result, {
+                'code': 'NetConnection.Connect.Success',
+                'objectEncoding': 0,
+                'description': 'Connection succeeded.',
+                'level': 'status'
+            })
+
+            msg, = self.messages.pop(0)
+
+            self.assertMessage(msg, message.DOWNSTREAM_BANDWIDTH,
+                bandwidth=2500000L)
+
+            msg, = self.messages.pop(0)
+
+            self.assertMessage(msg, message.UPSTREAM_BANDWIDTH,
+                bandwidth=2500000L, extra=2)
+
+            msg, = self.messages.pop(0)
+
+            self.assertMessage(msg, message.CONTROL,
+                type=0, value1=0)
+
+            self.assertEqual(self.messages, [])
+
+            name, args, kwargs = a.events.pop()
+            self.assertEqual(name, 'on-connect-accept')
+
+            name, args, kwargs = a.events.pop()
+            self.assertEqual(name, 'accept-connection')
+
+            name, args, kwargs = a.events.pop()
+            self.assertEqual(name, 'on-connect')
+            self.assertIdentical(args[0], a.client)
+            self.assertEqual(args[1:], client_args)
+            self.assertEqual(len(args), 3)
+            self.assertEqual(kwargs, {})
+
+            name, args, kwargs = a.events.pop()
+            self.assertEqual(name, 'build-client')
+
+        d.addCallback(check_status)
+
+        self.protocol.onDownstreamBandwidth(2000, 2)
+
+        return d
+
     def test_reject(self):
         a = self.factory.applications['what'] = SimpleApplication()
         a.reject = True
@@ -562,7 +623,7 @@ class ConnectingTestCase(unittest.TestCase):
 
             name, args, kwargs = a.events.pop()
 
-            self.assertEqual(name, 'connect-reject')
+            self.assertEqual(name, 'on-connect-reject')
             self.assertIdentical(args[0], a.client)
             self.assertEqual(len(args), 2)
             self.assertEqual(kwargs, {})
