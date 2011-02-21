@@ -223,6 +223,9 @@ class BaseCallHandler(object):
         """
         callId = kwargs.get('callId', None)
 
+        if callId == NO_RESULT:
+            return callId
+
         if callId is None:
             callId = self._lastCallId = self.getNextCallId()
         elif self.isCallActive(callId):

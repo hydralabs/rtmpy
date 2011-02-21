@@ -678,6 +678,14 @@ class ServerProtocol(rtmp.RTMPProtocol):
 
         return d
 
+    def onControlMessage(self, *args):
+        """
+        """
+
+
+    def onBytesRead(self, *args):
+        """
+        """
 
 class StreamPublisher(object):
     """
