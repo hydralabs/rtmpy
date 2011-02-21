@@ -220,8 +220,14 @@ class BaseStream(rpc.AbstractCallHandler):
            RPC call. A return value is not part of the interface but helps
            greatly with testing.
         """
+        command = None
+
+        if len(args) > 0 and args[0] is None:
+            command = args[0]
+            args = args[1:]
+
         if self.isCallActive(callId):
-            return self.handleResponse(name, callId, args)
+            return self.handleResponse(name, callId, args, command=command)
 
         return self.callReceived(name, callId, *args)
 
