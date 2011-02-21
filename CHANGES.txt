@@ -6,6 +6,10 @@ versions of RTMPy.
 
 .. contents::
 
+0.2 (Unreleased)
+----------------
+- Allow arguments to be passed to NetConnection.connect() (Ticket:110)
+
 
 0.1.1 (2010-11-30)
 ------------------
