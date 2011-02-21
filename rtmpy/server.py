@@ -475,7 +475,7 @@ class ServerProtocol(rtmp.RTMPProtocol):
 
         @param params: The connection parameters sent from the client, this
             includes items such as the connection url, and user agent
-        @type: data: C{dict}
+        @type params: C{dict}
         @param args: The client supplied arguments to NetConnection.connect()
         """
         if self.connected:
@@ -545,6 +545,10 @@ class ServerProtocol(rtmp.RTMPProtocol):
     def _onConnect(self, params, *args):
         """
         The business logic of connecting to the application.
+
+        @param params: The connection parameters sent from the client, this
+            includes items such as the connection url, and user agent
+        @type params: C{dict}
         """
         if self.application:
             # This protocol has already successfully completed a connection
@@ -873,7 +877,7 @@ class Application(object):
         @param protocol: The L{rtmp.ServerProtocol} instance.
         @param params: The connection parameters sent from the client, this
             includes items such as the connection url, and user agent
-        @type: data: C{dict}
+        @type params: C{dict}
         @param args: The client supplied arguments to NetConnection.connect()
         """
         c = self.client(protocol)
