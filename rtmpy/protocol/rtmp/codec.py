@@ -756,7 +756,7 @@ class ChannelMuxer(Codec):
         while self.pending and self.channelsInUse <= MAX_CHANNELS:
             self.send(*self.pending.pop(0))
 
-        if self.channelsInUse == 0:
+        if not bool(self.activeChannels):
             raise StopIteration
 
         to_release = []
