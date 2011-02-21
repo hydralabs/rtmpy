@@ -22,8 +22,9 @@ from twisted.internet import protocol, defer
 from twisted.python import failure, log
 
 from rtmpy import util, exc, versions
-from rtmpy import message, expose, status
+from rtmpy import message, rpc, status
 from rtmpy.protocol import rtmp, handshake, version
+
 
 
 class IApplication(Interface):
@@ -229,17 +230,17 @@ class NetStream(rtmp.NetStream):
         self.name = name
         self.state = 'publishing'
 
-    @expose
+    @rpc.expose
     def receiveAudio(self, audio):
         """
         """
 
-    @expose
+    @rpc.expose
     def receiveVideo(self, video):
         """
         """
 
-    @expose
+    @rpc.expose
     def publish(self, name, type_='live'):
         """
         Called by the peer to start pushing video/audio data.
@@ -272,7 +273,7 @@ class NetStream(rtmp.NetStream):
 
         return d
 
-    @expose
+    @rpc.expose
     def closeStream(self):
         """
         Called when the stream is closing.
@@ -333,7 +334,7 @@ class NetStream(rtmp.NetStream):
         if self.publisher:
             self.publisher.audioDataReceived(data, timestamp)
 
-    @expose('@setDataFrame')
+    @rpc.expose('@setDataFrame')
     def setDataFrame(self, name, meta):
         """
         Called by the peer to set the 'data frame'? Not quite sure what this is
@@ -350,7 +351,7 @@ class NetStream(rtmp.NetStream):
         if func and name == 'onMetaData':
             func(meta)
 
-    @expose
+    @rpc.expose
     def play(self, name, *args):
         d = defer.maybeDeferred(self.nc.playStream, name, self, *args)
 
@@ -463,7 +464,7 @@ class ServerProtocol(rtmp.RTMPProtocol):
                 return target
 
 
-    @expose('connect')
+    @rpc.expose('connect')
     def onConnect(self, params, *args):
         """
         Connects this protocol instance to an application. The application has
@@ -644,7 +645,7 @@ class ServerProtocol(rtmp.RTMPProtocol):
             log.err()
 
 
-    @expose
+    @rpc.expose
     def releaseStream(self, name):
         """
         Called when the stream is released. Not sure about this one.
