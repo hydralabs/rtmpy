@@ -20,8 +20,9 @@ from twisted.trial import unittest
 from twisted.internet import defer, reactor, protocol
 from twisted.test.proto_helpers import StringTransportWithDisconnection, StringIOWithoutClosing
 
-from rtmpy import server, exc
-from rtmpy.protocol.rtmp import message, ExtraResult
+from rtmpy import server, exc, rpc
+from rtmpy.protocol.rtmp import message
+
 
 
 class SimpleApplication(object):
@@ -327,13 +328,6 @@ class ServerFactoryTestCase(unittest.TestCase):
         """
         return protocol.getStream(protocol.createStream())
 
-        def capture_status(s):
-            self.stream_status[stream] = s
-
-        stream.sendStatus = capture_status
-
-        return stream
-
 
 
 class ConnectingTestCase(unittest.TestCase):
@@ -368,7 +362,7 @@ class ConnectingTestCase(unittest.TestCase):
         """
         Ensures that a status message has been sent.
         """
-        stream, msg, whenDone = self.messages.pop(0)
+        stream, msg = self.messages.pop(0)
 
         self.assertEqual(self.messages, [])
 
@@ -408,7 +402,7 @@ class ConnectingTestCase(unittest.TestCase):
         """
         Ensure that the msg is of a particular type and state
         """
-        self.assertEqual(msg.RTMP_TYPE, type_)
+        self.assertEqual(message.typeByClass(msg), type_)
 
         d = msg.__dict__
 
@@ -420,10 +414,6 @@ class ConnectingTestCase(unittest.TestCase):
 
     def connect(self, params, *args):
         return self.control.onConnect(params, *args)
-
-    def test_invokable_target(self):
-        self.assertEqual(self.control.getInvokableTarget('connect'),
-            self.control.onConnect)
 
     def test_invoke(self):
         """
@@ -510,8 +500,8 @@ class ConnectingTestCase(unittest.TestCase):
         d = self.connect({'app': 'what'})
 
         def check_status(res):
-            self.assertIsInstance(res, ExtraResult)
-            self.assertEqual(res.extra, {
+            self.assertIsInstance(res, rpc.CommandResult)
+            self.assertEqual(res.command, {
                 'capabilities': 31, 'fmsVer': 'FMS/3,5,1,516', 'mode': 1})
             self.assertEqual(res.result, {
                 'code': 'NetConnection.Connect.Success',
@@ -849,18 +839,11 @@ class PlayTestCase(ServerFactoryTestCase):
 
         self.assertFalse(d.called)
 
-        def cb(res):
-            self.assertTrue('foo' in self.app.streams)
+        res = self.app.publishStream(client, s, 'foo')
 
-            self.assertTrue(s in res.subscribers)
+        self.assertTrue('foo' in self.app.streams)
+        self.assertTrue(s in res.subscribers)
 
-        from twisted.internet import reactor
-
-        reactor.callLater(0, self.app.publishStream, client, s, 'foo')
-
-        d.addCallback(cb)
-
-        return d
 
     def test_existing(self):
         """

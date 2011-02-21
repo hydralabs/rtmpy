@@ -156,6 +156,8 @@ class RTMPProtocol(protocol.Protocol, core.NetConnection):
         if self.state == self.HANDSHAKE:
             del_attr('handshaker')
         elif self.state == self.STREAM:
+            self.closeAllStreams()
+
             self._decodingBuffer.truncate()
             self._encodingBuffer.truncate()
 
@@ -288,7 +290,7 @@ class RTMPProtocol(protocol.Protocol, core.NetConnection):
         # fast enough and the penalty for setting up a new thread is too high.
         msg.encode(buf)
 
-        e.send(buf.getvalue(), msg.type, stream.streamId, stream.timestamp)
+        e.send(buf.getvalue(), msg.__data_type__, stream.streamId, stream.timestamp)
 
         if e.active and not self.encoder_task:
             self._startEncoding()

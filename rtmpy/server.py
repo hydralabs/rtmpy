@@ -22,9 +22,9 @@ from twisted.internet import protocol, defer
 from twisted.python import failure, log
 
 from rtmpy import util, exc, versions
-from rtmpy import message, rpc, status
+from rtmpy import message, rpc, status, core
 from rtmpy.protocol import rtmp, handshake, version
-
+from rtmpy.status import codes
 
 
 class IApplication(Interface):
@@ -198,7 +198,8 @@ class Client(object):
         self.nc.call(name, *args)
 
 
-class NetStream(rtmp.NetStream):
+
+class NetStream(core.NetStream):
     """
     A server side NetStream. Knows nothing of L{IApplication}s but interfaces
     directly with the L{ServerProtocol} (which does). A NetStream is dumb and
@@ -215,7 +216,7 @@ class NetStream(rtmp.NetStream):
     """
 
     def __init__(self, nc, streamId):
-        rtmp.NetStream.__init__(self, nc, streamId)
+        core.NetStream.__init__(self, nc, streamId)
 
         self.state = None
         self.name = None
@@ -415,8 +416,6 @@ class ServerProtocol(rtmp.RTMPProtocol):
     management. Provides a proxy between streams and the associated application.
     """
 
-    stream_class = NetStream
-
     def startStreaming(self):
         """
         Called when the RTMP handshake has been successfully negotiated and
@@ -427,7 +426,14 @@ class ServerProtocol(rtmp.RTMPProtocol):
         self.connected = False
         self.application = None
 
-    def getInvokableTarget(self, name):
+
+    def buildStream(self, streamId):
+        """
+        """
+        return NetStream(self, streamId)
+
+
+    def callExposedMethod(self, name, *args):
         """
         Used to match a callable based on the supplied name when a notify or
         invoke is encountered. Returns C{None} if not found.
@@ -440,11 +446,6 @@ class ServerProtocol(rtmp.RTMPProtocol):
 
         @see: L{rtmp.RTMPProtocol.getInvokableTarget}
         """
-        target = rtmp.RTMPProtocol.getInvokableTarget(self, name)
-
-        if target:
-            return target
-
         # all client methods are publicly accessible
         client = getattr(self, 'client', None)
 
@@ -452,7 +453,7 @@ class ServerProtocol(rtmp.RTMPProtocol):
             target = util.get_callable_target(client, name)
 
             if target:
-                return target
+                return defer.maybeDeferred(target, *args)
 
         application = getattr(self, 'application', None)
 
@@ -461,7 +462,9 @@ class ServerProtocol(rtmp.RTMPProtocol):
             target = util.get_callable_target(application, name)
 
             if target:
-                return target
+                return defer.maybeDeferred(target, *args)
+
+        return super(ServerProtocol, self).callExposedMethod(name, *args)
 
 
     @rpc.expose('connect')
@@ -510,7 +513,7 @@ class ServerProtocol(rtmp.RTMPProtocol):
 
             self.sendMessage(message.ControlMessage(0, 0))
 
-            return rtmp.ExtraResult(result,
+            return rpc.CommandResult(result,
                 # what are these values?
                 {'mode': 1, 'capabilities': 31, 'fmsVer': 'FMS/3,5,1,516'})
 
@@ -522,11 +525,10 @@ class ServerProtocol(rtmp.RTMPProtocol):
             if self.application and self.client:
                 self.application.onConnectReject(self.client, fail, *args)
 
-            code = getattr(fail.value, 'code', 'NetConnection.Connect.Failed')
+            code = status.fromFailure(fail)
             description = fail.getErrorMessage() or 'Internal Server Error'
 
-            return status.error(code, description,
-                objectEncoding=params.pop('objectEncoding', self.objectEncoding))
+            return status.fromFailure(fail, codes.NC_CONNECT_FAILED, objectEncoding=self.objectEncoding)
 
         def chain_errback(f):
             self._pendingConnection.errback(f)

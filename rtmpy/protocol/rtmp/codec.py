@@ -816,6 +816,9 @@ class Encoder(ChannelMuxer):
 
         self.bytes += len(s)
 
+    @property
+    def active(self):
+        return bool(self.activeChannels)
 
     def __iter__(self):
         return self

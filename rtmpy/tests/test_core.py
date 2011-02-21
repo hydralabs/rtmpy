@@ -64,6 +64,12 @@ class SimpleStreamManager(core.StreamManager):
         return s
 
 
+    def closeStream(self):
+        """
+        We need this since we are the control stream.
+        """
+
+
 
 class TestRuntimeError(RuntimeError):
     """

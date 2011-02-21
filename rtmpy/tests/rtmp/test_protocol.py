@@ -82,6 +82,10 @@ class SimpleProtocol(rtmp.RTMPProtocol):
         return core.NetStream(self, streamId)
 
 
+    def closeStream(self):
+        pass
+
+
 
 class ProtocolTestCase(unittest.TestCase):
     """

@@ -95,7 +95,7 @@ def error(code, description, **kwargs):
 
 
 
-def fromFailure(fail, defaultCode=None):
+def fromFailure(fail, defaultCode=None, **kwargs):
     """
     Returns an error status notification based on the supplied
     L{twisted.python.failure.Failure} object.
@@ -110,7 +110,7 @@ def fromFailure(fail, defaultCode=None):
     code = exc.codeByClass(cls) or exc.codeByClass(defaultCode) or defaultCode
     description = fail.getErrorMessage()
 
-    return error(code, description)
+    return error(code, description, **kwargs)
 
 
 

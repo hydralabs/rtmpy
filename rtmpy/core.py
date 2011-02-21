@@ -151,6 +151,11 @@ class StreamManager(object):
             except:
                 log.err()
 
+        try:
+            control_stream.closeStream()
+        except:
+            log.err()
+
         self.streams = {
             self.CONTROL_STREAM_ID: control_stream
         }
