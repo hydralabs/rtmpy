@@ -440,8 +440,6 @@ class ServerNegotiator(BaseNegotiator):
 
         Builds and writes the ack packet.
         """
-        x = BufferedByteStream(self.peer_syn.payload)
-
         self.my_ack = Packet(self.peer_syn.uptime, self.my_syn.uptime)
 
         self.buildAckPayload(self.my_ack)

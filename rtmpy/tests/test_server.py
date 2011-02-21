@@ -367,7 +367,6 @@ class ConnectingTestCase(unittest.TestCase):
         self.assertEqual(self.messages, [])
 
         self.assertIdentical(stream, self.control)
-        self.assertEqual(whenDone, None)
 
         self.assertIsInstance(msg, message.Invoke)
         self.assertEqual(msg.name, 'onStatus')
@@ -495,7 +494,7 @@ class ConnectingTestCase(unittest.TestCase):
         """
         Ensure a successful connection to application
         """
-        a = self.factory.applications['what'] = SimpleApplication()
+        self.factory.applications['what'] = SimpleApplication()
 
         d = self.connect({'app': 'what'})
 
@@ -770,7 +769,7 @@ class PublishingTestCase(ServerFactoryTestCase):
         d = s.publish('foo')
 
         def eb(f):
-            x = f.trap(exc.ConnectError)
+            f.trap(exc.ConnectError)
 
             self.assertEqual(f.getErrorMessage(), 'Cannot publish stream - not connected')
 

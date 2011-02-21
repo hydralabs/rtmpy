@@ -142,10 +142,9 @@ class ClientSynTestCase(ClientNegotiatorTestCase):
     def test_restart(self):
         self.negotiator.start(self.uptime, self.version)
 
-        e = self.assertRaises(handshake.HandshakeError, self.negotiator.start,
+        self.assertRaises(handshake.HandshakeError, self.negotiator.start,
             self.uptime, self.version)
 
-        #self.assertEqual(str(e), 'Handshake negotiator cannot be restarted')
         self.assertFalse(self.succeeded)
 
     def test_initiate(self):

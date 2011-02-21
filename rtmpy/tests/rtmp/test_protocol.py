@@ -22,7 +22,7 @@ from twisted.internet import error, defer, reactor
 from twisted.test.proto_helpers import StringTransportWithDisconnection
 
 from rtmpy.protocol import rtmp
-from rtmpy import message, status, core, exc
+from rtmpy import message, core, exc
 
 
 class MockHandshakeNegotiator(object):

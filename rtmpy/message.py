@@ -17,7 +17,7 @@
 RTMP message implementations.
 """
 
-from zope.interface import Interface, implements, Attribute
+from zope.interface import Interface, implements
 import pyamf
 
 from rtmpy.util import add_to_class

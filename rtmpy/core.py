@@ -20,7 +20,6 @@ Core primitives and logic for all things RTMP.
 import collections
 
 from twisted.python import log
-from zope.interface import Interface, implements
 
 from rtmpy import rpc, status
 

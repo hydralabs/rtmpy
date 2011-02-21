@@ -525,10 +525,8 @@ class ServerProtocol(rtmp.RTMPProtocol):
             if self.application and self.client:
                 self.application.onConnectReject(self.client, fail, *args)
 
-            code = status.fromFailure(fail)
-            description = fail.getErrorMessage() or 'Internal Server Error'
-
-            return status.fromFailure(fail, codes.NC_CONNECT_FAILED, objectEncoding=self.objectEncoding)
+            return status.fromFailure(fail, codes.NC_CONNECT_FAILED,
+                objectEncoding=self.objectEncoding)
 
         def chain_errback(f):
             self._pendingConnection.errback(f)
@@ -643,7 +641,7 @@ class ServerProtocol(rtmp.RTMPProtocol):
 
         try:
             self.application.onUnpublish(self.client, stream)
-        except Exception, e:
+        except Exception:
             log.err()
 
 
@@ -868,7 +866,7 @@ class Application(object):
 
         try:
             self.onDisconnect(client)
-        except Exception, e:
+        except Exception:
             log.err()
 
 

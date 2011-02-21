@@ -18,7 +18,6 @@ Tests for L{rtmpy.rpc}.
 """
 
 
-from zope.interface import implementedBy
 from twisted.trial import unittest
 from twisted.internet import defer
 
@@ -823,7 +822,7 @@ class CallReceiverTestCase(unittest.TestCase):
         Test an RPC call that raises an exception.
         """
         try:
-            ret = yield self.makeCall('known_failure')
+            yield self.makeCall('known_failure')
         except TestRuntimeError, e:
             self.assertEqual(str(e), 'This is my BOOOM stick!!')
         else:

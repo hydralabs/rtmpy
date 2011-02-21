@@ -301,7 +301,7 @@ def add_to_class(f, depth=1):
 
         # Try to make sure we were called from a class def.
         if locals is frame.f_globals or '__module__' not in locals:
-            raise TypeError(code + " can be used only from a class definition.")
+            raise TypeError(f + " can be used only from a class definition.")
 
         f(locals, *args, **kwargs)
 

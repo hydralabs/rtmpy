@@ -187,7 +187,7 @@ class StreamManagerTestCase(unittest.TestCase):
         """
         m = self.buildManager()
 
-        ids = [m.createStream() for i in xrange(50)]
+        [m.createStream() for i in xrange(50)]
         ids_to_delete = [23, 14, 46, 2]
 
         for streamId in ids_to_delete:

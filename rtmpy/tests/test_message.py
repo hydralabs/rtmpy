@@ -486,27 +486,21 @@ class UpstreamBandwidthTestCase(BaseTestCase):
     def test_encode(self):
         # test default encode
         x = message.UpstreamBandwidth()
-        e = self.assertRaises(message.EncodeError, x.encode, self.buffer)
-        #self.assertEquals(str(e), 'Upstream bandwidth not set')
+        self.assertRaises(message.EncodeError, x.encode, self.buffer)
         self.buffer.truncate(0)
 
         x = message.UpstreamBandwidth(bandwidth='234')
-        e = self.assertRaises(message.EncodeError, x.encode, self.buffer)
-        #self.assertEquals(str(e), 'Extra not set')
+        self.assertRaises(message.EncodeError, x.encode, self.buffer)
         self.buffer.truncate(0)
 
         # test non-int encode
         x = message.UpstreamBandwidth(bandwidth='foo.bar', extra=234)
-        e = self.assertRaises(message.EncodeError, x.encode, self.buffer)
-        #self.assertEquals(str(e), "TypeError: Upstream bandwidth "
-        #    "(expected int, got <type 'str'>)")
+        self.assertRaises(message.EncodeError, x.encode, self.buffer)
         self.buffer.truncate(0)
 
         # test non-int encode
         x = message.UpstreamBandwidth(bandwidth=1200, extra='asdfas')
-        e = self.assertRaises(message.EncodeError, x.encode, self.buffer)
-        #self.assertEquals(str(e), "TypeError: extra "
-        #    "(expected int, got <type 'str'>)")
+        self.assertRaises(message.EncodeError, x.encode, self.buffer)
         self.buffer.truncate(0)
 
         x = message.UpstreamBandwidth(bandwidth=50, extra=12)
