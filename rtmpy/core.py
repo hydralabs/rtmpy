@@ -203,6 +203,25 @@ class BaseStream(rpc.AbstractCallHandler):
         self.timestamp = timestamp
 
 
+    def onInvoke(self, name, callId, args, timestamp):
+        """
+        Part of the L{message.IMessageListener} interface, responds to RTMP
+        invoke messages.
+
+        @param name: The name of the method call.
+        @param callId: Used for handling state.
+        @param args: A tuple of arguments supplied with the RPC call.
+        @param timestamp: A timestamp when the RPC call was made.
+        @return: Returns a L{defer.Deferred} that will hold the result of the
+           RPC call. A return value is not part of the interface but helps
+           greatly with testing.
+        """
+        if self.isCallActive(callId):
+            return self.handleResponse(name, callId, args)
+
+        return self.callReceived(name, callId, *args)
+
+
 
 class NetConnection(StreamManager, BaseStream):
     """

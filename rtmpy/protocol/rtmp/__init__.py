@@ -99,7 +99,7 @@ class DecodingDispatcher(object):
 
 
 
-class RTMPProtocol(protocol.Protocol, core.BaseStream):
+class RTMPProtocol(protocol.Protocol, core.NetConnection):
     """
     Provides basic handshaking and RTMP protocol support.
 
@@ -333,15 +333,3 @@ class RTMPProtocol(protocol.Protocol, core.BaseStream):
             peer before sending an acknowledgement
         """
         self.decoder.setBytesInterval(interval)
-
-    def onUpstreamBandwidth(self, bandwidth, extra, timestamp):
-        """
-        """
-
-    def onControlMessage(self, msg, timestamp):
-        """
-        """
-
-    def onBytesRead(self, bytes, timestamp):
-        """
-        """

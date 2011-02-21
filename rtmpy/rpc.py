@@ -341,7 +341,7 @@ class AbstractCallHandler(BaseCallHandler):
         @type name: C{str}
         @param callId: The tracking identifier for the called method.
         @type callId: C{int}
-        @param args: The arguments supplied with the response.
+        @param result: The arguments supplied with the response.
         @return: C{None}
         """
         command = kwargs.get('command', None)
@@ -375,6 +375,8 @@ class AbstractCallHandler(BaseCallHandler):
             log.msg('Original call was %r%r with command %r' % (
                 originalName, originalArgs, originalCommand))
 
+        return d
+
 
     def callReceived(self, name, callId, *args):
         """
@@ -393,6 +395,9 @@ class AbstractCallHandler(BaseCallHandler):
         @return: A L{defer.Deferred} containing the result of the call.
         """
         def cb(result):
+            if callId == NO_RESULT:
+                return result
+
             self.finishCall(callId)
             command = None
 
@@ -408,6 +413,9 @@ class AbstractCallHandler(BaseCallHandler):
 
 
         def eb(fail):
+            if callId == NO_RESULT:
+                return fail
+
             self.finishCall(callId)
 
             error = status.fromFailure(fail, exc.CallFailed)
