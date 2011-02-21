@@ -418,12 +418,7 @@ def get_test_requirements():
     """
     Returns a list of required packages to run the test suite.
     """
-    test_requires = ['Twisted>=2.5.0', 'PyAMF>=0.6']
-
-    if can_compile_extensions:
-        test_requires.extend(['Cython>=0.13'])
-
-    return test_requires
+    return []
 
 
 
