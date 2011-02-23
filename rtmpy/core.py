@@ -187,7 +187,7 @@ class BaseStream(rpc.AbstractCallHandler):
         else:
             s = status.status(code, description, **kwargs)
 
-        self.execute('onStatus', s, command=command)
+        self.call('onStatus', s, command=command)
 
 
     def setTimestamp(self, timestamp, relative=True):

@@ -60,7 +60,6 @@ class CommandResult(object):
         self.command = command
 
 
-
 def expose(func):
     """
     A decorator that provides an easy way to expose methods that the peer can
@@ -285,33 +284,16 @@ class AbstractCallHandler(BaseCallHandler):
         raise NotImplementedError
 
 
-    def execute(self, name, *args, **kwargs):
+    def call(self, name, *args, **kwargs):
         """
         Builds and sends an RPC call to the receiving endpoint.
 
-        This is a B{fire-and-forget} method, no result is expected or will be
-        returned. If you expect a result from the receiving endpoint, use
-        L{call}.
+        By default, this is a B{fire-and-forget} method, no result is expected
+        or will be returned.
 
-        @param name: The name of the method to invoke on the receiving endpoint.
-        @type name: C{str}
-        @param args: The list of arguments to be invoked on the remote method.
-        @param kwargs['command']: The command arg to be sent as part of the RPC
-            call. This should only be used in advanced cases and should
-            generally be left alone unless you know what you're doing.
-        @return: C{None}
-        """
-        command = kwargs.get('command', None)
-        msg = message.Invoke(name, NO_RESULT, command, *args)
-
-        self.sendMessage(msg)
-
-
-    def call(self, name, *args, **kwargs):
-        """
-        Builds and sends an RPC call to the receiving endpoint and returns a
-        L{defer.Deferred} that waits for a result. If an error notification is
-        received then the C{errback} will be fired.
+        If C{notify=True} is supplied, a L{defer.Deferred} is returned that
+        waits for a result. If an error notification is received then the
+        C{errback} will be fired.
 
         @param name: The name of the method to invoke on the receiving endpoint.
         @type name: C{str}
@@ -319,8 +301,20 @@ class AbstractCallHandler(BaseCallHandler):
         @param kwargs['command']: The command arg to be sent as part of the RPC
             call. This should only be used in advanced cases and should
             generally be left alone unless you know what you're doing.
+        @param kwargs['notify']: Return a L{defer.Deferred} which will hold the
+            result of the call.
+        @return: By default, C{None} but if C{notify=True} is supplied, a
+            L{defer.Deferred} that will hold the result of the call.
         """
         command = kwargs.get('command', None)
+        notify = kwargs.get('notify', False)
+
+        if not notify:
+            msg = message.Invoke(name, NO_RESULT, command, *args)
+
+            self.sendMessage(msg)
+
+            return
 
         d = defer.Deferred()
         callId = self.initiateCall(d, name, args, command)

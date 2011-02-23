@@ -279,9 +279,9 @@ class SimpleInitiator(rpc.AbstractCallHandler):
 
 
 
-class ExecuteTestCase(unittest.TestCase):
+class CallTestCase(unittest.TestCase):
     """
-    Tests for L{rpc.AbstractCallInitiator.execute}
+    Tests for L{rpc.AbstractCallInitiator.call}
     """
 
 
@@ -298,7 +298,7 @@ class ExecuteTestCase(unittest.TestCase):
         i = self.invoker
         m = self.messages
 
-        ret = i.execute('remote_method', 1, 2, 3, 'foo')
+        ret = i.call('remote_method', 1, 2, 3, 'foo')
         self.assertEqual(ret, None)
 
         self.assertEqual(len(m), 1)
@@ -318,7 +318,7 @@ class ExecuteTestCase(unittest.TestCase):
         cmd = {'foo': 'bar'}
         i, m = self.invoker, self.messages
 
-        ret = i.execute('remote_method', command=cmd)
+        ret = i.call('remote_method', command=cmd)
         self.assertEqual(ret, None)
 
         self.assertEqual(len(m), 1)
@@ -336,15 +336,15 @@ class ExecuteTestCase(unittest.TestCase):
         """
         i = self.invoker
 
-        i.execute('foo')
+        i.call('foo')
 
         self.assertFalse(i.isCallActive(0))
 
 
 
-class CallTestCase(unittest.TestCase):
+class CallWithNotifTestCase(unittest.TestCase):
     """
-    Tests for L{rpc.AbstractCallHandler.call}
+    Tests for L{rpc.AbstractCallHandler.call} with C{notify=True} supplied.
     """
 
 
@@ -361,7 +361,7 @@ class CallTestCase(unittest.TestCase):
         i = self.invoker
         m = self.messages
 
-        d = i.call('remote_method', 1, 2, 3, 'foo')
+        d = i.call('remote_method', 1, 2, 3, 'foo', notify=True)
 
         self.assertTrue(isinstance(d, defer.Deferred))
         self.assertEqual(len(m), 1)
@@ -386,7 +386,7 @@ class CallTestCase(unittest.TestCase):
         cmd = {'foo': 'bar'}
         i, m = self.invoker, self.messages
 
-        d = i.call('remote_method', command=cmd)
+        d = i.call('remote_method', command=cmd, notify=True)
 
         self.assertTrue(isinstance(d, defer.Deferred))
         self.assertEqual(len(m), 1)
@@ -421,7 +421,7 @@ class CallTestCase(unittest.TestCase):
         self.patch(i, 'sendMessage', sendBadMessage)
 
         self.assertRaises(TestRuntimeError, i.call,
-            'remote_method')
+            'remote_method', notify=True)
 
         self.assertFalse(i.isCallActive(self.msg.id))
 
@@ -452,6 +452,8 @@ class CallResponseTestCase(unittest.TestCase):
     def makeCall(self, name, *args, **kwargs):
         """
         """
+        kwargs.setdefault('notify', True)
+
         return self.invoker.call(name, *args, **kwargs)
 
 
