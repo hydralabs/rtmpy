@@ -23,7 +23,7 @@ from twisted.internet import defer, reactor, protocol
 from twisted.test.proto_helpers import StringTransportWithDisconnection, StringIOWithoutClosing
 
 from rtmpy import server, exc, rpc, util
-from rtmpy.protocol.rtmp import message, ExtraResult
+from rtmpy.protocol.rtmp import message
 
 
 

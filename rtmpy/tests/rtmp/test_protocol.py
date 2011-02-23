@@ -405,8 +405,6 @@ class InvokingTestCase(ProtocolTestCase):
         """
         Invoke a method that does not exist with no response expected.
         """
-        self.assertEqual(self.stream.getInvokableTarget('дак'), None)
-
         d = self.stream.onInvoke('дак', 0, [], 0)
 
         self.assertIsInstance(d, defer.Deferred)
@@ -469,8 +467,6 @@ class InvokingTestCase(ProtocolTestCase):
         """
         Invoke a method that does not exist with a response expected.
         """
-        self.assertEqual(self.stream.getInvokableTarget('дак'), None)
-
         d = self.stream.onInvoke('дак', 1, [], 0)
 
         self.assertIsInstance(d, defer.Deferred)
@@ -485,11 +481,10 @@ class InvokingTestCase(ProtocolTestCase):
                 "Unknown method 'дак'")
 
         def check_messages(res):
-            msg, whenDone, stream = self.messages.pop(0)
+            msg, stream = self.messages.pop(0)
 
             self.assertEqual(self.messages, [])
 
-            self.assertEqual(whenDone, None)
             self.assertIdentical(stream, self.stream)
 
             self.assertIsInstance(msg, message.Invoke)
@@ -541,17 +536,14 @@ class InvokingTestCase(ProtocolTestCase):
 
         self.targets['дак'] = func
 
-        self.assertEqual(self.stream.getInvokableTarget('дак'), func)
-
         d = self.stream.onInvoke('дак', 1, [], 0)
         self.assertIsInstance(d, defer.Deferred)
 
         def check_messages(res):
-            msg, whenDone, stream = self.messages.pop(0)
+            msg, stream = self.messages.pop(0)
 
             self.assertEqual(self.messages, [])
 
-            self.assertEqual(whenDone, None)
             self.assertIdentical(stream, self.stream)
 
             self.assertIsInstance(msg, message.Invoke)
@@ -606,8 +598,6 @@ class InvokingTestCase(ProtocolTestCase):
 
         self.targets['дак'] = func
 
-        self.assertEqual(self.stream.getInvokableTarget('дак'), func)
-
         d = self.stream.onInvoke('дак', 1, [], 0)
         self.assertIsInstance(d, defer.Deferred)
 
@@ -615,11 +605,10 @@ class InvokingTestCase(ProtocolTestCase):
             fail.trap(RuntimeError)
 
         def check_messages(res):
-            msg, whenDone, stream = self.messages.pop(0)
+            msg, stream = self.messages.pop(0)
 
             self.assertEqual(self.messages, [])
 
-            self.assertEqual(whenDone, None)
             self.assertIdentical(stream, self.stream)
 
             self.assertIsInstance(msg, message.Invoke)
