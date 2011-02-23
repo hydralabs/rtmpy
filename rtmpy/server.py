@@ -16,6 +16,7 @@
 """
 Server implementation.
 """
+import urlparse
 
 from zope.interface import Interface, Attribute, implements
 from twisted.internet import protocol, defer
@@ -890,8 +891,26 @@ class Application(object):
         @param args: The client supplied arguments to NetConnection.connect()
         """
         c = self.client(protocol)
-
         c.id = util.generateBytes(9, readable=True)
+
+        # Inject properties into the client object
+        # TODO: Evaluate if these should be defined with @property in the
+        #  Client class itself.
+        c.application = self
+
+        try:
+            c.ip = c.nc.transport.getPeer().host
+        except AttributeError:
+            c.ip = None
+
+        tcUrl = params.get('tcUrl', '')
+        c.protocol = urlparse.urlparse(tcUrl).scheme
+        if c.protocol == '':
+            c.protocol = None
+
+        c.pageUrl = params.get('pageUrl', None)
+        c.uri = params.get('tcUrl', None)
+        c.agent = params.get('flashVer', None)
 
         return c
 

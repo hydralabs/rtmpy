@@ -76,6 +76,32 @@ class SimpleApplication(object):
         self._add_event('on-app-start', args, kwargs)
 
 
+class MockProtocol(object):
+
+    class Transport(object):
+
+        def __init__(self, good=True):
+            if good:
+                self._peer = self.GoodPeer()
+            else:
+                self._peer = self.BadPeer()
+
+        class GoodPeer(object):
+            host = "127.0.0.1"
+
+        class BadPeer(object):
+            pass
+
+        def getPeer(self):
+            return self._peer
+
+    def __init__(self, good=True):
+        self.transport = self.Transport(good)
+
+
+
+
+
 class ApplicationRegisteringTestCase(unittest.TestCase):
     """
     Tests for L{server.ServerFactory.registerApplication}
@@ -632,6 +658,52 @@ class ConnectingTestCase(unittest.TestCase):
         d.addCallback(check_status)
 
         return d
+
+    def test_client_properties(self):
+        """
+        Ensure that buildClient properly populates Client properties
+        """
+        a = server.Application()
+        p = MockProtocol(True)
+
+        client_params = {
+            'flashVer': 'MAC 10,2,154,13', 'app': 'what',
+            'pageUrl': 'http://foo.com/page',
+            'tcUrl': 'rtmp://localhost/live'
+            }
+
+        c = a.buildClient(p, client_params)
+
+        self.assertIdentical(c.nc, p)
+        self.assertIdentical(c.application, a)
+        self.assertEquals(c.ip, '127.0.0.1')
+        self.assertEquals(c.agent, 'MAC 10,2,154,13')
+        self.assertEquals(c.pageUrl, 'http://foo.com/page')
+        self.assertEquals(c.uri, 'rtmp://localhost/live')
+        self.assertEquals(c.protocol, 'rtmp')
+
+        return
+
+    def test_missing_client_properties(self):
+        """
+        Ensure that buildClient properly handles missing properties
+        """
+        a = server.Application()
+        p = MockProtocol(False)
+
+        client_params = {'app': 'what'}
+
+        c = a.buildClient(p, client_params)
+
+        self.assertIdentical(c.nc, p)
+        self.assertIdentical(c.application, a)
+        self.assertEquals(c.ip, None)
+        self.assertEquals(c.agent, None)
+        self.assertEquals(c.pageUrl, None)
+        self.assertEquals(c.uri, None)
+        self.assertEquals(c.protocol, None)
+
+        return
 
 
 class TestRuntimeError(RuntimeError):
