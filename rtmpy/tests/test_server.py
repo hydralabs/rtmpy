@@ -77,7 +77,9 @@ class SimpleApplication(object):
 
 
 class MockProtocol(object):
-
+    """
+    A mock protocol used to test protocol.transport.getPeer() requests
+    """
     class Transport(object):
 
         def __init__(self, good=True):

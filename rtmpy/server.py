@@ -904,7 +904,7 @@ class Application(object):
             c.ip = None
 
         tcUrl = params.get('tcUrl', '')
-        c.protocol = urlparse.urlparse(tcUrl).scheme
+        c.protocol = urlparse.urlparse(tcUrl)[0]
         if c.protocol == '':
             c.protocol = None
 
