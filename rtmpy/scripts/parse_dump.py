@@ -27,6 +27,14 @@ from rtmpy import message
 __all__ = ['parse_dump', 'XMLObserver']
 
 
+
+class MissingDataError(Exception):
+    """
+    Raised if the dump file contains [xxxx bytes missing in capture file]
+    """
+
+
+
 def parse_dump(f, observer):
     """
     Reads a pre-recorded RTMP stream (in c array format) from C{f} and sends
@@ -48,6 +56,9 @@ def parse_dump(f, observer):
 
         if not endpoint:
             continue
+
+        if data.startswith('[') and data.endswith('bytes missing in capture file]'):
+            raise MissingDataError
 
         endpoint.dataReceived(data)
 
@@ -357,5 +368,8 @@ def run():
 
     try:
         parse_dump(f, observer)
+    except MissingDataError:
+        print('Dump file is corrupt - missing data?')
+        raise SystemExit(1)
     finally:
         f.close()

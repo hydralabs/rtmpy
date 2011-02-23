@@ -688,7 +688,7 @@ class ChannelMuxer(Codec):
         """
         Flushes the internal buffer.
         """
-        raise NotImplementedError
+        raise NotImplemented
 
 
     def _encodeOneFrame(self, channel):
