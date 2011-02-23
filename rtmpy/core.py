@@ -232,6 +232,23 @@ class BaseStream(rpc.AbstractCallHandler):
         return self.callReceived(name, callId, *args)
 
 
+    def onNotify(self, name, args, timestamp):
+        """
+        Part of the L{message.IMessageListener} interface, responds to RTMP
+        notify messages.
+
+        We simply put the notify through as an anonymous invoke call.
+
+        @param name: The name of the method call.
+        @param args: A tuple of arguments supplied with the RPC call.
+        @param timestamp: A timestamp when the RPC call was made.
+        @return: Returns a L{defer.Deferred} that will hold the result of the
+           RPC call. A return value is not part of the interface but helps
+           greatly with testing.
+        """
+        self.callReceived(name, rpc.NO_RESULT, *args)
+
+
 
 class NetConnection(StreamManager, BaseStream):
     """
