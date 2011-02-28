@@ -424,7 +424,7 @@ class AbstractCallHandler(BaseCallHandler):
 
 
         try:
-            self.initiateCall(name, *args, callId=callId)
+            self.initiateCall(name, callId=callId, *args)
         except:
             return defer.fail().addErrback(eb)
 
