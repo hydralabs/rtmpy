@@ -87,6 +87,7 @@ class StreamManager(object):
 
         return s
 
+
     def getNextAvailableStreamId(self):
         """
         Return the next available stream id.
@@ -261,11 +262,12 @@ class NetConnection(StreamManager, BaseStream):
     @ivar client: The client object that is linked to this NetConnection.
     """
 
-    def __init__(self):
+    def __init__(self, protocol):
+        self.protocol = protocol
+        self.client = None
+
         BaseStream.__init__(self, 0)
         StreamManager.__init__(self)
-
-        self.client = None
 
 
     def getControlStream(self):
@@ -274,8 +276,7 @@ class NetConnection(StreamManager, BaseStream):
 
         @see: L{StreamManager.getControlStream}
         """
-        return self
-
+        return self.protocol
 
 
 class NetStream(BaseStream):

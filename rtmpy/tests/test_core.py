@@ -425,7 +425,7 @@ class NetConnectionTestCase(unittest.TestCase):
         Ensure we can actually create L{core.NetConnection} objects and check
         some defaults.
         """
-        nc = core.NetConnection()
+        nc = core.NetConnection(None)
 
         self.assertEqual(nc.streamId, 0)
         self.assertEqual(nc.client, None)
@@ -435,9 +435,10 @@ class NetConnectionTestCase(unittest.TestCase):
         """
         Ensure that the control stream for L{core.NetConnection} is itself.
         """
-        nc = core.NetConnection()
+        o = object()
+        nc = core.NetConnection(o)
 
-        self.assertIdentical(nc.getControlStream(), nc)
+        self.assertIdentical(nc.getControlStream(), o)
 
 
 
@@ -447,7 +448,7 @@ class NetStreamTestCase(unittest.TestCase):
     """
 
     def setUp(self):
-        self.nc = core.NetConnection()
+        self.nc = core.NetConnection(None)
 
 
     def test_create(self):

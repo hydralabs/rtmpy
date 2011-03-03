@@ -336,7 +336,10 @@ class ServerFactoryTestCase(unittest.TestCase):
         self.transport.protocol = self.protocol
 
         self.protocol.connectionMade()
+        self.protocol.versionReceived(3)
         self.protocol.handshakeSuccess('')
+
+        self.manager = self.protocol.streamManager
 
 
     def connect(self, app, protocol):
@@ -344,17 +347,17 @@ class ServerFactoryTestCase(unittest.TestCase):
 
         app.acceptConnection(client)
 
-        protocol.connected = True
-        protocol.client = client
-        protocol.application = app
+        protocol.nc.connected = True
+        protocol.nc.client = client
+        protocol.nc.application = app
 
         return client
 
-    def createStream(self, protocol):
+    def createStream(self, manager):
         """
         Returns the L{server.NetStream} as created by the protocol
         """
-        return protocol.getStream(protocol.createStream())
+        return manager.getStream(manager.createStream())
 
 
 
@@ -374,6 +377,7 @@ class ConnectingTestCase(unittest.TestCase):
 
         self.protocol.transport = self.transport
         self.protocol.connectionMade()
+        self.protocol.versionSuccess()
         self.protocol.handshakeSuccess('')
 
         self.messages = []
@@ -381,9 +385,9 @@ class ConnectingTestCase(unittest.TestCase):
         def send_message(*args):
             self.messages.append(args)
 
-        self.patch(self.protocol, 'sendMessage', send_message)
+        self.patch(self.protocol.nc, 'sendMessage', send_message)
 
-        self.control = self.protocol.getStream(0)
+        self.control = self.protocol.controlStream
 
 
     def assertStatus(self, code=None, description=None, level='status'):
@@ -453,7 +457,7 @@ class ConnectingTestCase(unittest.TestCase):
             self.executed = True
             self.assertEqual(args, my_args)
 
-        self.patch(self.protocol, 'onConnect', connect)
+        self.patch(self.control, 'onConnect', connect)
 
         d = self.control.onInvoke('connect', 0, [my_args], 0)
 
@@ -484,7 +488,7 @@ class ConnectingTestCase(unittest.TestCase):
         def bork(*args):
             raise EnvironmentError('woot')
 
-        self.patch(self.protocol, '_onConnect', bork)
+        self.patch(self.protocol.nc, '_onConnect', bork)
 
         d = self.connect({})
 
@@ -592,7 +596,7 @@ class ConnectingTestCase(unittest.TestCase):
 
             name, args, kwargs = a.events.pop()
             self.assertEqual(name, 'build-client')
-            self.assertIdentical(args[0], self.protocol)
+            self.assertIdentical(args[0], self.protocol.nc)
             self.assertEqual(args[1], client_params)
             self.assertEqual(args[2:], client_args)
             self.assertEqual(len(args), 4)
@@ -782,7 +786,7 @@ class PublishingTestCase(ServerFactoryTestCase):
         """
         Returns the L{server.NetStream} as created by the protocol
         """
-        stream = self.protocol.getStream(self.protocol.createStream())
+        stream = self.manager.getStream(self.manager.createStream())
 
         def capture_status(s):
             self.stream_status[stream] = s
@@ -903,8 +907,9 @@ class PlayTestCase(ServerFactoryTestCase):
         suspended state, until a stream with the right name is published.
         """
         client = self.connect(self.app, self.protocol)
+        m = self.protocol.streamManager
 
-        s = self.createStream(self.protocol)
+        s = self.createStream(m)
 
         self.assertFalse('foo' in self.app.streams)
 
@@ -925,7 +930,7 @@ class PlayTestCase(ServerFactoryTestCase):
         """
         client = self.connect(self.app, self.protocol)
 
-        s = self.createStream(self.protocol)
+        s = self.createStream(self.protocol.streamManager)
 
         self.assertFalse('foo' in self.app.streams)
 
