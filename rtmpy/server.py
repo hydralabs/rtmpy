@@ -639,7 +639,7 @@ class NetConnection(core.NetConnection):
             # request.
             raise exc.ConnectFailed('Already connected.')
 
-        self.application = self.factory.getApplicationWithDefault(params)
+        self.application = self.protocol.factory.getApplicationWithDefault(params, *args)
 
         self.client = self.application.buildClient(self, params, *args)
 
@@ -739,7 +739,7 @@ class ServerProtocol(rtmp.RTMPProtocol):
         """
 
 
-    
+
 class StreamPublisher(object):
     """
     Linked to a L{NetStream} when it makes a publish request. Manages a list of
@@ -1161,29 +1161,30 @@ class ServerFactory(protocol.ServerFactory):
         return self.handshake(observer, output)
 
 
-    def getApplicationWithDefault(self, args):
+    def getApplicationWithDefault(self, params, *args):
         """
         Checks if an application exists within the static table. If an
         application cannot be found there, getApplication is called.
 
         @param args: arguments from RTMP connect packet
         """
+        print params
         try:
-            appName = args['app']
+            appName = params['app']
         except KeyError:
             raise exc.ConnectFailed("Bad connect packet (missing 'app' key)")
 
         if self.applications.has_key(appName):
             return self.applications[appName]
 
-        app = self.getApplication(args)
+        app = self.getApplication(params, *args)
 
         if app == None:
             raise exc.InvalidApplication('Unknown application %r' % (appName,))
 
         return app
 
-    def getApplication(self, args):
+    def getApplication(self, params, *args):
         """
         Returns the active L{IApplication} instance related to C{args}. If
         there is no active application, C{None} is returned.

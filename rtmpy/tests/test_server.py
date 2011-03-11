@@ -619,8 +619,8 @@ class ConnectingTestCase(unittest.TestCase):
         d = self.connect({'app': 'what'})
 
         def check_status(res):
-            self.assertIsInstance(res, ExtraResult)
-            self.assertEqual(res.extra, {
+            self.assertIsInstance(res, rpc.CommandResult)
+            self.assertEqual(res.command, {
                 'capabilities': 31, 'fmsVer': 'FMS/3,5,1,516', 'mode': 1})
             self.assertEqual(res.result, {
                 'code': 'NetConnection.Connect.Success',
