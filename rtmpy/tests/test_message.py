@@ -86,7 +86,7 @@ class MessageTestCase(unittest.TestCase):
         x.foo = 'bar'
 
         self.assertEqual(repr(x),
-            "<rtmpy.protocol.rtmp.message.Message foo='bar' at 0x%x>" % id(x))
+            "<rtmpy.message.Message foo='bar' at 0x%x>" % id(x))
 
 
 class FrameSizeTestCase(BaseTestCase):
@@ -486,27 +486,21 @@ class UpstreamBandwidthTestCase(BaseTestCase):
     def test_encode(self):
         # test default encode
         x = message.UpstreamBandwidth()
-        e = self.assertRaises(message.EncodeError, x.encode, self.buffer)
-        #self.assertEquals(str(e), 'Upstream bandwidth not set')
+        self.assertRaises(message.EncodeError, x.encode, self.buffer)
         self.buffer.truncate(0)
 
         x = message.UpstreamBandwidth(bandwidth='234')
-        e = self.assertRaises(message.EncodeError, x.encode, self.buffer)
-        #self.assertEquals(str(e), 'Extra not set')
+        self.assertRaises(message.EncodeError, x.encode, self.buffer)
         self.buffer.truncate(0)
 
         # test non-int encode
         x = message.UpstreamBandwidth(bandwidth='foo.bar', extra=234)
-        e = self.assertRaises(message.EncodeError, x.encode, self.buffer)
-        #self.assertEquals(str(e), "TypeError: Upstream bandwidth "
-        #    "(expected int, got <type 'str'>)")
+        self.assertRaises(message.EncodeError, x.encode, self.buffer)
         self.buffer.truncate(0)
 
         # test non-int encode
         x = message.UpstreamBandwidth(bandwidth=1200, extra='asdfas')
-        e = self.assertRaises(message.EncodeError, x.encode, self.buffer)
-        #self.assertEquals(str(e), "TypeError: extra "
-        #    "(expected int, got <type 'str'>)")
+        self.assertRaises(message.EncodeError, x.encode, self.buffer)
         self.buffer.truncate(0)
 
         x = message.UpstreamBandwidth(bandwidth=50, extra=12)
@@ -538,9 +532,6 @@ class AudioDataTestCase(BaseTestCase):
     """
     Tests for L{message.AudioData}
     """
-
-    def test_streaming(self):
-        self.assertTrue(message.AUDIO_DATA in message.STREAMABLE_TYPES)
 
     def test_create(self):
         x = message.AudioData()
@@ -596,9 +587,6 @@ class VideoDataTestCase(BaseTestCase):
     Tests for L{message.VideoData}
     """
 
-    def test_streaming(self):
-        self.assertTrue(message.VIDEO_DATA in message.STREAMABLE_TYPES)
-
     def test_create(self):
         x = message.VideoData()
         self.assertEquals(x.__dict__, {'data': None})
@@ -651,7 +639,7 @@ class VideoDataTestCase(BaseTestCase):
 class HelperTestCase(unittest.TestCase):
     def test_type_class(self):
         for k, v in message.TYPE_MAP.iteritems():
-            self.assertEquals(message.get_type_class(k), v)
+            self.assertEquals(message.classByType(k), v)
 
         self.assertFalse('foo' in message.TYPE_MAP.keys())
-        self.assertRaises(message.UnknownEventType, message.get_type_class, 'foo')
+        self.assertRaises(message.UnknownType, message.classByType, 'foo')

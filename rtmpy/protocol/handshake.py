@@ -24,15 +24,16 @@ generate/decode the packets) to determine if the packets are valid.
 @since: 0.1
 """
 
-import time
 
 from zope.interface import implements, Interface, Attribute
 from pyamf.util import BufferedByteStream
 
 from rtmpy.protocol import version
+from rtmpy import util
 
 
 HANDSHAKE_LENGTH = 1536
+
 
 
 class IProtocolImplementation(Interface):
@@ -44,6 +45,7 @@ class IProtocolImplementation(Interface):
         'Implements IHandshakeNegotiator for client handshakes')
     ServerNegotiator = Attribute(
         'Implements IHandshakeNegotiator for server handshakes')
+
 
 
 class IHandshakeObserver(Interface):
@@ -58,6 +60,7 @@ class IHandshakeObserver(Interface):
         """
 
 
+
 class IHandshakeNegotiator(Interface):
     """
     Negotiates handshakes.
@@ -67,6 +70,7 @@ class IHandshakeNegotiator(Interface):
         "from this negotiator")
     transport = Attribute("Provides ITransport")
 
+
     def start(uptime=None, version=None):
         """
         Called to start the handshaking process. You can supply the uptime and
@@ -74,16 +78,19 @@ class IHandshakeNegotiator(Interface):
         specifically will be set to enable H.264 streaming.
         """
 
+
     def dataReceived(data):
         """
         Called when handshaking data has been received.
         """
+
 
     def buildSynPayload():
         """
         Builds the handshake payload for the negotiators syn payload (the first
         packet sent).
         """
+
 
     def buildAckPayload():
         """
@@ -92,29 +99,12 @@ class IHandshakeNegotiator(Interface):
         """
 
 
+
 class HandshakeError(Exception):
     """
     Generic class for handshaking related errors.
     """
 
-
-class ProtocolVersionError(HandshakeError):
-    """
-    Base error class for RTMP protocol version errors.
-    """
-
-
-class ProtocolTooHigh(ProtocolVersionError):
-    """
-    Raised if a protocol version is greater than can the requested version.
-    """
-
-
-class ProtocolDegraded(ProtocolVersionError):
-    """
-    Raised when a protocol version is lower than expected. This is a request
-    from the remote endpoint to use a lower protocol version.
-    """
 
 
 class VerificationError(HandshakeError):
@@ -123,53 +113,48 @@ class VerificationError(HandshakeError):
     """
 
 
+
 class Packet(object):
     """
     A handshake packet.
 
-    @ivar first: The first 4 bytes of the packet, represented as an unsigned
-        long.
-    @type first: 32bit unsigned int.
-    @ivar second: The second 4 bytes of the packet, represented as an unsigned
-        long.
-    @type second: 32bit unsigned int.
+    @ivar uptime: The uptime of the system in milliseconds. This value seems
+        fairly arbitrary at this point. First 4 bytes of the packet.
+    @type uptime: 32bit unsigned int.
+    @ivar version: The version of the peer. For non-digested handshaking this
+        will be 0. The second 4 bytes of the packet.
+    @type version: 32bit unsigned int.
     @ivar payload: A blob of data which makes up the rest of the packet. This
         must be C{HANDSHAKE_LENGTH} - 8 bytes in length.
     @type payload: C{str}
-    @ivar timestamp: Timestamp that this packet was created (in milliseconds).
-    @type timestamp: C{int}
     """
 
-    first = None
-    second = None
-    payload = None
-    timestamp = None
+    def __init__(self, uptime=0, version=0):
+        self.uptime = uptime
+        self.version = version
 
-    def __init__(self, **kwargs):
-        timestamp = kwargs.get('timestamp', None)
+        self.payload = None
 
-        if timestamp is None:
-            kwargs['timestamp'] = int(time.time())
-
-        self.__dict__.update(kwargs)
 
     def encode(self, buffer):
         """
         Encodes this packet to a stream.
         """
-        buffer.write_ulong(self.first or 0)
-        buffer.write_ulong(self.second or 0)
+        buffer.write_ulong(self.uptime)
+        buffer.write_ulong(self.version)
 
         buffer.write(self.payload)
+
 
     def decode(self, buffer):
         """
         Decodes this packet from a stream.
         """
-        self.first = buffer.read_ulong()
-        self.second = buffer.read_ulong()
+        self.uptime = buffer.read_ulong()
+        self.version = buffer.read_ulong()
 
         self.payload = buffer.read(HANDSHAKE_LENGTH - 8)
+
 
 
 class BaseNegotiator(object):
@@ -194,10 +179,12 @@ class BaseNegotiator(object):
 
     implements(IHandshakeNegotiator)
 
+
     def __init__(self, observer, transport):
         self.observer = observer
         self.transport = transport
         self.started = False
+
 
     def start(self, uptime=None, version=None):
         """
@@ -211,11 +198,16 @@ class BaseNegotiator(object):
 
         self.peer_version = None
 
-        self.my_syn = Packet(first=uptime, second=version)
+        self.my_syn = Packet(uptime, version)
         self.my_ack = None
 
         self.peer_syn = None
         self.peer_ack = None
+
+        self.buildSynPayload(self.my_syn)
+
+        self._writePacket(self.my_syn)
+
 
     def getPeerPacket(self):
         """
@@ -232,12 +224,14 @@ class BaseNegotiator(object):
 
         return packet
 
+
     def _writePacket(self, packet, stream=None):
         stream = stream or BufferedByteStream()
 
         packet.encode(stream)
 
         self.transport.write(stream.getvalue())
+
 
     def dataReceived(self, data):
         """
@@ -256,12 +250,8 @@ class BaseNegotiator(object):
 
         self._process()
 
+
     def _process(self):
-        if not self.peer_version:
-            self.peer_version = self.buffer.read_uchar()
-
-            self.versionReceived()
-
         if not self.peer_syn:
             self.peer_syn = self.getPeerPacket()
 
@@ -286,11 +276,13 @@ class BaseNegotiator(object):
         # inform the observer accordingly
         self.observer.handshakeSuccess(self.buffer.getvalue())
 
+
     def writeAck(self):
         """
         Writes L{self.my_ack} to the observer.
         """
         self._writePacket(self.my_ack)
+
 
     def buildSynPayload(self, packet):
         """
@@ -298,30 +290,20 @@ class BaseNegotiator(object):
         """
         raise NotImplementedError
 
+
     def buildAckPayload(self, packet):
         """
         Called to build the ack packet, based on the state of the negotiations.
         """
         raise NotImplementedError
 
-    def versionReceived(self):
-        """
-        Called when the peers handshake version has been received.
-        """
-        if self.peer_version == self.protocolVersion:
-            return
-
-        if self.peer_version > version.MAX_VERSION:
-            raise ProtocolVersionError('Invalid protocol version')
-
-        if self.peer_version > self.protocolVersion:
-            raise ProtocolTooHigh('Unexpected protocol version')
 
     def synReceived(self):
         """
         Called when the peers syn packet has been received. Use this function to
         do any validation/verification.
         """
+
 
     def ackReceived(self):
         """
@@ -330,35 +312,12 @@ class BaseNegotiator(object):
         """
 
 
+
 class ClientNegotiator(BaseNegotiator):
     """
     Negotiator for client initiating handshakes.
     """
 
-    def start(self, uptime=None, version=None):
-        """
-        Writes the handshake version and the syn packet.
-        """
-        BaseNegotiator.start(self, uptime, version)
-
-        self.buildSynPayload(self.my_syn)
-
-        stream = BufferedByteStream()
-
-        stream.write_uchar(self.protocolVersion)
-        self._writePacket(self.my_syn, stream)
-
-    def versionReceived(self):
-        """
-        Called when the peers handshake version is received. If the peer offers
-        a version lower than the version the client wants to speak, then the
-        client will complain.
-        """
-        BaseNegotiator.versionReceived(self)
-
-        if self.peer_version < self.protocolVersion:
-            raise ProtocolDegraded('Protocol version did not match (got %d, '
-                'expected %d)' % (self.peer_version, self.protocolVersion))
 
     def synReceived(self):
         """
@@ -368,6 +327,7 @@ class ClientNegotiator(BaseNegotiator):
         We're waiting for the ack packet to be received before we do anything.
         """
 
+
     def ackReceived(self):
         """
         Called when the peers ack packet has been received. Use this function to
@@ -375,21 +335,21 @@ class ClientNegotiator(BaseNegotiator):
 
         If validation succeeds then the ack is sent.
         """
-        if self.buffer.remaining() != 0:
+        if self.buffer.remaining():
             raise HandshakeError('Unexpected trailing data after peer ack')
 
-        if self.peer_ack.first != self.my_syn.first:
+        if self.peer_ack.uptime != self.my_syn.uptime:
             raise VerificationError('Received uptime is not the same')
 
         if self.peer_ack.payload != self.my_syn.payload:
             raise VerificationError('Received payload is not the same')
 
-        self.my_ack = Packet(first=self.peer_syn.first,
-            second=self.my_syn.timestamp)
+        self.my_ack = Packet(self.peer_syn.uptime, self.my_syn.version)
 
         self.buildAckPayload(self.my_ack)
 
         self.writeAck()
+
 
 
 class ServerNegotiator(BaseNegotiator):
@@ -397,19 +357,22 @@ class ServerNegotiator(BaseNegotiator):
     Negotiator for server handshakes.
     """
 
-    def versionReceived(self):
+    def buildSynPayload(self, packet):
         """
-        Called when the peers version has been received.
+        Called to build the syn packet, based on the state of the negotiations.
 
-        Builds and writes the syn packet.
+        C{RTMP} payloads are just random.
         """
-        BaseNegotiator.versionReceived(self)
+        packet.payload = _generate_payload()
 
-        self.buildSynPayload(self.my_syn)
+    def buildAckPayload(self, packet):
+        """
+        Called to build the ack packet, based on the state of the negotiations.
 
-        stream = BufferedByteStream()
-        stream.write_uchar(self.protocolVersion)
-        self._writePacket(self.my_syn, stream)
+        C{RTMP} payloads are just random.
+        """
+        packet.payload = _generate_payload()
+
 
     def synReceived(self):
         """
@@ -417,21 +380,22 @@ class ServerNegotiator(BaseNegotiator):
 
         Builds and writes the ack packet.
         """
-        self.my_ack = Packet(first=self.peer_syn.timestamp,
-            second=self.my_syn.timestamp)
+        self.my_ack = Packet(self.peer_syn.uptime, self.my_syn.uptime)
 
         self.buildAckPayload(self.my_ack)
         self.writeAck()
+
 
     def ackReceived(self):
         """
         Called when the clients ack packet has been received.
         """
-        if self.my_syn.first != self.peer_ack.first:
+        if self.my_syn.uptime != self.peer_ack.uptime:
             raise VerificationError('Received uptime is not the same')
 
         if self.my_syn.payload != self.peer_ack.payload:
             raise VerificationError('Received payload does not match')
+
 
 
 def get_implementation(protocol):
@@ -451,3 +415,8 @@ def get_implementation(protocol):
         raise HandshakeError('Unknown handshake version %r' % (protocol,))
 
     return mod
+
+
+
+def _generate_payload():
+    return util.generateBytes(HANDSHAKE_LENGTH - 8)

@@ -17,11 +17,29 @@
 RTMPy exception types.
 """
 
+from rtmpy.status import codes
+from rtmpy.util import add_to_class
+
+
+__all__ = ['codeByClass', 'classByCode']
+
+
+#: A collection of known exception classes and their related status codes
+CLASS_CODES = {}
+
+
+
+@add_to_class
+def register(locals, code):
+    locals['__status_code__'] = code
+
+
 
 class BaseError(Exception):
     """
     Base exception class from which all others must be subclassed.
     """
+
 
 
 class NetConnectionError(BaseError):
@@ -30,12 +48,14 @@ class NetConnectionError(BaseError):
     """
 
 
+
 class CallFailed(NetConnectionError):
     """
     Raised when invoked methods from the peer fails for some reason.
     """
 
-    code = 'NetConnection.Call.Failed'
+    register(codes.NC_CALL_FAILED)
+
 
 
 class ConnectError(NetConnectionError):
@@ -44,13 +64,15 @@ class ConnectError(NetConnectionError):
     """
 
 
+
 class ConnectFailed(ConnectError):
     """
     Raised as a basic error for when connection fails and there is no other
     specific type of error.
     """
 
-    code = 'NetConnection.Connect.Failed'
+    register(codes.NC_CONNECT_FAILED)
+
 
 
 class ConnectRejected(ConnectError):
@@ -58,7 +80,8 @@ class ConnectRejected(ConnectError):
     Raised when the peers connection attempt is rejected by the application.
     """
 
-    code = 'NetConnection.Connect.Rejected'
+    register(codes.NC_CONNECT_REJECTED)
+
 
 
 class InvalidApplication(NetConnectionError):
@@ -67,7 +90,8 @@ class InvalidApplication(NetConnectionError):
     application.
     """
 
-    code = 'NetConnection.Connect.InvalidApp'
+    register(codes.NC_CONNECT_INVALID_APPLICATION)
+
 
 
 class StreamError(BaseError):
@@ -75,7 +99,8 @@ class StreamError(BaseError):
     Base NetStream errors.
     """
 
-    code = 'NetStream.Failed'
+    register(codes.NS_FAILED)
+
 
 
 class PublishError(StreamError):
@@ -84,13 +109,15 @@ class PublishError(StreamError):
     """
 
 
+
 class BadNameError(PublishError):
     """
     Raised when a peer attempts to publish a stream with the same name as an
     already published stream.
     """
 
-    code = 'NetStream.Publish.BadName'
+    register(codes.NS_PUBLISH_BADNAME)
+
 
 
 class PlayError(BaseError):
@@ -99,9 +126,49 @@ class PlayError(BaseError):
     """
 
 
+
 class StreamNotFound(PlayError):
     """
     Raised when the corresponding stream could not be found for a play request.
     """
 
-    code = 'NetStream.Play.StreamNotFound'
+    register(codes.NS_PLAY_STREAMNOTFOUND)
+
+
+
+def codeByClass(cls):
+    """
+    """
+    global CLASS_CODES
+
+    return CLASS_CODES.get(getattr(cls, '__name__', None), None)
+
+
+
+def classByCode(code):
+    """
+    """
+    global CLASS_CODES
+
+    return CLASS_CODES.get(code, None)
+
+
+
+for k, v in globals().items():
+    try:
+        if not issubclass(v, BaseError):
+            continue
+    except TypeError:
+        continue
+
+    __all__.append(k)
+
+    if not hasattr(v, '__status_code__'):
+        continue
+
+    code = v.__status_code__
+
+    CLASS_CODES[code] = v
+    CLASS_CODES[v.__name__] = code
+
+del k, v

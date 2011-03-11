@@ -29,7 +29,7 @@ cdef class Header:
     cdef public bint continuation
 
 
-@cython.locals(size=cython.int, channelId=cython.int)
+@cython.locals(mask=cython.int, channelId=cython.int)
 cpdef object encode(cBufferedByteStream stream, Header header, Header previous=?)
 
 @cython.locals(channelId=cython.int, bits=cython.int, header=Header)
@@ -38,4 +38,4 @@ cpdef Header decode(cBufferedByteStream stream)
 @cython.locals(merged=Header)
 cpdef Header merge(Header old, Header new)
 
-cdef int min_bytes_required(Header old, Header new) except -1
+cdef int get_size_mask(Header old, Header new) except -1

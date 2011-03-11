@@ -83,49 +83,6 @@ class ClientNegotiatorTestCase(BaseTestCase):
     negotiator_class = ClientNegotiator
 
 
-class ClientProtocolVersionTestCase(ClientNegotiatorTestCase):
-    """
-    Test cases for protocol version handling.
-    """
-
-    def setUp(self):
-        ClientNegotiatorTestCase.setUp(self)
-
-        self.negotiator.start(self.uptime, self.version)
-
-    def test_invalid(self):
-        """
-        RTMP version has to be less than \x20 (' ')
-        """
-        self.assertRaises(handshake.ProtocolVersionError,
-            self.negotiator.dataReceived, '\x20')
-
-        #self.assertEqual(str(e), 'Invalid protocol version')
-        self.assertFalse(self.succeeded)
-
-    def test_too_high(self):
-        self.assertTrue(6 > self.negotiator.protocolVersion)
-
-        self.assertRaises(handshake.ProtocolTooHigh,
-            self.negotiator.dataReceived, '\x06')
-
-        #self.assertEqual(str(e), 'Unexpected protocol version')
-        self.assertFalse(self.succeeded)
-
-    def test_degraded(self):
-        """
-        This negotiator is speaking 6 but is asked to talk 3.
-        """
-        self.negotiator.protocolVersion = 6
-
-        self.assertRaises(handshake.ProtocolDegraded,
-            self.negotiator.dataReceived, '\x03')
-
-        #self.assertEqual(str(e), 'Protocol version did not match (got 3, '
-        #    'expected 6)')
-        self.assertFalse(self.succeeded)
-
-
 class ClientSynTestCase(ClientNegotiatorTestCase):
     """
     High level tests for client syn handshake testing
@@ -142,10 +99,9 @@ class ClientSynTestCase(ClientNegotiatorTestCase):
     def test_restart(self):
         self.negotiator.start(self.uptime, self.version)
 
-        e = self.assertRaises(handshake.HandshakeError, self.negotiator.start,
+        self.assertRaises(handshake.HandshakeError, self.negotiator.start,
             self.uptime, self.version)
 
-        #self.assertEqual(str(e), 'Handshake negotiator cannot be restarted')
         self.assertFalse(self.succeeded)
 
     def test_initiate(self):
@@ -159,7 +115,6 @@ class ClientSynTestCase(ClientNegotiatorTestCase):
         self.buffer.seek(0)
 
         # protocol version
-        self.assertEqual(self.buffer.read_uchar(), 3)
         self.assertEqual(self.buffer.remaining(), 1536)
 
         self.assertEqual(self.buffer.read_ulong(), self.uptime)
@@ -178,8 +133,6 @@ class ClientPeerSynTestCase(ClientNegotiatorTestCase):
 
         self.syn = self.negotiator.my_syn
         self.buffer.truncate()
-
-        self.negotiator.dataReceived('\x03')
 
     def send_peer_syn(self):
         self.negotiator.dataReceived('\xff' * 1536)
@@ -245,7 +198,7 @@ class ClientPeerSynTestCase(ClientNegotiatorTestCase):
         self.buffer.seek(0)
 
         self.assertEqual(self.buffer.read(4), '\xff' * 4)
-        self.assertEqual(self.buffer.read_ulong(), ack.timestamp)
+        self.assertEqual(self.buffer.read_ulong(), ack.version)
 
         self.assertEquals(self.buffer.read(), ack.payload)
 
@@ -256,8 +209,6 @@ class ServerNegotiator(handshake.ServerNegotiator):
     """
     A pretend implementation of a server negotiator.
     """
-
-    protocolVersion = 0x03
 
     def buildSynPayload(self, packet):
         packet.payload = 's' * (1536 - 8)
@@ -272,11 +223,6 @@ class ServerNegotiatorTestCase(BaseTestCase):
     """
 
     negotiator_class = ServerNegotiator
-
-    def receive_client_version(self, version):
-        self.negotiator.dataReceived(version)
-
-        self.syn = self.negotiator.my_syn
 
     def receive_client_syn(self):
         # uptime
@@ -312,19 +258,13 @@ class ServerStartTestCase(ServerNegotiatorTestCase):
         self.version = 5678
 
         self.negotiator.start(self.uptime, self.version)
-
-        self.assertEqual(self.negotiator.protocolVersion, 3)
-        self.receive_client_version('\x03')
-
         self.buffer.seek(0)
 
-        # protocol version
-        self.assertEqual(self.buffer.read_uchar(), 3)
         self.assertEqual(self.buffer.remaining(), 1536)
 
         self.assertEqual(self.buffer.read_ulong(), self.uptime)
         self.assertEqual(self.buffer.read_ulong(), self.version)
-        self.assertEqual(self.buffer.read(), self.syn.payload)
+        self.assertEqual(self.buffer.read(), 's' * (1536 - 8))
 
 
 class ServerSynTestCase(ServerNegotiatorTestCase):
@@ -337,7 +277,6 @@ class ServerSynTestCase(ServerNegotiatorTestCase):
 
         self.negotiator.start(self.uptime, self.version)
 
-        self.receive_client_version('\x03')
         self.buffer.truncate()
 
     def test_receive_client_syn(self):
@@ -350,9 +289,9 @@ class ServerSynTestCase(ServerNegotiatorTestCase):
         self.buffer.seek(0)
 
         self.assertEqual(
-            self.buffer.read_ulong(), self.negotiator.peer_syn.timestamp)
+            self.buffer.read_ulong(), self.negotiator.peer_syn.uptime)
         self.assertEqual(
-            self.buffer.read_ulong(), self.negotiator.my_ack.timestamp)
+            self.buffer.read_ulong(), self.negotiator.my_ack.version)
 
         self.assertEqual(self.buffer.read(), self.negotiator.my_ack.payload)
         self.assertFalse(self.succeeded)
@@ -368,7 +307,6 @@ class ServerClientAckTestCase(ServerNegotiatorTestCase):
 
         self.negotiator.start(self.uptime, self.version)
 
-        self.receive_client_version('\x03')
         self.buffer.truncate()
 
     def test_waiting(self):
@@ -393,7 +331,9 @@ class ServerClientAckTestCase(ServerNegotiatorTestCase):
         self.receive_client_syn()
         self.buffer.truncate()
 
-        self.buffer.write_ulong(self.syn.first)
+        s = self.negotiator.my_syn
+
+        self.buffer.write_ulong(s.uptime)
         self.buffer.write('\xff' * (1536 - 4))
 
         bad_payload = self.buffer.getvalue()
@@ -409,7 +349,9 @@ class ServerClientAckTestCase(ServerNegotiatorTestCase):
         self.receive_client_syn()
         self.buffer.truncate()
 
-        self.syn.encode(self.buffer)
+        s = self.negotiator.my_syn
+
+        s.encode(self.buffer)
         payload = self.buffer.getvalue()
         self.buffer.truncate()
 

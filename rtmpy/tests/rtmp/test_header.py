@@ -89,8 +89,8 @@ class EncodeTestCase(unittest.TestCase):
         self.reset()
 
     def reset(self):
-        self.old = header.Header(2, 3, 4, 5, 6)
-        self.new = header.Header(2, 3, 4, 5, 6)
+        self.old = header.Header(0, 3, 4, 5, 6)
+        self.new = header.Header(0, 3, 4, 5, 6)
 
     def assertEncoded(self, bytes):
         self.stream.seek(0, 2)
@@ -102,7 +102,7 @@ class EncodeTestCase(unittest.TestCase):
     def test_size1(self):
         self.assertEncoded('\xc2')
 
-        self.old.channelId = self.new.channelId = 21
+        self.old.channelId = self.new.channelId = 19
         self.assertEncoded('\xd5')
 
     def test_size4(self):
@@ -138,25 +138,25 @@ class EncodeTestCase(unittest.TestCase):
         self.old = self.new
         h = self.new
 
-        h.channelId = 3
+        h.channelId = 1
         self.assertEncoded('\xc3')
 
-        h.channelId = 63
+        h.channelId = 61
         self.assertEncoded('\xff')
 
-        h.channelId = 64
+        h.channelId = 62
         self.assertEncoded('\xc0\x00')
 
-        h.channelId = 65
+        h.channelId = 63
         self.assertEncoded('\xc0\x01')
 
-        h.channelId = 319
+        h.channelId = 317
         self.assertEncoded('\xc0\xff')
 
-        h.channelId = 320
+        h.channelId = 318
         self.assertEncoded('\xc1\x00\x01')
 
-        h.channelId = 65599
+        h.channelId = 65597
         self.assertEncoded('\xc1\xff\xff')
 
 
@@ -173,7 +173,7 @@ class DecodeTestCase(unittest.TestCase):
     def test_decodeSize1(self):
         h = self._decode('\xc3')
 
-        self.assertEquals(h.channelId, 3)
+        self.assertEquals(h.channelId, 1)
         self.assertEquals(h.timestamp, -1)
         self.assertEquals(h.bodyLength, -1)
         self.assertEquals(h.datatype, -1)
@@ -181,7 +181,7 @@ class DecodeTestCase(unittest.TestCase):
 
         h = self._decode('\xd5')
 
-        self.assertEquals(h.channelId, 21)
+        self.assertEquals(h.channelId, 19)
         self.assertEquals(h.timestamp, -1)
         self.assertEquals(h.bodyLength, -1)
         self.assertEquals(h.datatype, -1)
@@ -190,7 +190,7 @@ class DecodeTestCase(unittest.TestCase):
     def test_decodeSize4(self):
         h = self._decode('\x95\x03\x92\xfa')
 
-        self.assertEquals(h.channelId, 21)
+        self.assertEquals(h.channelId, 19)
         self.assertEquals(h.timestamp, 234234)
         self.assertEquals(h.bodyLength, -1)
         self.assertEquals(h.datatype, -1)
@@ -199,7 +199,7 @@ class DecodeTestCase(unittest.TestCase):
     def test_decodeSize8(self):
         h = self._decode('U\x03\x92\xfa\x00z\n\x03')
 
-        self.assertEquals(h.channelId, 21)
+        self.assertEquals(h.channelId, 19)
         self.assertEquals(h.timestamp, 234234)
         self.assertEquals(h.bodyLength, 31242)
         self.assertEquals(h.datatype, 3)
@@ -208,7 +208,7 @@ class DecodeTestCase(unittest.TestCase):
     def test_decodeSize12(self):
         h = self._decode('\x15\x03\x92\xfa\x00z\n\x03-\x00\x00\x00')
 
-        self.assertEquals(h.channelId, 21)
+        self.assertEquals(h.channelId, 19)
         self.assertEquals(h.timestamp, 234234)
         self.assertEquals(h.bodyLength, 31242)
         self.assertEquals(h.datatype, 3)
@@ -217,7 +217,7 @@ class DecodeTestCase(unittest.TestCase):
     def test_extended_timestamp(self):
         h = self._decode('\xa2\xff\xff\xff\x01\x00\x00\x00')
 
-        self.assertEquals(h.channelId, 34)
+        self.assertEquals(h.channelId, 32)
         self.assertEquals(h.timestamp, 0x1000000)
         self.assertEquals(h.bodyLength, -1)
         self.assertEquals(h.datatype, -1)
@@ -225,7 +225,7 @@ class DecodeTestCase(unittest.TestCase):
 
         h = self._decode('b\xff\xff\xff\x00z\n\x03\x01\x00\x00\x00')
 
-        self.assertEquals(h.channelId, 34)
+        self.assertEquals(h.channelId, 32)
         self.assertEquals(h.timestamp, 0x1000000)
         self.assertEquals(h.bodyLength, 31242)
         self.assertEquals(h.datatype, 3)
@@ -234,7 +234,7 @@ class DecodeTestCase(unittest.TestCase):
         h = self._decode(
             '"\xff\xff\xff\x00z\n\x03-\x00\x00\x00\x01\x00\x00\x00')
 
-        self.assertEquals(h.channelId, 34)
+        self.assertEquals(h.channelId, 32)
         self.assertEquals(h.timestamp, 0x1000000)
         self.assertEquals(h.bodyLength, 31242)
         self.assertEquals(h.datatype, 3)
@@ -242,31 +242,31 @@ class DecodeTestCase(unittest.TestCase):
 
     def test_extended_channelid(self):
         h = self._decode('\xc3')
-        self.assertEqual(h.channelId, 3)
+        self.assertEqual(h.channelId, 1)
 
         h = self._decode('\xff')
-        self.assertEqual(h.channelId, 63)
+        self.assertEqual(h.channelId, 61)
 
         h = self._decode('\xc0\x00')
-        self.assertEqual(h.channelId, 64)
+        self.assertEqual(h.channelId, 62)
 
         h = self._decode('\xc0\xff')
-        self.assertEqual(h.channelId, 319)
+        self.assertEqual(h.channelId, 317)
 
         h = self._decode('\xc1\x00\x00')
-        self.assertEqual(h.channelId, 64)
+        self.assertEqual(h.channelId, 62)
 
         h = self._decode('\xc1\x01\x00')
-        self.assertEqual(h.channelId, 65)
+        self.assertEqual(h.channelId, 63)
 
         h = self._decode('\xc1\xff\x00')
-        self.assertEqual(h.channelId, 319)
+        self.assertEqual(h.channelId, 317)
 
         h = self._decode('\xc1\x00\x01')
-        self.assertEqual(h.channelId, 320)
+        self.assertEqual(h.channelId, 318)
 
         h = self._decode('\xc1\xff\xff')
-        self.assertEqual(h.channelId, 65599)
+        self.assertEqual(h.channelId, 65597)
 
 
 class MergeTestCase(unittest.TestCase):

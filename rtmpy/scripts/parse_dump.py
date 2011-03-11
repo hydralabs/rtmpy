@@ -20,10 +20,19 @@ Parses RTMP dumps from Wireshark - converted to c array format.
 """
 
 from pyamf.util import BufferedByteStream
-from rtmpy.protocol.rtmp import codec, message
+from rtmpy.protocol.rtmp import codec
+from rtmpy import message
 
 
 __all__ = ['parse_dump', 'XMLObserver']
+
+
+
+class MissingDataError(Exception):
+    """
+    Raised if the dump file contains [xxxx bytes missing in capture file]
+    """
+
 
 
 def parse_dump(f, observer):
@@ -47,6 +56,9 @@ def parse_dump(f, observer):
 
         if not endpoint:
             continue
+
+        if data.startswith('[') and data.endswith('bytes missing in capture file]'):
+            raise MissingDataError
 
         endpoint.dataReceived(data)
 
@@ -237,7 +249,7 @@ class StreamFactory(object):
 
         self.observer.messageStart(p)
 
-        e = message.get_type_class(datatype)()
+        e = message.classByType(datatype)()
 
         e.decode(BufferedByteStream(data))
 
@@ -356,5 +368,8 @@ def run():
 
     try:
         parse_dump(f, observer)
+    except MissingDataError:
+        print('Dump file is corrupt - missing data?')
+        raise SystemExit(1)
     finally:
         f.close()

@@ -20,6 +20,8 @@ RTMP message implementations.
 from zope.interface import Interface, implements
 import pyamf
 
+from rtmpy.util import add_to_class
+
 
 #: Changes the frame size for the RTMP stream
 FRAME_SIZE = 0x01
@@ -53,13 +55,92 @@ INVOKE = 0x14
 FLV_DATA = 0x16
 
 
-STREAMABLE_TYPES = [AUDIO_DATA, VIDEO_DATA]
+@add_to_class
+def set_type(locals, type):
+    """
+    Assigns the message type to the locals of the defined class.
+    """
+    locals['__data_type__'] = type
+
+
+
+class BaseError(Exception):
+    """
+    Base error class for all things C{message}.
+    """
+
+
+
+class DecodeError(BaseError):
+    """
+    Base error class for decoding RTMP messages.
+    """
+
+
+
+class TrailingDataError(DecodeError):
+    """
+    Raised if decoding a message does not consume the whole buffer.
+    """
+
+
+
+class EncodeError(BaseError):
+    """
+    Base error class for encoding RTMP messages.
+    """
+
+
+
+class UnknownType(BaseError):
+    """
+    Raised if an unknown message type is found.
+    """
+
+
+
+class IMessage(Interface):
+    """
+    An RTMP message in all its forms.
+
+    @see: U{RTMP datatypes on OSFlash<http://osflash.org/documentation/
+        rtmp#rtmp_datatypes>}
+    """
+
+
+    def encode(buffer):
+        """
+        Encodes the event instance to C{stream}.
+
+        @type buffer: L{pyamf.util.BufferedByteStream}
+        """
+
+
+    def decode(buffer):
+        """
+        Decodes the event instance from C{stream}.
+
+        @type buffer: L{pyamf.util.BufferedByteStream}
+        """
+
+
+    def dispatch(listener, timestamp):
+        """
+        Dispatch the event to the listener. Calls the correct method with the
+        correct args according to L{IEventListener}.
+
+        @param listener: Receives the event dispatch request.
+        @type listener: L{IEventListener}
+        @param timestamp: The timestamp that this message was dispatched.
+        """
+
 
 
 class IMessageListener(Interface):
     """
     Receives dispatched messages.
     """
+
 
     def onInvoke(invoke, timestamp):
         """
@@ -70,6 +151,7 @@ class IMessageListener(Interface):
         @param timestamp: The timestamp that this message was dispatched.
         """
 
+
     def onNotify(notify, timestamp):
         """
         Similar to L{onInvoke} but no response is expected and will be ignored.
@@ -78,6 +160,7 @@ class IMessageListener(Interface):
         @param timestamp: The timestamp that this message was dispatched.
         """
 
+
     def onAudioData(data, timestamp):
         """
         Called when audio data is received.
@@ -85,6 +168,7 @@ class IMessageListener(Interface):
         @param data: The audio bytes received.
         @param timestamp: The timestamp that this message was dispatched.
         """
+
 
     def onVideoData(data, timestamp):
         """
@@ -104,6 +188,7 @@ class IMessageListener(Interface):
         @param timestamp: The timestamp that this message was dispatched.
         """
 
+
     def onBytesRead(bytes, timestamp):
         """
         Called when the peer reports the number of raw bytes read from the
@@ -113,6 +198,7 @@ class IMessageListener(Interface):
         @type bytes: C{int}
         @param timestamp: The timestamp that this message was dispatched.
         """
+
 
     def onControlMessage(message, timestamp):
         """
@@ -126,6 +212,7 @@ class IMessageListener(Interface):
         @param timestamp: The timestamp that this message was dispatched.
         """
 
+
     def onDownstreamBandwidth(bandwidth, timestamp):
         """
         Called when the connected endpoint reports its downstream bandwidth
@@ -136,6 +223,7 @@ class IMessageListener(Interface):
         @type bandwidth: C{int}
         @param timestamp: The timestamp that this message was dispatched.
         """
+
 
     def onUpstreamBandwidth(bandwidth, extra, timestamp):
         """
@@ -151,68 +239,22 @@ class IMessageListener(Interface):
         """
 
 
-class IMessage(Interface):
-    """
-    An RTMP message in all its forms.
 
-    @see: U{RTMP datatypes on OSFlash<http://osflash.org/documentation/
-        rtmp#rtmp_datatypes>}
+class IMessageSender(Interface):
+    """
+    Indicates the ability to send a message.
     """
 
-    def encode(stream):
-        """
-        Encodes the event instance to C{stream}.
 
-        @type stream: L{pyamf.util.BufferedByteStream}
-        @raise EncodeError:
+    def sendMessage(msg):
         """
+        Sends a message to the receiving endpoint.
 
-    def decode(stream):
-        """
-        Decodes the event instance from C{stream}.
-
-        @type stream: L{pyamf.util.BufferedByteStream}
+        @param msg: The message to send.
+        @type msg: L{IMessage}
+        @return: C{None}
         """
 
-    def dispatch(listener, timestamp):
-        """
-        Dispatch the event to the listener. Calls the correct method with the
-        correct args according to L{IEventListener}.
-
-        @param listener: Receives the event dispatch request.
-        @type listener: L{IEventListener}
-        @param timestamp: The timestamp that this message was dispatched.
-        """
-
-
-class BaseError(Exception):
-    """
-    Base error class for all things C{event}.
-    """
-
-
-class DecodeError(BaseError):
-    """
-    Base error class for decoding RTMP events.
-    """
-
-
-class TrailingDataError(DecodeError):
-    """
-    Raised if decoding an event does not consume the whole buffer.
-    """
-
-
-class EncodeError(BaseError):
-    """
-    Base error class for encoding RTMP events.
-    """
-
-
-class UnknownEventType(BaseError):
-    """
-    Raised if an unknown event type is found.
-    """
 
 
 class Message(object):
@@ -222,6 +264,7 @@ class Message(object):
 
     implements(IMessage)
 
+
     def encode(self, buf):
         """
         Called to encode the event to C{buf}.
@@ -229,6 +272,7 @@ class Message(object):
         @type buf: L{pyamf.util.BufferedByteStream}
         """
         raise NotImplementedError
+
 
     def decode(self, buf):
         """
@@ -238,6 +282,7 @@ class Message(object):
         """
         raise NotImplementedError
 
+
     def dispatch(self, listener, timestamp):
         """
         Called to dispatch the event into listener.
@@ -246,6 +291,7 @@ class Message(object):
         """
         raise NotImplementedError
 
+
     def __repr__(self):
         t = self.__class__
         keys = self.__dict__.keys()
@@ -253,13 +299,13 @@ class Message(object):
 
         s = '<%s.%s '
 
-        if keys:
-            for k in keys:
-                s += '%s=%r ' % (k, self.__dict__[k])
+        for k in keys:
+            s += '%s=%r ' % (k, self.__dict__[k])
 
         s += 'at 0x%x>'
 
         return s % (t.__module__, t.__name__, id(self))
+
 
 
 class FrameSize(Message):
@@ -271,16 +317,19 @@ class FrameSize(Message):
     @type size: C{int}
     """
 
-    RTMP_TYPE = FRAME_SIZE
+    set_type(FRAME_SIZE)
+
 
     def __init__(self, size=None):
         self.size = size
+
 
     def decode(self, buf):
         """
         Decode a frame size message.
         """
         self.size = buf.read_ulong()
+
 
     def encode(self, buf):
         """
@@ -295,11 +344,13 @@ class FrameSize(Message):
             raise EncodeError('Frame size wrong type '
                 '(expected int, got %r)' % (type(self.size),))
 
+
     def dispatch(self, listener, timestamp):
         """
         Dispatches the message to the listener.
         """
         listener.onFrameSize(self.size, timestamp)
+
 
 
 class BytesRead(Message):
@@ -310,18 +361,21 @@ class BytesRead(Message):
     @type bytes: C{int}
     """
 
-    RTMP_TYPE = BYTES_READ
+    set_type(BYTES_READ)
 
     FOUR_GB_THRESHOLD = 0xee800000
 
+
     def __init__(self, bytes=None):
         self.bytes = bytes
+
 
     def decode(self, buf):
         """
         Decode a bytes read message.
         """
         self.bytes = buf.read_ulong()
+
 
     def encode(self, buf):
         """
@@ -336,6 +390,7 @@ class BytesRead(Message):
             raise EncodeError('Bytes read wrong type '
                 '(expected int, got %r)' % (type(self.bytes),))
 
+
     def dispatch(self, listener, timestamp):
         """
         Dispatches the message to the listener.
@@ -343,22 +398,25 @@ class BytesRead(Message):
         listener.onBytesRead(self.bytes, timestamp)
 
 
+
 class ControlMessage(Message):
     """
     A control message. Akin to Red5's Ping event.
     """
 
-    RTMP_TYPE = CONTROL
+    set_type(CONTROL)
 
     UNDEFINED = -1
     PING = 6
     PONG = 7
+
 
     def __init__(self, type=None, value1=0, value2=None, value3=None):
         self.type = type
         self.value1 = value1
         self.value2 = value2
         self.value3 = value3
+
 
     def decode(self, buf):
         """
@@ -372,6 +430,7 @@ class ControlMessage(Message):
             self.value3 = buf.read_long()
         except IOError:
             pass
+
 
     def encode(self, buf):
         """
@@ -406,6 +465,7 @@ class ControlMessage(Message):
                 raise EncodeError('TypeError encoding value3 '
                     '(expected int, got %r)' % (type(self.value3),))
 
+
     def dispatch(self, listener, timestamp):
         """
         Dispatches the event to the listener.
@@ -413,21 +473,25 @@ class ControlMessage(Message):
         return listener.onControlMessage(self, timestamp)
 
 
+
 class DownstreamBandwidth(Message):
     """
     A downstream bandwidth message.
     """
 
-    RTMP_TYPE = DOWNSTREAM_BANDWIDTH
+    set_type(DOWNSTREAM_BANDWIDTH)
+
 
     def __init__(self, bandwidth=None):
         self.bandwidth = bandwidth
+
 
     def decode(self, buf):
         """
         Decode a downstream bandwidth message.
         """
         self.bandwidth = buf.read_ulong()
+
 
     def encode(self, buf):
         """
@@ -442,11 +506,13 @@ class DownstreamBandwidth(Message):
             raise EncodeError('TypeError for downstream bandwidth '
                 '(expected int, got %r)' % (type(self.bandwidth),))
 
+
     def dispatch(self, listener, timestamp):
         """
         Dispatches the message to the listener.
         """
         return listener.onDownstreamBandwidth(self.bandwidth, timestamp)
+
 
 
 class UpstreamBandwidth(Message):
@@ -458,11 +524,13 @@ class UpstreamBandwidth(Message):
     @param extra: Not sure what this is supposed to represent at the moment.
     """
 
-    RTMP_TYPE = UPSTREAM_BANDWIDTH
+    set_type(UPSTREAM_BANDWIDTH)
+
 
     def __init__(self, bandwidth=None, extra=None):
         self.bandwidth = bandwidth
         self.extra = extra
+
 
     def decode(self, buf):
         """
@@ -470,6 +538,7 @@ class UpstreamBandwidth(Message):
         """
         self.bandwidth = buf.read_ulong()
         self.extra = buf.read_uchar()
+
 
     def encode(self, buf):
         """
@@ -493,12 +562,14 @@ class UpstreamBandwidth(Message):
             raise EncodeError('TypeError: extra '
                 '(expected int, got %r)' % (type(self.extra),))
 
+
     def dispatch(self, listener, timestamp):
         """
         Dispatches the message to the listener.
         """
         return listener.onUpstreamBandwidth(
             self.bandwidth, self.extra, timestamp)
+
 
 
 class Notify(Message):
@@ -510,11 +581,13 @@ class Notify(Message):
     @param args: A list of method arguments.
     """
 
-    RTMP_TYPE = NOTIFY
+    set_type(NOTIFY)
+
 
     def __init__(self, name=None, *args):
         self.name = name
         self.argv = list(args)
+
 
     def decode(self, buf):
         """
@@ -524,6 +597,7 @@ class Notify(Message):
 
         self.name = decoder.next()
         self.argv = [x for x in decoder]
+
 
     def encode(self, buf):
         """
@@ -536,6 +610,7 @@ class Notify(Message):
         for a in args:
             encoder.writeElement(a)
 
+
     def dispatch(self, listener, timestamp):
         """
         Dispatches the message to the listener.
@@ -543,19 +618,22 @@ class Notify(Message):
         return listener.onNotify(self.name, self.argv, timestamp)
 
 
+
 class Invoke(Message):
     """
     Similar to L{Notify} but a reply is expected.
     """
 
-    RTMP_TYPE = INVOKE
+    set_type(INVOKE)
 
     encoding = pyamf.AMF0
+
 
     def __init__(self, name=None, id=None, *args):
         self.name = name
         self.id = id
         self.argv = list(args)
+
 
     def decode(self, buf):
         """
@@ -565,7 +643,8 @@ class Invoke(Message):
 
         self.name = decoder.next()
         self.id = decoder.next()
-        self.argv = [x for x in decoder]
+        self.argv = list(decoder)
+
 
     def encode(self, buf):
         """
@@ -578,11 +657,13 @@ class Invoke(Message):
         for a in args:
             encoder.writeElement(a)
 
+
     def dispatch(self, listener, timestamp):
         """
         Dispatches the message to the listener.
         """
         listener.onInvoke(self.name, self.id, self.argv, timestamp)
+
 
 
 class FlexMessage(Invoke):
@@ -591,7 +672,7 @@ class FlexMessage(Invoke):
     encoding/decoding.
     """
 
-    RTMP_TYPE = FLEX_MESSAGE
+    set_type(FLEX_MESSAGE)
 
     encoding = pyamf.AMF3
 
@@ -603,6 +684,7 @@ class FlexMessage(Invoke):
         return Invoke.decode(self, buf)
 
 
+
 class StreamingMessage(Message):
     """
     An message containing streaming data.
@@ -611,8 +693,10 @@ class StreamingMessage(Message):
     @type data: C{str}
     """
 
+
     def __init__(self, data=None):
         self.data = data
+
 
     def decode(self, buf):
         """
@@ -622,6 +706,7 @@ class StreamingMessage(Message):
             self.data = buf.read()
         except IOError:
             self.data = ''
+
 
     def encode(self, buf):
         """
@@ -637,12 +722,14 @@ class StreamingMessage(Message):
                 type(self.data),))
 
 
+
 class AudioData(StreamingMessage):
     """
     A message containing audio data.
     """
 
-    RTMP_TYPE = AUDIO_DATA
+    set_type(AUDIO_DATA)
+
 
     def dispatch(self, listener, timestamp):
         """
@@ -651,12 +738,14 @@ class AudioData(StreamingMessage):
         listener.onAudioData(self.data, timestamp)
 
 
+
 class VideoData(StreamingMessage):
     """
     A message containing video data.
     """
 
-    RTMP_TYPE = VIDEO_DATA
+    set_type(VIDEO_DATA)
+
 
     def dispatch(self, listener, timestamp):
         """
@@ -665,23 +754,30 @@ class VideoData(StreamingMessage):
         return listener.onVideoData(self.data, timestamp)
 
 
+
 #: Map event types to event classes
-TYPE_MAP = {
-    FRAME_SIZE: FrameSize,
-    BYTES_READ: BytesRead,
-    CONTROL: ControlMessage,
-    DOWNSTREAM_BANDWIDTH: DownstreamBandwidth,
-    UPSTREAM_BANDWIDTH: UpstreamBandwidth,
-    NOTIFY: Notify,
-    INVOKE: Invoke,
-    FLEX_MESSAGE: FlexMessage,
-    AUDIO_DATA: AudioData,
-    VIDEO_DATA: VideoData,
-    # TODO: Shared object etc.
-}
+TYPE_MAP = {}
+
+for k, v in globals().items():
+    try:
+        if not IMessage.implementedBy(v):
+            continue
+    except TypeError:
+        continue
+
+    t = getattr(v, '__data_type__', None)
+
+    if not t:
+        continue
+
+    TYPE_MAP[t] = v
+    TYPE_MAP[v] = t
+
+del k, v
 
 
-def get_type_class(datatype):
+
+def classByType(datatype):
     """
     A helper method that returns the mapped event class to the supplied
     datatype.
@@ -696,12 +792,30 @@ def get_type_class(datatype):
     try:
         return TYPE_MAP[datatype]
     except KeyError:
-        raise UnknownEventType('Unknown event type %r' % (datatype,))
+        raise UnknownType('Unknown event type %r' % (datatype,))
 
 
-def is_command_type(datatype):
+
+def typeByClass(obj):
     """
-    Determines if the data type supplied is a command type. This means that the
-    related RTMP message must be marshalled on channel id = 2.
+    Returns the message type based on C{obj}. C{obj} can be an instance of a
+    class or a class object.
+
+    If no message type is linked to C{obj}, B{-1} is returned.
     """
-    return datatype <= UPSTREAM_BANDWIDTH
+    try:
+        return TYPE_MAP[obj]
+    except KeyError:
+        pass
+
+    cls = getattr(obj, '__class__', None)
+
+    if cls is None:
+        return -1
+
+    try:
+        return TYPE_MAP[cls]
+    except KeyError:
+        pass
+
+    return -1

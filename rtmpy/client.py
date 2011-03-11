@@ -19,11 +19,9 @@ RTMP client implementation.
 @since: 0.1.0
 """
 
-from zope.interface import implements
-from twisted.internet import reactor, protocol as twisted_protocol
-import twisted
+from twisted.internet import protocol as twisted_protocol
 
-from rtmpy import protocol, util, versions
+from rtmpy import protocol, versions
 from rtmpy.protocol import handshake
 
 

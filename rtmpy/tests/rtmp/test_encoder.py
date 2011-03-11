@@ -21,7 +21,8 @@ import unittest
 
 from pyamf.util import BufferedByteStream
 
-from rtmpy.protocol.rtmp import codec, message
+from rtmpy.protocol.rtmp import codec
+from rtmpy import message
 
 
 class BaseTestCase(unittest.TestCase):
@@ -46,18 +47,13 @@ class EncoderTestCase(BaseTestCase):
         """
         Ensure that messages are queued when all channels are busy
         """
-        self.encoder.channelsInUse = 0xffff
-        while not self.encoder.isFull():
-            self.encoder.send('foo', 8, 6, 0)
+        self.encoder.channelsInUse = codec.MAX_CHANNELS
 
         self.encoder.send('bar', 12, 2, 3)
 
-        self.assertEqual(self.encoder.pending, [('bar', 12, 2, 3, None)])
+        self.assertEqual(self.encoder.pending, [('bar', 12, 2, 3)])
 
-        self.encoder.next()
-
-        self.assertEqual(self.encoder.pending, [('bar', 12, 2, 3, None)])
-
+        self.encoder.channelsInUse -= 1
         self.encoder.next()
 
         self.assertEqual(self.encoder.pending, [])
@@ -75,20 +71,20 @@ class AquireChannelTestCase(BaseTestCase):
 
         self.assertTrue(isinstance(c, codec.ProducingChannel))
 
-        self.assertEqual(c.channelId, 3)
+        self.assertEqual(c.channelId, 1)
         self.assertEqual(c.header, None)
 
         self.assertEqual(self.encoder.channelsInUse, 1)
 
     def test_overflow(self):
         """
-        Attempt to aquire 62 channels
+        Attempt to acquire MAX_CHANNELS + 1 channels.
         """
 
-        for i in xrange(codec.MIN_CHANNEL_ID, codec.MAX_CHANNELS):
-            self.assertNotEqual(self.encoder.acquireChannel(), None)
+        self.encoder.channelsInUse = codec.MAX_CHANNELS - 1
+        self.assertNotEqual(self.encoder.acquireChannel(), None)
 
-        self.assertEqual(self.encoder.channelsInUse, 65596)
+        self.assertEqual(self.encoder.channelsInUse, codec.MAX_CHANNELS)
         self.assertEqual(self.encoder.acquireChannel(), None)
 
 
@@ -295,46 +291,3 @@ class CommandTypeTestCase(BaseTestCase):
         self.assertEqual(self.output.getvalue(), '')
         self.encoder.send('eggs', message.INVOKE, 0, 21)
         self.assertEqual(self.output.getvalue(), '')
-
-
-class CallbackTestCase(BaseTestCase):
-    """
-    Tests to ensure that a callback is executed once the RTMP message is
-    completely encoded.
-    """
-
-    def setUp(self):
-        BaseTestCase.setUp(self)
-
-        self.executed = False
-
-    def cb(self):
-        self.executed = True
-
-    def test_command(self):
-        self.assertFalse(self.executed)
-        self.encoder.send('eggs', message.CONTROL, 0, 0, self.cb)
-        self.assertTrue(self.executed)
-
-    def test_callback(self):
-        self.assertFalse(self.executed)
-        self.encoder.send('eggs', message.VIDEO_DATA, 0, 0, self.cb)
-        self.assertFalse(self.executed)
-
-        self.encoder.next()
-        self.assertTrue(self.executed)
-
-    def test_large(self):
-        self.assertFalse(self.executed)
-        self.encoder.send('a' * 1024, message.VIDEO_DATA, 0, 0, self.cb)
-
-        while True:
-            try:
-                self.encoder.next()
-            except StopIteration:
-                break
-            else:
-                if self.executed is not True:
-                    self.assertFalse(self.executed)
-
-        self.assertTrue(self.executed)
