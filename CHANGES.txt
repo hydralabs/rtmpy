@@ -8,8 +8,12 @@ versions of RTMPy.
 
 0.2 (Unreleased)
 ----------------
+- Refactor: A new beginning .. (Ticket:112)
 - Allow arguments to be passed to NetConnection.connect() (Ticket:110)
-
+- Refactored the base RTMP functionality in rtmpy.protocol.rtmp to be protocol
+  agnostic. (Ticket:119)
+- Add support for Client properties: application, ip, agent, pageUrl, uri,
+  protocol (Ticket:113)
 
 0.1.1 (2010-11-30)
 ------------------
