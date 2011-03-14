@@ -1168,18 +1168,17 @@ class ServerFactory(protocol.ServerFactory):
 
         @param args: arguments from RTMP connect packet
         """
-        print params
         try:
             appName = params['app']
         except KeyError:
             raise exc.ConnectFailed("Bad connect packet (missing 'app' key)")
 
-        if self.applications.has_key(appName):
+        if appName in self.applications:
             return self.applications[appName]
 
         app = self.getApplication(params, *args)
 
-        if app == None:
+        if app is None:
             raise exc.InvalidApplication('Unknown application %r' % (appName,))
 
         return app
