@@ -13,6 +13,8 @@ these people directly.
 Active
 ------
 
+   **feisley**
+      `Jacob Feisley <http://hydralabs.org>`_ <jacob at hydralabs.com>
    **nick**
       `Nick Joyce <http://dev.pyamf.org/wiki/NickJoyce>`_ <nick at boxdesign.co.uk>
    **thijs**

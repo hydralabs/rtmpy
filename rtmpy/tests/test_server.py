@@ -78,6 +78,34 @@ class SimpleApplication(object):
         self._add_event('on-app-start', args, kwargs)
 
 
+class MockProtocol(object):
+    """
+    A mock protocol used to test protocol.transport.getPeer() requests
+    """
+    class Transport(object):
+
+        def __init__(self, good=True):
+            if good:
+                self._peer = self.GoodPeer()
+            else:
+                self._peer = self.BadPeer()
+
+        class GoodPeer(object):
+            host = "127.0.0.1"
+
+        class BadPeer(object):
+            pass
+
+        def getPeer(self):
+            return self._peer
+
+    def __init__(self, good=True):
+        self.transport = self.Transport(good)
+
+
+
+
+
 class ApplicationRegisteringTestCase(unittest.TestCase):
     """
     Tests for L{server.ServerFactory.registerApplication}
@@ -329,7 +357,10 @@ class ServerFactoryTestCase(unittest.TestCase):
         self.transport.protocol = self.protocol
 
         self.protocol.connectionMade()
+        self.protocol.versionReceived(3)
         self.protocol.handshakeSuccess('')
+
+        self.manager = self.protocol.streamManager
 
 
     def connect(self, app, protocol):
@@ -337,17 +368,17 @@ class ServerFactoryTestCase(unittest.TestCase):
 
         app.acceptConnection(client)
 
-        protocol.connected = True
-        protocol.client = client
-        protocol.application = app
+        protocol.nc.connected = True
+        protocol.nc.client = client
+        protocol.nc.application = app
 
         return client
 
-    def createStream(self, protocol):
+    def createStream(self, manager):
         """
         Returns the L{server.NetStream} as created by the protocol
         """
-        return protocol.getStream(protocol.createStream())
+        return manager.getStream(manager.createStream())
 
 
 
@@ -367,6 +398,7 @@ class ConnectingTestCase(unittest.TestCase):
 
         self.protocol.transport = self.transport
         self.protocol.connectionMade()
+        self.protocol.versionSuccess()
         self.protocol.handshakeSuccess('')
 
         self.messages = []
@@ -374,9 +406,9 @@ class ConnectingTestCase(unittest.TestCase):
         def send_message(*args):
             self.messages.append(args)
 
-        self.patch(self.protocol, 'sendMessage', send_message)
+        self.patch(self.protocol.nc, 'sendMessage', send_message)
 
-        self.control = self.protocol.getStream(0)
+        self.control = self.protocol.controlStream
 
 
     def assertStatus(self, code=None, description=None, level='status'):
@@ -446,7 +478,7 @@ class ConnectingTestCase(unittest.TestCase):
             self.executed = True
             self.assertEqual(args, my_args)
 
-        self.patch(self.protocol, 'onConnect', connect)
+        self.patch(self.control, 'onConnect', connect)
 
         d = self.control.onInvoke('connect', 0, [my_args], 0)
 
@@ -477,7 +509,7 @@ class ConnectingTestCase(unittest.TestCase):
         def bork(*args):
             raise EnvironmentError('woot')
 
-        self.patch(self.protocol, '_onConnect', bork)
+        self.patch(self.protocol.nc, '_onConnect', bork)
 
         d = self.connect({})
 
@@ -626,10 +658,55 @@ class ConnectingTestCase(unittest.TestCase):
 
             name, args, kwargs = a.events.pop()
             self.assertEqual(name, 'build-client')
-            self.assertIdentical(args[0], self.protocol)
+            self.assertIdentical(args[0], self.protocol.nc)
             self.assertEqual(args[1], client_params)
             self.assertEqual(args[2:], client_args)
             self.assertEqual(len(args), 4)
+
+        d.addCallback(check_status)
+
+        self.protocol.onDownstreamBandwidth(2000, 2)
+
+        return d
+
+    def test_dynamic_app_success(self):
+        """
+        Ensure a successful connection
+        """
+        def getApplication(args):
+            return SimpleApplication()
+
+        self.patch(self.factory, "getApplication", getApplication)
+
+        d = self.connect({'app': 'what'})
+
+        def check_status(res):
+            self.assertIsInstance(res, rpc.CommandResult)
+            self.assertEqual(res.command, {
+                'capabilities': 31, 'fmsVer': 'FMS/3,5,1,516', 'mode': 1})
+            self.assertEqual(res.result, {
+                'code': 'NetConnection.Connect.Success',
+                'objectEncoding': 0,
+                'description': 'Connection succeeded.',
+                'level': 'status'
+            })
+
+            msg, = self.messages.pop(0)
+
+            self.assertMessage(msg, message.DOWNSTREAM_BANDWIDTH,
+                bandwidth=2500000L)
+
+            msg, = self.messages.pop(0)
+
+            self.assertMessage(msg, message.UPSTREAM_BANDWIDTH,
+                bandwidth=2500000L, extra=2)
+
+            msg, = self.messages.pop(0)
+
+            self.assertMessage(msg, message.CONTROL,
+                type=0, value1=0)
+
+            self.assertEqual(self.messages, [])
 
         d.addCallback(check_status)
 
@@ -694,6 +771,52 @@ class ConnectingTestCase(unittest.TestCase):
         d.addCallback(check_status)
 
         return d
+
+    def test_client_properties(self):
+        """
+        Ensure that buildClient properly populates Client properties
+        """
+        a = server.Application()
+        p = MockProtocol(True)
+
+        client_params = {
+            'flashVer': 'MAC 10,2,154,13', 'app': 'what',
+            'pageUrl': 'http://foo.com/page',
+            'tcUrl': 'rtmp://localhost/live'
+            }
+
+        c = a.buildClient(p, client_params)
+
+        self.assertIdentical(c.nc, p)
+        self.assertIdentical(c.application, a)
+        self.assertEquals(c.ip, '127.0.0.1')
+        self.assertEquals(c.agent, 'MAC 10,2,154,13')
+        self.assertEquals(c.pageUrl, 'http://foo.com/page')
+        self.assertEquals(c.uri, 'rtmp://localhost/live')
+        self.assertEquals(c.protocol, 'rtmp')
+
+        return
+
+    def test_missing_client_properties(self):
+        """
+        Ensure that buildClient properly handles missing properties
+        """
+        a = server.Application()
+        p = MockProtocol(False)
+
+        client_params = {'app': 'what'}
+
+        c = a.buildClient(p, client_params)
+
+        self.assertIdentical(c.nc, p)
+        self.assertIdentical(c.application, a)
+        self.assertEquals(c.ip, None)
+        self.assertEquals(c.agent, None)
+        self.assertEquals(c.pageUrl, None)
+        self.assertEquals(c.uri, None)
+        self.assertEquals(c.protocol, None)
+
+        return
 
 
 class TestRuntimeError(RuntimeError):
@@ -770,7 +893,7 @@ class PublishingTestCase(ServerFactoryTestCase):
         """
         Returns the L{server.NetStream} as created by the protocol
         """
-        stream = self.protocol.getStream(self.protocol.createStream())
+        stream = self.manager.getStream(self.manager.createStream())
 
         def capture_status(s):
             self.stream_status[stream] = s
@@ -893,8 +1016,9 @@ class PlayTestCase(ServerFactoryTestCase):
         suspended state, until a stream with the right name is published.
         """
         client = self.connect(self.app, self.protocol)
+        m = self.protocol.streamManager
 
-        s = self.createStream(self.protocol)
+        s = self.createStream(m)
 
         self.assertFalse('foo' in self.app.streams)
 
@@ -915,7 +1039,7 @@ class PlayTestCase(ServerFactoryTestCase):
         """
         client = self.connect(self.app, self.protocol)
 
-        s = self.createStream(self.protocol)
+        s = self.createStream(self.protocol.streamManager)
 
         self.assertFalse('foo' in self.app.streams)
 

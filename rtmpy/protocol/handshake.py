@@ -29,6 +29,7 @@ from zope.interface import implements, Interface, Attribute
 from pyamf.util import BufferedByteStream
 
 from rtmpy.protocol import version
+from rtmpy import util
 
 
 HANDSHAKE_LENGTH = 1536
@@ -102,28 +103,6 @@ class IHandshakeNegotiator(Interface):
 class HandshakeError(Exception):
     """
     Generic class for handshaking related errors.
-    """
-
-
-
-class ProtocolVersionError(HandshakeError):
-    """
-    Base error class for RTMP protocol version errors.
-    """
-
-
-
-class ProtocolTooHigh(ProtocolVersionError):
-    """
-    Raised if a protocol version is greater than can the requested version.
-    """
-
-
-
-class ProtocolDegraded(ProtocolVersionError):
-    """
-    Raised when a protocol version is lower than expected. This is a request
-    from the remote endpoint to use a lower protocol version.
     """
 
 
@@ -225,6 +204,10 @@ class BaseNegotiator(object):
         self.peer_syn = None
         self.peer_ack = None
 
+        self.buildSynPayload(self.my_syn)
+
+        self._writePacket(self.my_syn)
+
 
     def getPeerPacket(self):
         """
@@ -269,11 +252,6 @@ class BaseNegotiator(object):
 
 
     def _process(self):
-        if not self.peer_version:
-            self.peer_version = self.buffer.read_uchar()
-
-            self.versionReceived()
-
         if not self.peer_syn:
             self.peer_syn = self.getPeerPacket()
 
@@ -320,20 +298,6 @@ class BaseNegotiator(object):
         raise NotImplementedError
 
 
-    def versionReceived(self):
-        """
-        Called when the peers handshake version has been received.
-        """
-        if self.peer_version == self.protocolVersion:
-            return
-
-        if self.peer_version > version.MAX_VERSION:
-            raise ProtocolVersionError('Invalid protocol version')
-
-        if self.peer_version > self.protocolVersion:
-            raise ProtocolTooHigh('Unexpected protocol version')
-
-
     def synReceived(self):
         """
         Called when the peers syn packet has been received. Use this function to
@@ -353,32 +317,6 @@ class ClientNegotiator(BaseNegotiator):
     """
     Negotiator for client initiating handshakes.
     """
-
-    def start(self, uptime=None, version=None):
-        """
-        Writes the handshake version and the syn packet.
-        """
-        BaseNegotiator.start(self, uptime, version)
-
-        self.buildSynPayload(self.my_syn)
-
-        stream = BufferedByteStream()
-
-        stream.write_uchar(self.protocolVersion)
-        self._writePacket(self.my_syn, stream)
-
-
-    def versionReceived(self):
-        """
-        Called when the peers handshake version is received. If the peer offers
-        a version lower than the version the client wants to speak, then the
-        client will complain.
-        """
-        BaseNegotiator.versionReceived(self)
-
-        if self.peer_version < self.protocolVersion:
-            raise ProtocolDegraded('Protocol version did not match (got %d, '
-                'expected %d)' % (self.peer_version, self.protocolVersion))
 
 
     def synReceived(self):
@@ -419,19 +357,21 @@ class ServerNegotiator(BaseNegotiator):
     Negotiator for server handshakes.
     """
 
-    def versionReceived(self):
+    def buildSynPayload(self, packet):
         """
-        Called when the peers version has been received.
+        Called to build the syn packet, based on the state of the negotiations.
 
-        Builds and writes the syn packet.
+        C{RTMP} payloads are just random.
         """
-        BaseNegotiator.versionReceived(self)
+        packet.payload = _generate_payload()
 
-        self.buildSynPayload(self.my_syn)
+    def buildAckPayload(self, packet):
+        """
+        Called to build the ack packet, based on the state of the negotiations.
 
-        stream = BufferedByteStream()
-        stream.write_uchar(self.protocolVersion)
-        self._writePacket(self.my_syn, stream)
+        C{RTMP} payloads are just random.
+        """
+        packet.payload = _generate_payload()
 
 
     def synReceived(self):
@@ -475,3 +415,8 @@ def get_implementation(protocol):
         raise HandshakeError('Unknown handshake version %r' % (protocol,))
 
     return mod
+
+
+
+def _generate_payload():
+    return util.generateBytes(HANDSHAKE_LENGTH - 8)

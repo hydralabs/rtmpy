@@ -16,10 +16,12 @@
 """
 Server implementation.
 """
+import urlparse
 
 from zope.interface import Interface, Attribute, implements
 from twisted.internet import protocol, defer
 from twisted.python import failure, log
+import pyamf
 
 from rtmpy import util, exc, versions
 from rtmpy import message, rpc, status, core
@@ -410,21 +412,19 @@ class NetStream(core.NetStream):
 
 
 
-class ServerProtocol(rtmp.RTMPProtocol):
+class NetConnection(core.NetConnection):
     """
-    Server side RTMP protocol implementation. Handles connection and stream
-    management. Provides a proxy between streams and the associated application.
+    Server side NetConnection implementation.
     """
 
-    def startStreaming(self):
-        """
-        Called when the RTMP handshake has been successfully negotiated and
-        RTMP messages can now be exchanged.
-        """
-        rtmp.RTMPProtocol.startStreaming(self)
+    objectEncoding = pyamf.AMF0
+
+    def __init__(self, protocol):
+        core.NetConnection.__init__(self, protocol)
 
         self.connected = False
         self.application = None
+        self.clientId = None
 
 
     def buildStream(self, streamId):
@@ -432,168 +432,6 @@ class ServerProtocol(rtmp.RTMPProtocol):
         """
         return NetStream(self, streamId)
 
-
-    def callExposedMethod(self, name, *args):
-        """
-        Used to match a callable based on the supplied name when a notify or
-        invoke is encountered. Returns C{None} if not found.
-
-        If no match is found from the superclass, the C{client} and then the
-        C{application} are checked in that order.
-
-        All methods on a client/application is considered B{public} and
-        accessible by the peer.
-
-        @see: L{rtmp.RTMPProtocol.getInvokableTarget}
-        """
-        # all client methods are publicly accessible
-        client = getattr(self, 'client', None)
-
-        if client:
-            target = util.get_callable_target(client, name)
-
-            if target:
-                return defer.maybeDeferred(target, *args)
-
-        application = getattr(self, 'application', None)
-
-        # todo: think about how to protect methods
-        if application:
-            target = util.get_callable_target(application, name)
-
-            if target:
-                return defer.maybeDeferred(target, *args)
-
-        return super(ServerProtocol, self).callExposedMethod(name, *args)
-
-
-    @rpc.expose('connect')
-    def onConnect(self, params, *args):
-        """
-        Connects this protocol instance to an application. The application has
-        the power to reject the connection (see L{Application.rejectConnection})
-
-        Will return a L{defer.Deferred} that will contain the result of the
-        connection request. The return is paused until the peer has sent its
-        bandwidth negotiation packets. See L{onDownstreamBandwidth}.
-
-        @param params: The connection parameters sent from the client, this
-            includes items such as the connection url, and user agent
-        @type params: C{dict}
-        @param args: The client supplied arguments to NetConnection.connect()
-        """
-        if self.connected:
-            # todo: error and disconnect here.
-            return
-
-        def connection_accepted(res):
-            """
-            Called when the application has accepted the connection
-            (in principle)
-            """
-            oe = params.pop('objectEncoding', self.objectEncoding)
-
-            self.objectEncoding = oe
-
-            f = self.factory
-
-            # begin negotiating bandwidth
-            self.sendMessage(message.DownstreamBandwidth(f.downstreamBandwidth))
-            self.sendMessage(message.UpstreamBandwidth(f.upstreamBandwidth, 2))
-
-            return res
-
-        def return_success(res):
-            self.connected = True
-            del self._pendingConnection
-
-            result = status.status('NetConnection.Connect.Success',
-                description='Connection succeeded.',
-                objectEncoding=self.objectEncoding)
-
-            self.sendMessage(message.ControlMessage(0, 0))
-
-            return rpc.CommandResult(result,
-                # what are these values?
-                {'mode': 1, 'capabilities': 31, 'fmsVer': 'FMS/3,5,1,516'})
-
-        def eb(fail):
-            """
-            Called when an error occurred when asking the application to
-            validate the connection request.
-            """
-            if self.application and self.client:
-                self.application.onConnectReject(self.client, fail, *args)
-
-            return status.fromFailure(fail, codes.NC_CONNECT_FAILED,
-                objectEncoding=self.objectEncoding)
-
-        def chain_errback(f):
-            self._pendingConnection.errback(f)
-
-        self._pendingConnection = defer.Deferred()
-
-        self._pendingConnection.addCallbacks(return_success, eb)
-
-        d = defer.maybeDeferred(self._onConnect, params, *args)
-
-        d.addCallback(connection_accepted)
-        d.addErrback(chain_errback)
-
-        # todo: timeout for connection
-        return self._pendingConnection
-
-    def _onConnect(self, params, *args):
-        """
-        The business logic of connecting to the application.
-
-        @param params: The connection parameters sent from the client, this
-            includes items such as the connection url, and user agent
-        @type params: C{dict}
-        """
-        if self.application:
-            # This protocol has already successfully completed a connection
-            # request.
-            raise exc.ConnectFailed('Already connected.')
-
-        try:
-            appName = params['app']
-        except KeyError:
-            raise exc.ConnectFailed("Bad connect packet (missing 'app' key)")
-
-        self.application = self.factory.getApplication(appName)
-
-        if self.application is None:
-            raise exc.InvalidApplication("Unknown application '%s'" % (appName,))
-
-        self.client = self.application.buildClient(self, params, *args)
-
-        def cb(res):
-            """
-            Called with the result of the connection attempt, either C{True} or
-            C{False}.
-            """
-            if res is False:
-                raise exc.ConnectRejected('Authorization is required')
-
-            self.application.acceptConnection(self.client)
-            self.application.onConnectAccept(self.client, *args)
-
-        d = defer.maybeDeferred(self.application.onConnect, self.client, *args)
-
-        d.addCallback(cb)
-
-        return d
-
-    def onDownstreamBandwidth(self, interval, timestamp):
-        """
-        """
-        rtmp.RTMPProtocol.onDownstreamBandwidth(self, interval, timestamp)
-
-        if not self.connected:
-            if hasattr(self, '_pendingConnection'):
-                if not self._pendingConnection.called:
-                    self._pendingConnection.callback(None)
 
     def publishStream(self, stream, streamName, type_):
         """
@@ -662,6 +500,7 @@ class ServerProtocol(rtmp.RTMPProtocol):
         if self.application:
             self.application.disconnect(self.client)
 
+
     def playStream(self, name, subscriber, *args):
         """
         """
@@ -678,6 +517,218 @@ class ServerProtocol(rtmp.RTMPProtocol):
 
         return d
 
+
+    def callExposedMethod(self, name, *args):
+        """
+        Used to match a callable based on the supplied name when a notify or
+        invoke is encountered. Returns C{None} if not found.
+
+        If no match is found from the superclass, the C{client} and then the
+        C{application} are checked in that order.
+
+        All methods on a client/application is considered B{public} and
+        accessible by the peer.
+
+        @see: L{rtmp.RTMPProtocol.getInvokableTarget}
+        """
+        # all client methods are publicly accessible
+        client = getattr(self, 'client', None)
+
+        if client:
+            target = util.get_callable_target(client, name)
+
+            if target:
+                return defer.maybeDeferred(target, *args)
+
+        application = getattr(self, 'application', None)
+
+        # todo: think about how to protect methods
+        if application:
+            target = util.get_callable_target(application, name)
+
+            if target:
+                return defer.maybeDeferred(target, *args)
+
+        return core.NetConnection.callExposedMethod(self, name, *args)
+
+
+    @rpc.expose('connect')
+    def onConnect(self, params, *args):
+        """
+        Connects this protocol instance to an application. The application has
+        the power to reject the connection (see L{Application.rejectConnection})
+
+        Will return a L{defer.Deferred} that will contain the result of the
+        connection request. The return is paused until the peer has sent its
+        bandwidth negotiation packets. See L{onDownstreamBandwidth}.
+
+        @param params: The connection parameters sent from the client, this
+            includes items such as the connection url, and user agent
+        @type params: C{dict}
+        @param args: The client supplied arguments to NetConnection.connect()
+        """
+        def connection_accepted(res):
+            """
+            Called when the application has accepted the connection
+            (in principle)
+            """
+            oe = params.pop('objectEncoding', self.objectEncoding)
+
+            self.objectEncoding = oe
+
+            f = self.protocol.factory
+
+            # begin negotiating bandwidth
+            self.sendMessage(message.DownstreamBandwidth(f.downstreamBandwidth))
+            self.sendMessage(message.UpstreamBandwidth(f.upstreamBandwidth, 2))
+
+            return res
+
+        def return_success(res):
+            self.connected = True
+            del self._pendingConnection
+
+            result = status.status('NetConnection.Connect.Success',
+                description='Connection succeeded.',
+                objectEncoding=self.objectEncoding)
+
+            self.sendMessage(message.ControlMessage(0, 0))
+
+            return rpc.CommandResult(result,
+                # what are these values?
+                {'mode': 1, 'capabilities': 31, 'fmsVer': 'FMS/3,5,1,516'})
+
+        def eb(fail):
+            """
+            Called when an error occurred when asking the application to
+            validate the connection request.
+            """
+            if self.application and self.client:
+                self.application.onConnectReject(self.client, fail, *args)
+
+            return status.fromFailure(fail, codes.NC_CONNECT_FAILED,
+                objectEncoding=self.objectEncoding)
+
+        def chain_errback(f):
+            self._pendingConnection.errback(f)
+
+        self._pendingConnection = defer.Deferred()
+
+        self._pendingConnection.addCallbacks(return_success, eb)
+
+        d = defer.maybeDeferred(self._onConnect, params, *args)
+
+        d.addCallback(connection_accepted)
+        d.addErrback(chain_errback)
+
+        # todo: timeout for connection
+        return self._pendingConnection
+
+    def _onConnect(self, params, *args):
+        """
+        The business logic of connecting to the application.
+
+        @param params: The connection parameters sent from the client, this
+            includes items such as the connection url, and user agent
+        @type params: C{dict}
+
+        @param args: arguments from RTMP connect packet
+        """
+        if self.application:
+            # This protocol has already successfully completed a connection
+            # request.
+            raise exc.ConnectFailed('Already connected.')
+
+        self.application = self.protocol.factory.getApplicationWithDefault(params, *args)
+
+        self.client = self.application.buildClient(self, params, *args)
+
+        def cb(res):
+            """
+            Called with the result of the connection attempt, either C{True} or
+            C{False}.
+            """
+            if res is False:
+                raise exc.ConnectRejected('Authorization is required')
+
+            self.application.acceptConnection(self.client)
+            self.application.onConnectAccept(self.client, *args)
+
+        d = defer.maybeDeferred(self.application.onConnect, self.client, *args)
+
+        d.addCallback(cb)
+
+        return d
+
+    def sendMessage(self, msg, stream=None):
+        """
+        """
+        self.protocol.sendMessage(msg, stream or self)
+
+
+    def getStreamingChannel(self, stream):
+        return self.protocol.getStreamingChannel(stream)
+
+
+
+class ServerProtocol(rtmp.RTMPProtocol):
+    """
+    Server side RTMP protocol implementation. Handles connection and stream
+    management. Provides a proxy between streams and the associated application.
+    """
+
+    netconnection = NetConnection
+
+
+    def buildStreamManager(self):
+        return self.nc
+
+    def versionSuccess(self):
+        self.transport.write('\x03')
+
+        rtmp.RTMPProtocol.versionSuccess(self)
+
+    def startStreaming(self):
+        """
+        """
+        self.nc = self.netconnection(self)
+        self.nc.protocol = self
+
+        rtmp.RTMPProtocol.startStreaming(self)
+
+
+    def onConnect(self, params, *args):
+        return self.nc.onConnect(params, *args)
+
+    def onDownstreamBandwidth(self, interval, timestamp):
+        """
+        """
+        rtmp.RTMPProtocol.onDownstreamBandwidth(self, interval, timestamp)
+
+        if hasattr(self.nc, '_pendingConnection'):
+            if not self.nc._pendingConnection.called:
+                self.nc._pendingConnection.callback(None)
+
+
+    def closeStream(self):
+        """
+        Called when the stream is asked to close itself.
+        """
+        self.nc.closeStream()
+
+
+    def onInvoke(self,name, callId, args, timestamp):
+        """
+        """
+        self.nc.onInvoke(name, callId, args, timestamp)
+
+
+    def onNotify(self, name, args, timestamp):
+        """
+        """
+        self.nc.onNotify(name, args, timestamp)
+
+
     def onControlMessage(self, *args):
         """
         """
@@ -686,6 +737,8 @@ class ServerProtocol(rtmp.RTMPProtocol):
     def onBytesRead(self, *args):
         """
         """
+
+
 
 class StreamPublisher(object):
     """
@@ -890,8 +943,26 @@ class Application(object):
         @param args: The client supplied arguments to NetConnection.connect()
         """
         c = self.client(protocol)
-
         c.id = util.generateBytes(9, readable=True)
+
+        # Inject properties into the client object
+        # TODO: Evaluate if these should be defined with @property in the
+        #  Client class itself.
+        c.application = self
+
+        try:
+            c.ip = c.nc.transport.getPeer().host
+        except AttributeError:
+            c.ip = None
+
+        tcUrl = params.get('tcUrl', '')
+        c.protocol = urlparse.urlparse(tcUrl)[0]
+        if c.protocol == '':
+            c.protocol = None
+
+        c.pageUrl = params.get('pageUrl', None)
+        c.uri = params.get('tcUrl', None)
+        c.agent = params.get('flashVer', None)
 
         return c
 
@@ -1068,7 +1139,7 @@ class ServerFactory(protocol.ServerFactory):
     """
 
     protocol = ServerProtocol
-    protocolVersion = version.RTMP
+    handshake = handshake.ServerNegotiator
 
     upstreamBandwidth = 2500000L
     downstreamBandwidth = 2500000L
@@ -1082,22 +1153,45 @@ class ServerFactory(protocol.ServerFactory):
             for name, app in applications.items():
                 self.registerApplication(name, app)
 
-    def buildHandshakeNegotiator(self, protocol):
+
+    def buildHandshakeNegotiator(self, observer, output):
         """
         Returns a negotiator capable of handling server side handshakes.
-
-        @param protocol: The L{ServerProtocol} requiring handshake negotiations.
         """
-        i = handshake.get_implementation(self.protocolVersion)
+        return self.handshake(observer, output)
 
-        return i.ServerNegotiator(protocol, protocol.transport)
 
-    def getApplication(self, name):
+    def getApplicationWithDefault(self, params, *args):
         """
-        Returns the active L{IApplication} instance related to C{name}. If
+        Checks if an application exists within the static table. If an
+        application cannot be found there, getApplication is called.
+
+        @param args: arguments from RTMP connect packet
+        """
+        try:
+            appName = params['app']
+        except KeyError:
+            raise exc.ConnectFailed("Bad connect packet (missing 'app' key)")
+
+        if appName in self.applications:
+            return self.applications[appName]
+
+        app = self.getApplication(params, *args)
+
+        if app is None:
+            raise exc.InvalidApplication('Unknown application %r' % (appName,))
+
+        return app
+
+    def getApplication(self, params, *args):
+        """
+        Returns the active L{IApplication} instance related to C{args}. If
         there is no active application, C{None} is returned.
+
+        @param args: arguments from RTMP connect packet
         """
-        return self.applications.get(name, None)
+        return None
+
 
     def registerApplication(self, name, app):
         """

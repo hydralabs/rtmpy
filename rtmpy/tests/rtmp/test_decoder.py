@@ -17,7 +17,7 @@
 Decoding tests for L{rtmpy.rtmp.codec}.
 """
 
-import unittest
+from twisted.trial import unittest
 
 from pyamf.util import BufferedByteStream
 
@@ -259,7 +259,7 @@ class DeMuxerTestCase(unittest.TestCase):
     """
 
     def setUp(self):
-        self.patch('codec.FrameReader', MockFrameReader)
+        self.patch(codec, 'FrameReader', MockFrameReader)
 
         self.demuxer = codec.ChannelDemuxer()
 
@@ -295,7 +295,7 @@ class DecoderTestCase(unittest.TestCase):
     """
 
     def setUp(self):
-        self.patch('codec.ChannelDemuxer', MockChannelDemuxer)
+        self.patch(codec, 'ChannelDemuxer', MockChannelDemuxer)
 
         self.dispatcher = DispatchTester(self)
         self.stream_factory = MockStreamFactory(self)

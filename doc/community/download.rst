@@ -16,7 +16,7 @@ Latest Stable Release - 0.1
 The files below also include a copy of the documentation.
 
 +-----------------+-----------------------------------+
-| **Gzipped Tar** | `RTMPy-0.1.1.tar.gz`_               |
+| **Gzipped Tar** | `RTMPy-0.1.1.tar.gz`_             |
 +-----------------+-----------------------------------+
 
 

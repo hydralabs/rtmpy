@@ -1,5 +1,6 @@
 global-exclude *.pyc
 include distribute_setup.py
+include setupinfo.py
 graft doc
 prune doc/build
 global-exclude RTMPy.egg-info

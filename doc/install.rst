@@ -17,13 +17,6 @@ simply type the following on the command-line to install RTMPy::
 
 `Note: you might need root permissions or equivalent for these steps.`
 
-If you don't have `setuptools` or `easy_install`, first download
-ez_setup.py_ and run::
-
-    python ez_setup.py
-
-After `easy_install` is installed, run `easy_install rtmpy` again. If
-you run into problems, try the manual installation instructions below.
 
 To upgrade your existing RTMPy installation to the latest version
 use::
@@ -40,7 +33,7 @@ Prerequisites
 The following software packages are prerequisites:
 
 - Twisted_ 2.5 or newer
-- PyAMF_ 0.6b2 or newer
+- PyAMF_ 0.6.2 or newer
 - `zope.interface`_ 3.3.0 or newer
 - PyWin32_ b210 or newer (for Windows only)
 

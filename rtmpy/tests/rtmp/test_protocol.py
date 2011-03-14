@@ -56,7 +56,7 @@ class MockFactory(object):
         self.test = test
         self.protocol = protocol
 
-    def buildHandshakeNegotiator(self, protocol):
+    def buildHandshakeNegotiator(self, protocol, output):
         self.test.assertIdentical(protocol, self.protocol)
 
         return self.test.handshaker
@@ -75,18 +75,25 @@ class MockApplication(object):
 
 
 
-class SimpleProtocol(rtmp.RTMPProtocol):
+class SimpleProtocol(rtmp.RTMPProtocol, core.StreamManager):
     """
     A simple RTMP protocol that returns empty streams.
     """
 
-    def buildStream(self, streamId):
-        return core.NetStream(self, streamId)
+    def buildStreamManager(self):
+        return self
+
+
+    def getControlStream(self):
+        return self
 
 
     def closeStream(self):
         pass
 
+
+    def buildStream(self, streamId):
+        return core.NetStream(self, streamId)
 
 
 class ProtocolTestCase(unittest.TestCase):
@@ -102,6 +109,7 @@ class ProtocolTestCase(unittest.TestCase):
     def connect(self):
         self.protocol.factory = MockFactory(self, self.protocol)
         self.protocol.connectionMade()
+        self.protocol.versionSuccess()
 
 
 class StateTest(ProtocolTestCase):
@@ -110,7 +118,7 @@ class StateTest(ProtocolTestCase):
     """
 
     def test_not_connected(self):
-        self.assertFalse(hasattr(self.protocol, 'state'))
+        self.assertEqual(self.protocol.state, None)
 
     def test_connect(self):
         self.connect()
@@ -126,7 +134,9 @@ class StateTest(ProtocolTestCase):
 
         self.assertEqual(self.protocol.state, 'stream')
         self.assertFalse(hasattr(self.protocol, 'handshaker'))
-        self.assertEqual(self.protocol.streams, {0: self.protocol})
+
+        m = self.protocol.streamManager
+        self.assertEqual(m.streams, {0: m})
 
 
 class ConnectionLostTestCase(ProtocolTestCase):
@@ -154,7 +164,7 @@ class ConnectionLostTestCase(ProtocolTestCase):
 
     def test_decode_task(self):
         self.protocol.handshakeSuccess('')
-        self.protocol._startDecoding()
+        self.protocol.startDecoding()
 
         self.assertTrue(hasattr(self.protocol, 'decoder_task'))
         self.protocol.connectionLost(error.ConnectionDone())
@@ -162,7 +172,7 @@ class ConnectionLostTestCase(ProtocolTestCase):
 
     def test_encode_task(self):
         self.protocol.handshakeSuccess('')
-        self.protocol._startEncoding()
+        self.protocol.startEncoding()
 
         self.assertTrue(hasattr(self.protocol, 'encoder_task'))
         self.protocol.connectionLost(error.ConnectionDone())
@@ -207,7 +217,7 @@ class CooperateTestCase(ProtocolTestCase):
             self.assertFalse(self.transport.connected)
             self.flushLoggedErrors(TestRuntimeError)
 
-        d = self.protocol._startDecoding().addErrback(eb)
+        d = self.protocol.startDecoding().addErrback(eb)
 
         return d
 
@@ -223,16 +233,16 @@ class CooperateTestCase(ProtocolTestCase):
             self.assertFalse(self.transport.connected)
             self.flushLoggedErrors(TestRuntimeError)
 
-        d = self.protocol._startEncoding().addErrback(eb)
+        d = self.protocol.startEncoding().addErrback(eb)
 
         return d
 
     def test_resume_decode(self):
-        d = self.protocol._startDecoding()
+        d = self.protocol.startDecoding()
 
         def resume(res):
             self.assertTrue(self.transport.connected)
-            return self.protocol._startDecoding()
+            return self.protocol.startDecoding()
 
         d.addCallback(resume)
 
@@ -281,6 +291,7 @@ class BasicResponseTestCase(ProtocolTestCase):
         self.protocol.factory = self.factory
 
         self.protocol.connectionMade()
+        self.protocol.versionSuccess()
         self.protocol.handshakeSuccess('')
 
         self.decoder = self.protocol.decoder
@@ -288,12 +299,19 @@ class BasicResponseTestCase(ProtocolTestCase):
         self.messages = []
 
         def send_message(*args, **kwargs):
-            args = list(args) + [kwargs.get('stream', None)]
+            args = list(args)
+            stream = kwargs.get('stream', None)
+
+            if stream:
+                args.append(stream)
+
             self.messages.append(args)
 
         self.patch(self.protocol, 'sendMessage', send_message)
 
-        self.stream = self.protocol.streams[self.protocol.createStream()]
+        m = self.protocol.streamManager
+
+        self.stream = m.buildStream(1)
 
     def test_send_bytes_read(self):
         """
@@ -308,9 +326,9 @@ class BasicResponseTestCase(ProtocolTestCase):
 
         self.assertEqual(len(self.messages), 1)
 
-        msg, _, = self.messages[0]
+        msg, stream, = self.messages[0]
 
-        self.assertEqual(_, None)
+        self.assertIdentical(stream, self.protocol)
         self.assertIsInstance(msg, message.BytesRead)
         self.assertEqual(msg.bytes, 16)
 
@@ -358,6 +376,7 @@ class InvokingTestCase(ProtocolTestCase):
         self.protocol.factory = self.factory
 
         self.protocol.connectionMade()
+        self.protocol.versionSuccess()
         self.protocol.handshakeSuccess('')
 
         self.decoder = self.protocol.decoder
