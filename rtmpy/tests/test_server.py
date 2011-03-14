@@ -533,7 +533,7 @@ class ConnectingTestCase(unittest.TestCase):
         def bork(*args):
             raise EnvironmentError('щоот')
 
-        self.patch(self.protocol, '_onConnect', bork)
+        self.patch(self.protocol.nc, '_onConnect', bork)
 
         d = self.connect({})
 

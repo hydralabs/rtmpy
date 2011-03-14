@@ -1028,7 +1028,7 @@ class Application(object):
             self._streamingClients[client] = stream
 
         if client.id != stream.client.id:
-            raise exc.BadNameError('%s is already used' % (name,))
+            raise exc.BadNameError("'%s' is already used" % (name,))
 
         self._runCallbacksForPublishedStream(name, stream)
 
@@ -1039,7 +1039,7 @@ class Application(object):
         try:
             source = self.streams[name]
         except KeyError:
-            raise exc.BadNameError('Unknown stream %r' % (name,))
+            raise exc.BadNameError("Unknown stream '%s'" % (name,))
 
         if source.client.id != stream.client.id:
             raise exc.BadNameError('Unable to unpublish stream')
@@ -1179,7 +1179,7 @@ class ServerFactory(protocol.ServerFactory):
         app = self.getApplication(params, *args)
 
         if app is None:
-            raise exc.InvalidApplication('Unknown application %r' % (appName,))
+            raise exc.InvalidApplication("Unknown application '%s'" % (appName,))
 
         return app
 
@@ -1254,7 +1254,7 @@ class ServerFactory(protocol.ServerFactory):
         try:
             app = self.applications[name]
         except KeyError:
-            raise exc.InvalidApplication('Unknown application %r' % (name,))
+            raise exc.InvalidApplication("Unknown application '%s'" % (name,))
 
         # TODO: run through the attached clients and signal the app shutdown.
         d = defer.maybeDeferred(app.shutdown)
