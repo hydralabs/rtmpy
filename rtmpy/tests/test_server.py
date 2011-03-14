@@ -1055,3 +1055,112 @@ class PlayTestCase(ServerFactoryTestCase):
         d.addCallback(cb)
 
         return d
+
+
+
+class Publisher(object):
+    """
+    A value object that acts like a publisher.
+    """
+
+    meta_data = None
+
+
+    def onMetaData(self, data):
+        self.meta_data = data
+
+
+
+class SendTestCase(ServerFactoryTestCase):
+    """
+    Tests for L{server.NetStream.send}
+    """
+
+    def setUp(self):
+        ServerFactoryTestCase.setUp(self)
+
+        self.app = server.Application()
+
+        d = self.factory.registerApplication('foo', self.app)
+
+        def cb(res):
+            self.client = self.connect(self.app, self.protocol)
+            m = self.protocol.streamManager
+
+            self.stream = self.createStream(m)
+            self.publisher = Publisher()
+            self.stream.publishingStarted(self.publisher, 'spammy')
+
+            return res
+
+        d.addCallback(cb)
+
+        return d
+
+
+    def sendMessage(self, msg, stream=None, timestamp=None):
+        """
+        Dispatches an RTMP message to the protocol. Useful for mocking 'real'
+        RTMP calls.
+        """
+        if stream is None:
+            stream = self.protocol
+
+        msg.dispatch(stream, timestamp or 0)
+
+
+    def setMetaData(self, data):
+        """
+        Dispatches an RTMP message to call L{NetStream.setDataFrame}.
+        """
+        m = message.Notify('@setDataFrame', 'onMetaData', data)
+
+        self.sendMessage(m, self.stream)
+
+
+    def clearMetaData(self):
+        """
+        Dispatches an RTMP message to call L{NetStream.clearDataFrame}.
+        """
+        m = message.Notify('@clearDataFrame', 'onMetaData')
+
+        self.sendMessage(m, self.stream)
+
+        self.assertEqual(self.publisher.meta_data, {})
+
+
+    def assertMetaData(self, data):
+        """
+        Short cut to check that the meta data
+        """
+        self.assertEqual(self.publisher.meta_data, data)
+
+
+    def test_set_data_frame(self):
+        """
+        An RTMP message setting the meta data must call
+        L{ServerProtocol.setDataFrame} accordingly, which in turn must call
+        L{stream.publisher.onMetaData}.
+        """
+        self.setMetaData({})
+
+        self.setMetaData({'foo': 'bar'})
+        self.assertMetaData({'foo': 'bar'})
+
+        self.setMetaData({'foo': 'baz'})
+        self.assertMetaData({'foo': 'baz'})
+
+        self.setMetaData({'gak': 'baz'})
+        self.assertMetaData({'gak': 'baz'})
+
+
+    def test_clear_data_frame(self):
+        """
+        An RTMP message setting the meta data must call
+        L{ServerProtocol.clearDataFrame} accordingly, which in turn must call
+        L{stream.publisher.onMetaData} with the appropriate args.
+        """
+        self.setMetaData({'gak': 'baz'})
+
+        self.clearMetaData()
+        self.assertMetaData({})
