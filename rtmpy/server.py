@@ -557,15 +557,6 @@ class NetConnection(core.NetConnection):
             if target:
                 return defer.maybeDeferred(target, *args)
 
-        application = getattr(self, 'application', None)
-
-        # todo: think about how to protect methods
-        if application:
-            target = util.get_callable_target(application, name)
-
-            if target:
-                return defer.maybeDeferred(target, *args)
-
         return core.NetConnection.callExposedMethod(self, name, *args)
 
 
