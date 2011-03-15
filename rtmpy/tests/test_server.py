@@ -332,18 +332,17 @@ class ServerFactoryTestCase(unittest.TestCase):
         self.factory = server.ServerFactory()
         self.protocol = self.factory.buildProtocol(None)
         self.transport = StringTransportWithDisconnection()
-        self.protocol.transport = self.transport
-        self.transport.protocol = self.protocol
+        self.nc = server.NetConnection(self.protocol)
 
-        self.protocol.connectionMade()
+        self.protocol.makeConnection(self.transport)
+        self.transport.protocol = self.protocol
         self.protocol.versionReceived(3)
         self.protocol.handshakeSuccess('')
 
         self.manager = self.protocol.streamManager
 
-
     def connect(self, app, protocol):
-        client = app.buildClient(self.protocol, {'app': 'foo'})
+        client = app.buildClient(self.nc, {'app': 'foo'})
 
         app.acceptConnection(client)
 
@@ -359,6 +358,41 @@ class ServerFactoryTestCase(unittest.TestCase):
         """
         return manager.getStream(manager.createStream())
 
+
+class ServerFactoryDisconnectedTestCase(unittest.TestCase):
+    """
+    """
+
+    def setUp(self):
+        self.factory = server.ServerFactory()
+        self.protocol = self.factory.buildProtocol(None)
+        self.transport = StringTransportWithDisconnection()
+        self.nc = server.NetConnection(self.protocol)
+
+        self.protocol.connectionMade()
+        self.transport.protocol = self.protocol
+        self.protocol.transport = self.transport
+        self.protocol.versionReceived(3)
+        self.protocol.handshakeSuccess('')
+
+        self.manager = self.protocol.streamManager
+
+    def connect(self, app, protocol):
+        client = app.buildClient(self.nc, {'app': 'foo'})
+
+        app.acceptConnection(client)
+
+        protocol.nc.connected = True
+        protocol.nc.client = client
+        protocol.nc.application = app
+
+        return client
+
+    def createStream(self, manager):
+        """
+        Returns the L{server.NetStream} as created by the protocol
+        """
+        return manager.getStream(manager.createStream())
 
 
 class ConnectingTestCase(unittest.TestCase):
@@ -771,7 +805,7 @@ class ApplicationInterfaceTestCase(ServerFactoryTestCase):
         ServerFactoryTestCase.setUp(self)
 
         self.app = server.Application()
-        self.client = self.app.buildClient(self.protocol, {'app': 'foo'})
+        self.client = self.app.buildClient(self.nc, {'app': 'foo'})
         self.app.acceptConnection(self.client)
 
         return self.factory.registerApplication('foo', self.app)
@@ -881,30 +915,6 @@ class PublishingTestCase(ServerFactoryTestCase):
         return d.addCallback(cb)
 
 
-    def test_not_connected(self):
-        """
-        Test when
-        """
-        s = self.createStream()
-
-        self.assertFalse(self.protocol.connected)
-
-        d = s.publish('foo')
-
-        def eb(f):
-            f.trap(exc.ConnectError)
-
-            self.assertEqual(f.getErrorMessage(), 'Cannot publish stream - not connected')
-
-            self.assertStatus(s, {
-                'code': 'NetConnection.Call.Failed',
-                'description': 'Cannot publish stream - not connected',
-                'level': 'error'
-            })
-
-        return d.addErrback(eb)
-
-
     def test_kill_connection_after_successful_publish(self):
         """
         After a successful publish, the peer disconnects rudely. Check app state
@@ -930,6 +940,63 @@ class PublishingTestCase(ServerFactoryTestCase):
         d.addCallback(kill_connection)
 
         return d
+
+
+class PublishingDisconnectedTestCase(ServerFactoryDisconnectedTestCase):
+    """
+    Tests for publishing a stream when the transport is disconnected
+    """
+
+    def setUp(self):
+        ServerFactoryDisconnectedTestCase.setUp(self)
+
+        self.stream_status = {}
+
+        self.app = server.Application()
+
+        return self.factory.registerApplication('foo', self.app)
+
+
+    def createStream(self):
+        """
+        Returns the L{server.NetStream} as created by the protocol
+        """
+        stream = self.manager.getStream(self.manager.createStream())
+
+        def capture_status(s):
+            self.stream_status[stream] = s
+
+        stream.sendStatus = capture_status
+
+        return stream
+
+
+    def assertStatus(self, stream, s):
+        self.assertEqual(self.stream_status[stream], s)
+
+
+    def test_not_connected(self):
+        """
+        Test publish with a disconnected transport
+        """
+        s = self.createStream()
+
+        self.assertFalse(self.protocol.connected)
+
+        d = s.publish('foo')
+
+        def eb(f):
+            f.trap(exc.ConnectError)
+
+            self.assertEqual(f.getErrorMessage(), 'Cannot publish stream - not connected')
+
+            self.assertStatus(s, {
+                'code': 'NetConnection.Call.Failed',
+                'description': 'Cannot publish stream - not connected',
+                'level': 'error'
+            })
+
+        return d.addErrback(eb)
 
 
 class PlayTestCase(ServerFactoryTestCase):

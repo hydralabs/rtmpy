@@ -289,7 +289,7 @@ class NetStream(core.NetStream):
             def send_status(res):
                 self.sendStatus(status.status('NetStream.Unpublish.Success',
                     description='%s is now unpublished.' % (self.name,),
-                    clientid=self.nc.clientId))
+                    clientid=self.nc.client.id))
 
                 return res
 
@@ -498,7 +498,7 @@ class NetConnection(core.NetConnection):
         propagate the event to the attached application (if one exists)
         """
         if self.application:
-            self.application.disconnect(self.client)
+            self.application._disconnect(self.client)
 
 
     def playStream(self, name, subscriber, *args):
@@ -692,7 +692,6 @@ class ServerProtocol(rtmp.RTMPProtocol):
         """
         """
         self.nc = self.netconnection(self)
-        self.nc.protocol = self
 
         rtmp.RTMPProtocol.startStreaming(self)
 
@@ -902,8 +901,16 @@ class Application(object):
         """
         self.clients[client.id] = client
 
-
     def disconnect(self, client):
+        """
+        Disconnects the client from the server.
+        """
+        self._disconnect(client)
+
+        client.nc.protocol.transport.loseConnection()
+
+
+    def _disconnect(self, client):
         """
         Removes the C{client} from this application.
         """
@@ -921,9 +928,10 @@ class Application(object):
 
             self.streams.pop(name, None)
 
-        del self.clients[client.id]
+        c = self.clients.pop(client.id, None)
 
-        client.id = None
+        if c is None:
+            return
 
         try:
             self.onDisconnect(client)
