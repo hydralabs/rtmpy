@@ -526,6 +526,9 @@ class RTMPProtocol(StateEngine, protocol.Protocol):
     """
     """
 
+    streamId = 0
+    timestamp = 0
+
 
     def logAndDisconnect(self, reason, *args, **kwargs):
         """
