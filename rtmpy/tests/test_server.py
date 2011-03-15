@@ -910,7 +910,7 @@ class ApplicationInterfaceTestCase(ServerFactoryTestCase):
 
 class ClientInterfaceTestCase(unittest.TestCase):
     """
-    Tests for L{server.ServerProtocol} implementing the L{server.IApplication}
+    Tests for L{server.Client} implementing the L{server.IClient}
     interface correctly.
     """
 
@@ -920,11 +920,13 @@ class ClientInterfaceTestCase(unittest.TestCase):
 
     def test_client_call(self):
         """
-        Ensure that if onDisconnect raises an error, that execution continues
-        smoothly.
+        Ensure that invoking call on a client passes all proper arguments
         """
 
         class MockNetConnection(object):
+            """
+            Mock NetConnection object to test Client APIs
+            """
 
             def __init__(self):
                 self.events = []
