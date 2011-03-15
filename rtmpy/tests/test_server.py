@@ -931,21 +931,18 @@ class ClientInterfaceTestCase(unittest.TestCase):
             def __init__(self):
                 self.events = []
 
-            def _add_event(self, name, args, kwargs):
-                self.events.append((name, args, kwargs))
+            def _add_event(self, args, kwargs):
+                self.events.append((args, kwargs))
 
             def call(self, *args, **kwargs):
-                self._add_event("call", args, kwargs)
+                self._add_event(args, kwargs)
 
-        self.client.nc = MockNetConnection()
+        nc = self.client.nc = MockNetConnection()
 
         self.client.call("method_name", 1, "string", kw="Hello")
 
-        name, args, kwargs = self.client.nc.events.pop()
-        self.assertEqual(name, 'call')
-        self.assertIdentical(args[0], "method_name")
-        self.assertEqual(args[1:], (1, 'string'))
-        self.assertEqual(len(args), 3)
+        args, kwargs = nc.events.pop()
+        self.assertEqual(args, ('method_name', 1, 'string'))
         self.assertEqual(kwargs, {'kw': 'Hello'})
 
 
