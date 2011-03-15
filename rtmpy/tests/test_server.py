@@ -133,7 +133,7 @@ class ApplicationRegisteringTestCase(unittest.TestCase):
             self.assertEqual(self.factory.applications, {'foo': self.app})
 
         reactor.callLater(0, d.callback, None)
-        
+
     def test_create_unicode(self):
         """
         Test initial args for L{server.ServerFactory}
@@ -559,7 +559,7 @@ class ConnectingTestCase(unittest.TestCase):
         d.addCallback(cb)
 
         return d
-    
+
     def test_random_failure_unicode(self):
         """
         If something random goes wrong, make sure the status is correctly set.
@@ -600,7 +600,7 @@ class ConnectingTestCase(unittest.TestCase):
         d.addCallback(cb)
 
         return d
-    
+
     def test_unknown_application_unicode(self):
         self.assertEqual(self.factory.getApplication('what'), None)
 
@@ -908,6 +908,45 @@ class ApplicationInterfaceTestCase(ServerFactoryTestCase):
         self.flushLoggedErrors(TestRuntimeError)
 
 
+class ClientInterfaceTestCase(unittest.TestCase):
+    """
+    Tests for L{server.ServerProtocol} implementing the L{server.IApplication}
+    interface correctly.
+    """
+
+    def setUp(self):
+        self.client = server.Client(None)
+
+
+    def test_client_call(self):
+        """
+        Ensure that if onDisconnect raises an error, that execution continues
+        smoothly.
+        """
+
+        class MockNetConnection(object):
+
+            def __init__(self):
+                self.events = []
+
+            def _add_event(self, name, args, kwargs):
+                self.events.append((name, args, kwargs))
+
+            def call(self, *args, **kwargs):
+                self._add_event("call", args, kwargs)
+
+        self.client.nc = MockNetConnection()
+
+        self.client.call("method_name", 1, "string", kw="Hello")
+
+        name, args, kwargs = self.client.nc.events.pop()
+        self.assertEqual(name, 'call')
+        self.assertIdentical(args[0], "method_name")
+        self.assertEqual(args[1:], (1, 'string'))
+        self.assertEqual(len(args), 3)
+        self.assertEqual(kwargs, {'kw': 'Hello'})
+
+
 class PublishingTestCase(ServerFactoryTestCase):
     """
     Tests for all facets of publishing a stream
@@ -975,8 +1014,8 @@ class PublishingTestCase(ServerFactoryTestCase):
 
 
         return d.addCallback(cb)
-        
-        
+
+
 
 
     def test_kill_connection_after_successful_publish(self):

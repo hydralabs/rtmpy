@@ -196,8 +196,8 @@ class Client(object):
         self.nc = nc
         self.id = None
 
-    def call(self, name, *args):
-        self.nc.call(name, *args)
+    def call(self, name, *args, **kwargs):
+        self.nc.call(name, *args, **kwargs)
 
 
 
