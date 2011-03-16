@@ -175,7 +175,7 @@ class BaseCallHandler(object):
 
 
     def __init__(self):
-        self._lastCallId = 0
+        self._lastCallId = 1
         self._activeCalls = {}
 
 
@@ -341,6 +341,10 @@ class AbstractCallHandler(BaseCallHandler):
         @param result: The arguments supplied with the response.
         @return: C{None}
         """
+        if callId == 1:
+            log.msg("Encountered callId == 1, name=%r, result=%r, kwargs=%r" % (name, result, kwargs))
+            raise AssertionError("Found callId == 1, please contact RTMPy Developers")
+
         command = kwargs.get('command', None)
         callContext = self.finishCall(callId)
 
