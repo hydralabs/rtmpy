@@ -411,7 +411,7 @@ class InvokingTestCase(ProtocolTestCase):
             fail.trap(exc.CallFailed)
 
             self.assertEqual(util.getFailureMessage(fail),
-                "Unknown method 'foo'")
+                "Method not found (foo)")
 
         def check_messages(res):
             self.assertEqual(self.messages, [])
@@ -435,7 +435,7 @@ class InvokingTestCase(ProtocolTestCase):
             fail.trap(exc.CallFailed)
 
             self.assertEqual(util.getFailureMessage(fail),
-                "Unknown method 'дак'")
+                "Method not found (дак)")
 
         def check_messages(res):
             self.assertEqual(self.messages, [])
@@ -461,7 +461,7 @@ class InvokingTestCase(ProtocolTestCase):
             fail.trap(exc.CallFailed)
 
             self.assertEqual(util.getFailureMessage(fail),
-                "Unknown method 'foo'")
+                "Method not found (foo)")
 
         def check_messages(res):
             msg, stream = self.messages.pop(0)
@@ -475,7 +475,7 @@ class InvokingTestCase(ProtocolTestCase):
             self.assertEqual(msg.name, '_error')
             self.assertEqual(msg.argv, [None, {
                 'code': 'NetConnection.Call.Failed',
-                'description': "Unknown method 'foo'",
+                'description': "Method not found (foo)",
                 'level': 'error'}])
 
         d.addCallbacks(cb, eb).addCallback(check_messages)
@@ -497,7 +497,7 @@ class InvokingTestCase(ProtocolTestCase):
             fail.trap(exc.CallFailed)
 
             self.assertEqual(util.getFailureMessage(fail),
-                "Unknown method 'дак'")
+                "Method not found (дак)")
 
         def check_messages(res):
             msg, stream = self.messages.pop(0)
@@ -511,7 +511,7 @@ class InvokingTestCase(ProtocolTestCase):
             self.assertEqual(msg.name, '_error')
             self.assertEqual(msg.argv, [None, {
                 'code': 'NetConnection.Call.Failed',
-                'description': "Unknown method 'дак'",
+                'description': "Method not found (дак)",
                 'level': 'error'}])
 
         d.addCallbacks(cb, eb).addCallback(check_messages)
