@@ -167,6 +167,8 @@ class BaseCallHandler(object):
     Once a call is I{finished}, it is forgotten about. Call ids cannot be
     reused.
 
+    @ivar strict: Whether response/requests should be handled strictly. This is
+        focussed around the callId of the request/response rpc.
     @ivar _lastCallId: The value of the last initiated RPC call.
     @type _lastCallId: C{int}
     @ivar _activeCalls: A C{dict} of callId -> context. An active call has been
@@ -174,9 +176,11 @@ class BaseCallHandler(object):
     """
 
 
-    def __init__(self):
+    def __init__(self, strict=True):
         self._lastCallId = 1
         self._activeCalls = {}
+
+        self.strict = strict
 
 
     def isCallActive(self, callId):
@@ -224,6 +228,13 @@ class BaseCallHandler(object):
 
         if callId == NO_RESULT:
             return callId
+
+        if callId == 1:
+            log.msg('Initiating RPC call with callId == 1')
+            log.msg('Context: %r %r' % (args, kwargs))
+
+            if self.strict:
+                raise AssertionError("Initiated call with callId == 1")
 
         if callId is None:
             callId = self._lastCallId = self.getNextCallId()
@@ -342,8 +353,11 @@ class AbstractCallHandler(BaseCallHandler):
         @return: C{None}
         """
         if callId == 1:
-            log.msg("Encountered callId == 1, name=%r, result=%r, kwargs=%r" % (name, result, kwargs))
-            raise AssertionError("Found callId == 1, please contact RTMPy Developers")
+            log.msg('Received RPC response for callId == 1')
+            log.msg('name=%r, result=%r, kwargs=%r' % (name, result, kwargs))
+
+            if self.strict:
+                raise AssertionError("Received response for callId == 1")
 
         command = kwargs.get('command', None)
         callContext = self.finishCall(callId)
