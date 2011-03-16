@@ -153,7 +153,7 @@ def callExposedMethod(obj, name, *args, **kwargs):
             log.err("'%s' is exposed but %r does not exist on %r " % (
                 name, methodName, obj))
 
-        raise exc.CallFailed("Unknown method '%s'" % (name,))
+        raise exc.CallFailed("Method not found (%s)" % (name,))
 
     return method(*args, **kwargs)
 

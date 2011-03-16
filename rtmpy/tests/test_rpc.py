@@ -622,7 +622,7 @@ class CallingExposedMethodTestCase(unittest.TestCase):
         e = self.assertRaises(exc.CallFailed,
             self.call, 'exposed_named', (1, 2, 3), 'foo')
 
-        self.assertEqual(str(e), "Unknown method 'exposed_named'")
+        self.assertEqual(str(e), "Method not found (exposed_named)")
 
 
     def test_not_exposed(self):
@@ -633,7 +633,7 @@ class CallingExposedMethodTestCase(unittest.TestCase):
         e = self.assertRaises(exc.CallFailed,
             self.call, 'not_exposed', (), None)
 
-        self.assertEqual(str(e), "Unknown method 'not_exposed'")
+        self.assertEqual(str(e), "Method not found (not_exposed)")
 
 
     def test_deleted_func(self):
@@ -644,7 +644,7 @@ class CallingExposedMethodTestCase(unittest.TestCase):
         e = self.assertRaises(exc.CallFailed,
             self.call, 'deleted_func', (), None)
 
-        self.assertEqual(str(e), "Unknown method 'deleted_func'")
+        self.assertEqual(str(e), "Method not found (deleted_func)")
 
 
 
