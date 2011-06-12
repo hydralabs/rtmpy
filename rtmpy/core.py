@@ -301,7 +301,7 @@ class NetStream(BaseStream):
         return self.nc.client
 
 
-    def sendMessage(self, msg):
+    def sendMessage(self, msg, whenDone=None):
         """
         Sends an RTMP message to the peer. This a low level method and is not
         part of any public api. If its use is necessary then this is a bug.
@@ -309,7 +309,7 @@ class NetStream(BaseStream):
         @param msg: The RTMP message to be sent by this stream.
         @type: L{message.Message}
         """
-        self.nc.sendMessage(msg, stream=self)
+        self.nc.sendMessage(msg, stream=self, whenDone=whenDone)
 
 
     @rpc.expose

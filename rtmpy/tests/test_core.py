@@ -307,7 +307,7 @@ class MessageSendingStream(core.BaseStream):
         self.messages = []
 
 
-    def sendMessage(self, msg):
+    def sendMessage(self, msg, whenDone=None):
         self.messages.append(msg)
 
 

@@ -138,14 +138,14 @@ class CallHandlerTestCase(unittest.TestCase):
         h = self.handler
         c = ('foo', ['bar', 'baz'], {})
 
+        self.assertEqual(h.getNextCallId(), 1)
+        self.assertEqual(h.getCallContext(1), None)
+
+        self.assertEqual(h.initiateCall(*c), 1)
+        self.assertEqual(h.getCallContext(1), c)
+
         self.assertEqual(h.getNextCallId(), 2)
         self.assertEqual(h.getCallContext(2), None)
-
-        self.assertEqual(h.initiateCall(*c), 2)
-        self.assertEqual(h.getCallContext(2), c)
-
-        self.assertEqual(h.getNextCallId(), 3)
-        self.assertEqual(h.getCallContext(3), None)
 
 
     def test_active(self):
@@ -155,9 +155,9 @@ class CallHandlerTestCase(unittest.TestCase):
         """
         h = self.handler
 
-        self.assertEqual(h.getNextCallId(), 2)
+        self.assertEqual(h.getNextCallId(), 1)
 
-        self.assertFalse(h.isCallActive(2))
+        self.assertFalse(h.isCallActive(1))
 
         callId = h.initiateCall()
 
@@ -368,7 +368,7 @@ class CallWithNotifTestCase(unittest.TestCase):
         msg = m.pop()
 
         self.assertEqual(message.typeByClass(msg), message.INVOKE)
-        self.assertEqual(msg.id, 2)
+        self.assertEqual(msg.id, 1)
         self.assertEqual(msg.name, 'remote_method')
         self.assertEqual(msg.argv, [None, 1, 2, 3, 'foo'])
 
@@ -393,7 +393,7 @@ class CallWithNotifTestCase(unittest.TestCase):
         msg = m.pop()
 
         self.assertEqual(message.typeByClass(msg), message.INVOKE)
-        self.assertEqual(msg.id, 2)
+        self.assertEqual(msg.id, 1)
         self.assertEqual(msg.name, 'remote_method')
         self.assertEqual(msg.argv, [cmd])
 
@@ -488,7 +488,7 @@ class CallResponseTestCase(unittest.TestCase):
 
         d.addCallback(cb)
 
-        self.sendResponse('_result', 2, 'foo', 'bar')
+        self.sendResponse('_result', 1, 'foo', 'bar')
 
         self.assertTrue(self.executed)
         self.assertFalse(self.invoker.isCallActive(2))
@@ -514,7 +514,7 @@ class CallResponseTestCase(unittest.TestCase):
         d.addCallback(lambda _: self.fail('Callback called'))
         d.addErrback(eb)
 
-        self.sendResponse('_error', 2, 'foo', 'bar')
+        self.sendResponse('_error', 1, 'foo', 'bar')
 
         self.assertTrue(self.executed)
         self.assertFalse(self.invoker.isCallActive(2))
@@ -533,7 +533,7 @@ class CallResponseTestCase(unittest.TestCase):
 
         d.addCallback(cb)
 
-        self.sendResponse('_result', 2, 'foo', 'bar', command={'foo': 'bar'})
+        self.sendResponse('_result', 1, 'foo', 'bar', command={'foo': 'bar'})
 
         self.assertTrue(self.executed)
         self.assertFalse(self.invoker.isCallActive(2))
@@ -670,7 +670,7 @@ class SimpleFacilitator(rpc.AbstractCallHandler):
         self.messages = []
 
 
-    def sendMessage(self, msg):
+    def sendMessage(self, msg, whenDone=None):
         """
         Keeps track of any messages that were 'sent'.
         """
@@ -749,7 +749,7 @@ class CallReceiverTestCase(unittest.TestCase):
         else:
             self.fail('exc.CallFailed not raised')
 
-        self.assertEqual(str(e), 'Unable to initiate an already active call 2')
+        self.assertEqual(str(e), 'Unable to initiate an already active call 1')
         m = self.messages
         self.assertEqual(len(m), 1)
 
@@ -759,7 +759,7 @@ class CallReceiverTestCase(unittest.TestCase):
         self.assertEqual(msg.name, '_error')
         self.assertEqual(msg.argv, [None, {
             'code': 'NetConnection.Call.Failed',
-            'description': 'Unable to initiate an already active call 2',
+            'description': 'Unable to initiate an already active call 1',
             'level': 'error'
         }])
         self.assertEqual(msg.id, callId)
@@ -815,7 +815,7 @@ class CallReceiverTestCase(unittest.TestCase):
         self.assertTrue(message.typeByClass(msg), message.Invoke)
         self.assertEqual(msg.name, '_result')
         self.assertEqual(msg.argv, [None, 'foo'])
-        self.assertEqual(msg.id, 2)
+        self.assertEqual(msg.id, 1)
 
 
     @defer.inlineCallbacks
@@ -842,7 +842,7 @@ class CallReceiverTestCase(unittest.TestCase):
             'description': 'This is my BOOOM stick!!',
             'level': 'error'
         }])
-        self.assertEqual(msg.id, 2)
+        self.assertEqual(msg.id, 1)
 
 
     @defer.inlineCallbacks
@@ -862,4 +862,4 @@ class CallReceiverTestCase(unittest.TestCase):
         self.assertTrue(message.typeByClass(msg), message.Invoke)
         self.assertEqual(msg.name, '_result')
         self.assertEqual(msg.argv, [{'one': 'two'}, 'foo'])
-        self.assertEqual(msg.id, 2)
+        self.assertEqual(msg.id, 1)

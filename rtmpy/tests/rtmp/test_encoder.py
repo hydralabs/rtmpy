@@ -51,7 +51,7 @@ class EncoderTestCase(BaseTestCase):
 
         self.encoder.send('bar', 12, 2, 3)
 
-        self.assertEqual(self.encoder.pending, [('bar', 12, 2, 3)])
+        self.assertEqual(self.encoder.pending, [('bar', 12, 2, 3, None)])
 
         self.encoder.channelsInUse -= 1
         self.encoder.next()

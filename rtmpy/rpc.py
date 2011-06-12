@@ -73,6 +73,10 @@ class ResultWithCallback(object):
         self.callback = callback
 
 
+    def __cmp__(self, other):
+        return cmp(self.result, other)
+
+
 
 def expose(func):
     """
@@ -377,13 +381,6 @@ class AbstractCallHandler(BaseCallHandler):
         @param result: The arguments supplied with the response.
         @return: C{None}
         """
-        if callId == 1:
-            log.msg('Received RPC response for callId == 1')
-            log.msg('name=%r, result=%r, kwargs=%r' % (name, result, kwargs))
-
-            if self.strict:
-                raise AssertionError("Received response for callId == 1")
-
         command = kwargs.get('command', None)
         callContext = self.finishCall(callId)
 
