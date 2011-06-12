@@ -229,13 +229,6 @@ class BaseCallHandler(object):
         if callId == NO_RESULT:
             return callId
 
-        if callId == 1:
-            log.msg('Initiating RPC call with callId == 1')
-            log.msg('Context: %r %r' % (args, kwargs))
-
-            if self.strict:
-                raise AssertionError("Initiated call with callId == 1")
-
         if callId is None:
             callId = self._lastCallId = self.getNextCallId()
         elif self.isCallActive(callId):
