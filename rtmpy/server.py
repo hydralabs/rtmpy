@@ -606,6 +606,11 @@ class NetConnection(core.NetConnection):
                 # what are these values?
                 {'mode': 1, 'capabilities': 31, 'fmsVer': 'FMS/3,5,1,516'})
 
+        def lose_connection():
+            self.protocol.transport.loseConnection()
+
+
+        @rpc.after(lose_connection)
         def eb(fail):
             """
             Called when an error occurred when asking the application to
@@ -616,6 +621,7 @@ class NetConnection(core.NetConnection):
 
             return status.fromFailure(fail, codes.NC_CONNECT_FAILED,
                 objectEncoding=self.objectEncoding)
+
 
         def chain_errback(f):
             self._pendingConnection.errback(f)
@@ -668,10 +674,10 @@ class NetConnection(core.NetConnection):
 
         return d
 
-    def sendMessage(self, msg, stream=None):
+    def sendMessage(self, msg, stream=None, whenDone=None):
         """
         """
-        self.protocol.sendMessage(msg, stream or self)
+        self.protocol.sendMessage(msg, stream or self, whenDone=whenDone)
 
 
     def getStreamingChannel(self, stream):

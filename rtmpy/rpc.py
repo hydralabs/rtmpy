@@ -55,9 +55,23 @@ class CommandResult(object):
     call and a command object that gets encoded as part of the RTMP message.
     """
 
+
     def __init__(self, result, command):
         self.result = result
         self.command = command
+
+
+
+class ResultWithCallback(object):
+    """
+    An RPC result object what will fire callback once the result has been sent.
+    """
+
+
+    def __init__(self, result, callback):
+        self.result = result
+        self.callback = callback
+
 
 
 def expose(func):
@@ -101,6 +115,24 @@ def expose(func):
 
     return decorator
 
+
+
+def after(cb):
+    """
+    Used as a decorator around a function that will return a result to the RPC
+    mechanism.
+
+    Once the result has been dispatched to the client, C{cb} will be fired.
+    """
+    def wrapped(func):
+        def wrapper(*args, **kwargs):
+            result = func(*args, **kwargs)
+
+            return ResultWithCallback(result, cb)
+
+        return wrapper
+
+    return wrapped
 
 
 def getExposedMethods(cls):
@@ -177,7 +209,7 @@ class BaseCallHandler(object):
 
 
     def __init__(self, strict=True):
-        self._lastCallId = 1
+        self._lastCallId = 0
         self._activeCalls = {}
 
         self.strict = strict
@@ -279,7 +311,7 @@ class AbstractCallHandler(BaseCallHandler):
 
 
     # IMessageSender
-    def sendMessage(self, msg):
+    def sendMessage(self, msg, whenDone=None):
         """
         Sends a message. Must be implemented by subclasses.
 
@@ -408,14 +440,19 @@ class AbstractCallHandler(BaseCallHandler):
 
             self.finishCall(callId)
             command = None
+            whenDone = None
 
             if isinstance(result, CommandResult):
                 command = result.command
                 result = result.result
 
+            if isinstance(result, ResultWithCallback):
+                whenDone = result.callback
+                result = result.result
+
             msg = message.Invoke(RESPONSE_RESULT, callId, command, result)
 
-            self.sendMessage(msg)
+            self.sendMessage(msg, whenDone=whenDone)
 
             return result
 
@@ -426,10 +463,16 @@ class AbstractCallHandler(BaseCallHandler):
 
             self.finishCall(callId)
 
+            whenDone = None
+
+            if isinstance(fail, ResultWithCallback):
+                whenDone = fail.callback
+                fail = fail.result
+
             error = status.fromFailure(fail, exc.CallFailed)
             msg = message.Invoke(RESPONSE_ERROR, callId, None, error)
 
-            self.sendMessage(msg)
+            self.sendMessage(msg, whenDone=whenDone)
 
             return fail
 

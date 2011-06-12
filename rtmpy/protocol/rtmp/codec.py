@@ -276,6 +276,15 @@ class ProducingChannel(BaseChannel):
 
         self.buffer = BufferedByteStream()
         self.acquired = False
+        self.callback = None
+
+
+    def setCallback(self, cb):
+        """
+        Sets the callback that will be fired once this channel has been completely
+        encoded.
+        """
+        self.callback = cb
 
 
     def reset(self):
@@ -697,10 +706,18 @@ class ChannelMuxer(Codec):
         self.writeHeader(channel)
         channel.marshallOneFrame()
 
-        return channel.complete()
+        c = channel.complete()
+
+        if c is True and channel.callback is not None:
+            try:
+                channel.callback()
+            except:
+                pass
+
+        return c
 
 
-    def send(self, data, datatype, streamId, timestamp):
+    def send(self, data, datatype, streamId, timestamp, whenDone=None):
         """
         Queues an RTMP message to be encoded. Call C{next} to do the encoding.
 
@@ -725,7 +742,7 @@ class ChannelMuxer(Codec):
             channel = self.acquireChannel()
 
             if not channel:
-                self.pending.append((data, datatype, streamId, timestamp))
+                self.pending.append((data, datatype, streamId, timestamp, whenDone))
 
                 return
 
@@ -735,6 +752,9 @@ class ChannelMuxer(Codec):
             datatype,
             len(data),
             streamId)
+
+        if whenDone is not None:
+            channel.setCallback(whenDone)
 
         channel.append(data)
         self.nextHeaders[channel] = h

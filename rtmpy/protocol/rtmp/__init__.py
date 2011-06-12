@@ -248,7 +248,7 @@ class BaseStreamer(object):
         return self.encoder_task
 
 
-    def sendMessage(self, msg, stream):
+    def sendMessage(self, msg, stream, whenDone=None):
         """
         Sends an RTMP message to the peer. Not part of a public api, use
         C{stream.sendMessage} instead.
@@ -269,7 +269,7 @@ class BaseStreamer(object):
         msg.encode(buf)
 
         e.send(buf.getvalue(), msg.__data_type__,
-            stream.streamId, stream.timestamp)
+            stream.streamId, stream.timestamp, whenDone)
 
         if e.active and not self.encoder_task:
             self.startEncoding()
