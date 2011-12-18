@@ -407,7 +407,25 @@ class FrameReader(Codec):
 
         @rtype: L{header.Header}
         """
-        return header.decode(self.stream)
+        orig_pos = self.stream.tell()
+
+        try:
+            return header.decode(self.stream)
+        except Exception:
+            # something went wrong, lets dump out the state of the decoder so
+            # we might have a chance to debug what's going on
+            boom_pos = self.stream.tell()
+
+            self.stream.seek(orig_pos)
+
+            # yes, print, bog off :P
+            print 'Attempted to decode header for %r' % (self._currentChannel,)
+            print 'Stream bytes was: %r' % (
+                self.stream.read(boom_pos - orig_pos + 1),)
+
+            print 'Channel state: %r' % (self.channels,)
+
+            raise
 
 
     def send(self, data):
