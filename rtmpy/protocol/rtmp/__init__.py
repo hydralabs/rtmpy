@@ -276,7 +276,7 @@ class BaseStreamer(object):
 
 
     def setFrameSize(self, size):
-        self.sendMessage(message.FrameSize(size))
+        self.sendMessage(message.FrameSize(size), self.controlStream)
         self.encoder.setFrameSize(size)
 
 
