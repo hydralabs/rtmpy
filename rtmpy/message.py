@@ -25,7 +25,8 @@ from rtmpy.util import add_to_class
 
 #: Changes the frame size for the RTMP stream
 FRAME_SIZE = 0x01
-# 0x02 is unknown
+#: Abort
+ABORT = 0x02
 #: Send every x bytes read by both sides
 BYTES_READ = 0x03
 #: A stream control message, has subtypes
@@ -350,6 +351,48 @@ class FrameSize(Message):
         Dispatches the message to the listener.
         """
         listener.onFrameSize(self.size, timestamp)
+
+
+
+class Abort(Message):
+    """
+    An abort message. When reading a part of a chunked RTMP message, called to
+    abort the reading.
+    """
+
+    set_type(ABORT)
+
+
+    def __init__(self, channelId=None):
+        self.channelId = channelId
+
+
+    def decode(self, buf):
+        """
+        Decode a frame size message.
+        """
+        self.channelId = buf.read_ulong()
+
+
+    def encode(self, buf):
+        """
+        Encode a frame size message.
+        """
+        if self.channelId is None:
+            raise EncodeError('Frame size not set')
+
+        try:
+            buf.write_ulong(self.channelId)
+        except TypeError:
+            raise EncodeError('Channel ID wrong type (expected int, got %r)' % (
+                type(self.channelId),))
+
+
+    def dispatch(self, listener, timestamp):
+        """
+        Dispatches the message to the listener.
+        """
+        listener.onAbort(self.channelId, timestamp)
 
 
 

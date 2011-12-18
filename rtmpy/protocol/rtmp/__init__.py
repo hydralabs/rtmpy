@@ -302,6 +302,13 @@ class BaseStreamer(object):
         self.decoder.setFrameSize(size)
 
 
+    def onAbort(self, channelId, timestamp):
+        """
+        Called to abort a channel currently be decoded.
+        """
+        self.decoder.abort(channelId)
+
+
     def onDownstreamBandwidth(self, interval, timestamp):
         """
         Called when the peer sends its RTMP bytes interval.

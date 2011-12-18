@@ -470,6 +470,14 @@ class FrameReader(Codec):
         return bytes, complete, h
 
 
+    def abort(self, channelId):
+        """
+        """
+        channel = self.getChannel(channelId)
+
+        channel.reset()
+
+
     def __iter__(self):
         return self
 
