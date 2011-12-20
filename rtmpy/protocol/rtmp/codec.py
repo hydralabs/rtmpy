@@ -411,6 +411,8 @@ class FrameReader(Codec):
 
         try:
             return header.decode(self.stream)
+        except IOError:
+            raise
         except Exception:
             # something went wrong, lets dump out the state of the decoder so
             # we might have a chance to debug what's going on
