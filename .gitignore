@@ -10,4 +10,4 @@ doc/build
 doc/changelog.rst
 doc/themes
 doc/html/intro.html
-rtmpy/_version.py
+_version.py
