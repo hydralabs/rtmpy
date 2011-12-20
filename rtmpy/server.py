@@ -414,6 +414,8 @@ class NetStream(core.NetStream):
         d.addErrback(eb)
         d.addCallback(cb)
 
+        self._firstPacketReceived = False
+
         return d
 
     def onMetaData(self, data):
@@ -422,6 +424,11 @@ class NetStream(core.NetStream):
         self.call('onMetaData', data)
 
     def videoDataReceived(self, data, timestamp):
+        if not self._firstPacketReceived:
+            # set the framesize
+            self.nc.protocol.setFrameSize(len(data))
+            self._firstPacketReceived = True
+
         self._videoChannel.sendData(data, timestamp)
 
     def audioDataReceived(self, data, timestamp):
