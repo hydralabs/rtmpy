@@ -283,13 +283,8 @@ class BaseStreamer(object):
     def getStreamingChannel(self, stream):
         """
         """
-        channel = self.encoder.acquireChannel()
-
-        if channel is None:
-            # todo: make this better
-            raise RuntimeError('No streaming channel available')
-
-        return codec.StreamingChannel(channel, stream.streamId, self.getWriter())
+        return codec.StreamingChannel(self.encoder, stream.streamId,
+            self.getWriter())
 
 
     def onFrameSize(self, size, timestamp):

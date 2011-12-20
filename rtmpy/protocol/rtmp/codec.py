@@ -881,18 +881,26 @@ class StreamingChannel(object):
     """
 
 
-    def __init__(self, channel, streamId, output):
+    def __init__(self, encoder, streamId, output):
+        self.encoder = encoder
+
+        self.channel = self.encoder.acquireChannel()
+
+        if self.channel is None:
+            # todo: make this better
+            raise RuntimeError('No streaming channel available')
+
+
         self.type = None
-        self.channel = channel
         self.streamId = streamId
         self.output = output
         self.stream = BufferedByteStream()
 
         self._lastHeader = None
-        self._oldStream = channel.stream
-        channel.stream = self.stream
+        self._oldStream = self.channel.stream
+        self.channel.stream = self.stream
 
-        h = header.Header(channel.channelId)
+        h = header.Header(self.channel.channelId)
 
         # encode a continuation header for speed
         header.encode(self.stream, h, h)
@@ -938,7 +946,10 @@ class StreamingChannel(object):
             c.marshallOneFrame()
 
         c.reset()
-        self.output.write(self.stream.getvalue())
+        s = self.stream.getvalue()
+        self.output.write(s)
+        self.encoder.bytes += len(s)
+
         self.stream.consume()
 
 
