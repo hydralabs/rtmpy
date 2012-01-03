@@ -826,7 +826,7 @@ class StreamPublisher(object):
         to_remove = []
 
         for subscriber, context in self.subscribers.iteritems():
-            relTimestamp = timestamp - context['timestamp']
+            relTimestamp = max(0, timestamp - context['timestamp'])
 
             try:
                 subscriber.videoDataReceived(data, relTimestamp)
